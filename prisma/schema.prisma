@@ -1,0 +1,12 @@
+// CRM Pipedrive Clone - Database Schema
+// Full schema will be implemented in FASE 2
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
