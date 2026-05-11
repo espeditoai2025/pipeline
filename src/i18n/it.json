@@ -1,0 +1,85 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "deals": "Affari",
+    "contacts": "Contatti",
+    "companies": "Aziende",
+    "leads": "Lead",
+    "activities": "Attività",
+    "reports": "Report",
+    "automations": "Automazioni",
+    "products": "Prodotti",
+    "settings": "Impostazioni"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Bentornato",
+    "kpi": {
+      "openDeals": "Affari aperti",
+      "totalValue": "Valore totale pipeline",
+      "wonThisMonth": "Vinti questo mese",
+      "activitiesOverdue": "Attività scadute"
+    },
+    "pipelineOverview": "Panoramica pipeline"
+  },
+  "deals": {
+    "title": "Affari",
+    "new": "Nuovo affare",
+    "status": {
+      "open": "Aperto",
+      "won": "Vinto",
+      "lost": "Perso"
+    }
+  },
+  "contacts": {
+    "title": "Contatti",
+    "new": "Nuovo contatto"
+  },
+  "companies": {
+    "title": "Aziende",
+    "new": "Nuova azienda"
+  },
+  "leads": {
+    "title": "Lead",
+    "new": "Nuovo lead"
+  },
+  "activities": {
+    "title": "Attività",
+    "new": "Nuova attività"
+  },
+  "common": {
+    "search": "Cerca...",
+    "save": "Salva",
+    "cancel": "Annulla",
+    "delete": "Elimina",
+    "edit": "Modifica",
+    "view": "Visualizza",
+    "close": "Chiudi",
+    "loading": "Caricamento...",
+    "noResults": "Nessun risultato",
+    "confirm": "Conferma",
+    "back": "Indietro",
+    "next": "Avanti",
+    "logout": "Esci",
+    "profile": "Profilo",
+    "darkMode": "Modalità scura",
+    "lightMode": "Modalità chiara"
+  },
+  "auth": {
+    "login": "Accedi",
+    "register": "Registrati",
+    "logout": "Esci",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Password dimenticata?"
+  },
+  "commandPalette": {
+    "placeholder": "Cerca o esegui un'azione...",
+    "noResults": "Nessun risultato per questa ricerca.",
+    "groups": {
+      "navigation": "Navigazione",
+      "actions": "Azioni rapide",
+      "recent": "Recenti"
+    }
+  }
+}

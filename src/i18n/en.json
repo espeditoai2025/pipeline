@@ -1,0 +1,85 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "deals": "Deals",
+    "contacts": "Contacts",
+    "companies": "Companies",
+    "leads": "Leads",
+    "activities": "Activities",
+    "reports": "Reports",
+    "automations": "Automations",
+    "products": "Products",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome back",
+    "kpi": {
+      "openDeals": "Open deals",
+      "totalValue": "Total pipeline value",
+      "wonThisMonth": "Won this month",
+      "activitiesOverdue": "Overdue activities"
+    },
+    "pipelineOverview": "Pipeline overview"
+  },
+  "deals": {
+    "title": "Deals",
+    "new": "New deal",
+    "status": {
+      "open": "Open",
+      "won": "Won",
+      "lost": "Lost"
+    }
+  },
+  "contacts": {
+    "title": "Contacts",
+    "new": "New contact"
+  },
+  "companies": {
+    "title": "Companies",
+    "new": "New company"
+  },
+  "leads": {
+    "title": "Leads",
+    "new": "New lead"
+  },
+  "activities": {
+    "title": "Activities",
+    "new": "New activity"
+  },
+  "common": {
+    "search": "Search...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "view": "View",
+    "close": "Close",
+    "loading": "Loading...",
+    "noResults": "No results",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "logout": "Logout",
+    "profile": "Profile",
+    "darkMode": "Dark mode",
+    "lightMode": "Light mode"
+  },
+  "auth": {
+    "login": "Log in",
+    "register": "Register",
+    "logout": "Log out",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Forgot password?"
+  },
+  "commandPalette": {
+    "placeholder": "Search or run an action...",
+    "noResults": "No results for this search.",
+    "groups": {
+      "navigation": "Navigation",
+      "actions": "Quick actions",
+      "recent": "Recent"
+    }
+  }
+}

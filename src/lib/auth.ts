@@ -1,8 +1,8 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import Google from "next-auth/providers/google";
 import { compare } from "bcryptjs";
 import { z } from "zod";
+import { authConfig } from "./auth.config";
 import { db } from "./db";
 
 const loginSchema = z.object({
@@ -11,11 +11,9 @@ const loginSchema = z.object({
 });
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  ...authConfig,
   providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    }),
+    ...authConfig.providers,
     Credentials({
       credentials: {
         email: { label: "Email", type: "email" },
@@ -27,7 +25,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const { email, password } = parsed.data;
 
-        // db is a stub until FASE 2 migration — cast to any for now
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const user = await (db as any).user?.findUnique({
           where: { email },
@@ -56,27 +53,4 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
-  pages: {
-    signIn: "/login",
-    error: "/login",
-  },
-  callbacks: {
-    jwt({ token, user }) {
-      if (user) {
-        token.role = (user as { role?: string }).role;
-        token.organizationId = (user as { organizationId?: string }).organizationId;
-      }
-      return token;
-    },
-    session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.sub ?? "";
-        (session.user as { role?: string }).role = token.role as string | undefined;
-        (session.user as { organizationId?: string }).organizationId =
-          token.organizationId as string | undefined;
-      }
-      return session;
-    },
-  },
-  session: { strategy: "jwt" },
 });
