@@ -3,6 +3,7 @@ import { ArrowUpRight, Briefcase, CheckCircle, Euro, TrendingUp, Target } from "
 import type { Metadata } from "next";
 import { PipelineOverviewChart } from "@/components/charts/PipelineOverviewChart";
 import { getKpis, getForecast } from "@/lib/reporting";
+import { AIInsightsStrip } from "@/components/ai/AIInsightsStrip";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("dashboard");
@@ -96,6 +97,9 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {kpiCards.map((kpi) => <KpiCard key={kpi.title} {...kpi} />)}
       </div>
+
+      {/* AI Insight (compact) */}
+      <AIInsightsStrip compact />
 
       {/* Forecast strip */}
       <div className="rounded-xl border border-[var(--crm-primary)]/20 bg-[var(--crm-primary)]/5 px-5 py-3 flex items-center gap-6 flex-wrap">

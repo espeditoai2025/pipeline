@@ -14,6 +14,7 @@ import {
   getKpis, getFunnelData, getTrendData, getActivitiesByType, getTopPerformers, getForecast, exportDealsCSV,
   type Period,
 } from "@/lib/reporting";
+import { AIInsightsStrip } from "@/components/ai/AIInsightsStrip";
 
 const PERIODS: { value: Period; label: string }[] = [
   { value: "7d", label: "7 giorni" },
@@ -133,6 +134,9 @@ export default function ReportsPage() {
           </Button>
         </div>
       </div>
+
+      {/* AI Insights */}
+      <AIInsightsStrip />
 
       {/* KPI grid */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">

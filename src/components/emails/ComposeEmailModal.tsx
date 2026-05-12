@@ -9,7 +9,9 @@ import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { sendEmail, saveDraft } from "@/server/actions/emails";
+import { AIEmailWriter } from "@/components/ai/AIEmailWriter";
 import type { EmailThread, EmailTemplate, EmailMessage } from "@/types/emails";
+import type { AIEmailDraft } from "@/types/ai";
 
 const schema = z.object({
   to: z.string().email("Email non valida"),
@@ -100,6 +102,12 @@ export function ComposeEmailModal({ open, onClose, replyThread, templates, onSen
     toast.success(`Template "${tpl.name}" applicato`);
   }
 
+  function applyAIDraft(draft: AIEmailDraft) {
+    setValue("subject", draft.subject);
+    setValue("body", draft.body);
+    toast.success("Email AI applicata");
+  }
+
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="w-full sm:max-w-lg">
@@ -154,6 +162,14 @@ export function ComposeEmailModal({ open, onClose, replyThread, templates, onSen
               ))}
             </div>
           )}
+
+          <AIEmailWriter
+            context={{
+              contactName: replyThread?.contactName ?? undefined,
+              dealTitle: replyThread?.dealTitle ?? undefined,
+            }}
+            onApply={applyAIDraft}
+          />
 
           <div>
             <label className="block text-sm font-medium mb-1">Corpo *</label>
