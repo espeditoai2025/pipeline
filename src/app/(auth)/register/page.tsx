@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
+import { PipelyAppIcon } from "@/components/shared/PipelyLogo";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
@@ -38,7 +38,7 @@ export default function RegisterPage() {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-[var(--crm-neutral-100)] p-8">
       <div className="mb-8 text-center">
-        <Image src="/pipely-app-icon-blue.svg" alt="Pipely" width={48} height={48} className="mx-auto mb-4 rounded-xl" priority />
+        <PipelyAppIcon size={48} className="mx-auto mb-4 rounded-xl" />
         <h1 className="text-2xl font-semibold text-[var(--crm-neutral-900)]">Crea il tuo account</h1>
         <p className="mt-1 text-sm text-[var(--crm-neutral-500)]">
           Inizia gratis, senza carta di credito

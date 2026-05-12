@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -23,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { PipelyFavicon, PipelyWordmark, PipelyWordmarkDark } from "@/components/shared/PipelyLogo";
 
 const navItems = [
   { key: "dashboard", href: "/", icon: LayoutDashboard },
@@ -101,31 +101,11 @@ export function Sidebar() {
         )}
       >
         {sidebarCollapsed ? (
-          <Image
-            src="/pipely-favicon.svg"
-            alt="Pipely"
-            width={28}
-            height={28}
-            priority
-          />
+          <PipelyFavicon size={28} />
         ) : (
           <>
-            <Image
-              src="/pipely-logo.svg"
-              alt="Pipely"
-              width={100}
-              height={25}
-              priority
-              className="dark:hidden"
-            />
-            <Image
-              src="/pipely-logo-dark.svg"
-              alt="Pipely"
-              width={100}
-              height={25}
-              priority
-              className="hidden dark:block"
-            />
+            <PipelyWordmark className="dark:hidden" />
+            <PipelyWordmarkDark className="hidden dark:block" />
           </>
         )}
       </div>

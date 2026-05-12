@@ -1,11 +1,16 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { LayoutGrid, List, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { KanbanBoard } from "@/components/pipeline/KanbanBoard";
 import { DealsListView } from "@/components/pipeline/DealsListView";
+
+const KanbanBoard = dynamic(
+  () => import("@/components/pipeline/KanbanBoard").then((m) => m.KanbanBoard),
+  { ssr: false },
+);
 import { FilterBar } from "@/components/pipeline/FilterBar";
 import { DealForm } from "@/components/pipeline/DealForm";
 import { MOCK_PIPELINE } from "@/lib/mock-data";
