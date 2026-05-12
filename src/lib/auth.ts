@@ -1,9 +1,8 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { compare } from "bcryptjs";
 import { z } from "zod";
 import { authConfig } from "./auth.config";
-import { db } from "./db";
+import { findUserByEmail, verifyPassword } from "./mock-users";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -24,23 +23,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!parsed.success) return null;
 
         const { email, password } = parsed.data;
+        const user = findUserByEmail(email);
+        if (!user) return null;
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const user = await (db as any).user?.findUnique({
-          where: { email },
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            passwordHash: true,
-            role: true,
-            organizationId: true,
-          },
-        });
-
-        if (!user?.passwordHash) return null;
-
-        const valid = await compare(password, user.passwordHash);
+        const valid = verifyPassword(password, user.passwordHash);
         if (!valid) return null;
 
         return {

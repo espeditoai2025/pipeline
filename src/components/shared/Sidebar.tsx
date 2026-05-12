@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -99,13 +100,33 @@ export function Sidebar() {
           sidebarCollapsed ? "justify-center" : "gap-2",
         )}
       >
-        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--crm-primary)] shrink-0">
-          <span className="text-white font-bold text-sm">P</span>
-        </div>
-        {!sidebarCollapsed && (
-          <span className="font-semibold text-[var(--crm-neutral-900)] dark:text-white text-sm">
-            Pipely
-          </span>
+        {sidebarCollapsed ? (
+          <Image
+            src="/pipely-favicon.svg"
+            alt="Pipely"
+            width={28}
+            height={28}
+            priority
+          />
+        ) : (
+          <>
+            <Image
+              src="/pipely-logo.svg"
+              alt="Pipely"
+              width={100}
+              height={25}
+              priority
+              className="dark:hidden"
+            />
+            <Image
+              src="/pipely-logo-dark.svg"
+              alt="Pipely"
+              width={100}
+              height={25}
+              priority
+              className="hidden dark:block"
+            />
+          </>
         )}
       </div>
 

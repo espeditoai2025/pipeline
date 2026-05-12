@@ -25,6 +25,10 @@ export const metadata: Metadata = {
   },
   description: "Gestisci le tue vendite con efficienza",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/pipely-favicon.svg",
+    apple: "/pipely-app-icon-blue.svg",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

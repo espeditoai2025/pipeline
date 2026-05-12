@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn } from "next-auth/react";
@@ -37,9 +38,7 @@ export default function LoginPage() {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-[var(--crm-neutral-100)] p-8">
       <div className="mb-8 text-center">
-        <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-[var(--crm-primary)] mb-4">
-          <span className="text-white font-bold text-lg">P</span>
-        </div>
+        <Image src="/pipely-app-icon-blue.svg" alt="Pipely" width={48} height={48} className="mx-auto mb-4 rounded-xl" priority />
         <h1 className="text-2xl font-semibold text-[var(--crm-neutral-900)]">Accedi a Pipely</h1>
         <p className="mt-1 text-sm text-[var(--crm-neutral-500)]">
           Inserisci le tue credenziali per continuare
