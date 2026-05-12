@@ -1,0 +1,40 @@
+{
+  "name": "Pipeline CRM",
+  "short_name": "Pipeline",
+  "description": "Gestisci le tue vendite con efficienza",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "lang": "it",
+  "shortcuts": [
+    {
+      "name": "Nuova pipeline",
+      "short_name": "Pipeline",
+      "url": "/deals",
+      "description": "Apri la pipeline degli affari"
+    },
+    {
+      "name": "Contatti",
+      "short_name": "Contatti",
+      "url": "/contacts",
+      "description": "Gestisci i tuoi contatti"
+    }
+  ]
+}

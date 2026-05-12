@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { Providers } from "@/components/shared/Providers";
+import { PWARegister } from "@/components/shared/PWARegister";
 import "./globals.css";
 
 const inter = Inter({
@@ -19,10 +20,23 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "CRM",
-    template: "%s | CRM",
+    default: "Pipeline CRM",
+    template: "%s | Pipeline CRM",
   },
-  description: "CRM Pipedrive Clone - Gestisci le tue vendite con efficienza",
+  description: "Gestisci le tue vendite con efficienza",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Pipeline CRM",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#4f46e5",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -35,6 +49,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <NextIntlClientProvider locale={locale} messages={messages}>
           <Providers>{children}</Providers>
         </NextIntlClientProvider>
+        <PWARegister />
       </body>
     </html>
   );
