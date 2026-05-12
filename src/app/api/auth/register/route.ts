@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { hash } from "bcryptjs";
 import { z } from "zod";
-import { findUserByEmail, createUser } from "@/lib/mock-users";
+import { db } from "@/lib/db";
 
 const bodySchema = z.object({
   name: z.string().min(2),
@@ -18,11 +19,33 @@ export async function POST(req: NextRequest) {
 
   const { name, email, organizationName, password } = parsed.data;
 
-  if (findUserByEmail(email)) {
-    return NextResponse.json({ error: "Email già in uso" }, { status: 409 });
+  try {
+    const existing = await db.user.findUnique({ where: { email } });
+    if (existing) {
+      return NextResponse.json({ error: "Email già in uso" }, { status: 409 });
+    }
+
+    const slug = `${organizationName
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "")
+      .slice(0, 50)}-${Date.now()}`;
+
+    const passwordHash = await hash(password, 12);
+
+    await db.organization.create({
+      data: {
+        name: organizationName,
+        slug,
+        users: {
+          create: { name, email, passwordHash, role: "OWNER" },
+        },
+      },
+    });
+
+    return NextResponse.json({ ok: true }, { status: 201 });
+  } catch (err) {
+    console.error("[register]", err);
+    return NextResponse.json({ error: "Errore del server" }, { status: 500 });
   }
-
-  createUser({ name, email, organizationName, password });
-
-  return NextResponse.json({ ok: true }, { status: 201 });
 }

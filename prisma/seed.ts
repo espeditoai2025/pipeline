@@ -23,6 +23,20 @@ async function main() {
 
   // 3 Users
   const ownerHash = await hash("password123", 12);
+
+  // Demo account (pipely.it)
+  await prisma.user.upsert({
+    where: { email: "demo@pipely.it" },
+    update: {},
+    create: {
+      email: "demo@pipely.it",
+      name: "Demo User",
+      passwordHash: await hash("demo1234", 10),
+      role: "OWNER",
+      organizationId: org.id,
+    },
+  });
+
   const owner = await prisma.user.upsert({
     where: { email: "owner@acme.com" },
     update: {},

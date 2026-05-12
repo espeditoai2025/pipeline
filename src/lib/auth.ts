@@ -1,8 +1,9 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import { compare } from "bcryptjs";
 import { z } from "zod";
 import { authConfig } from "./auth.config";
-import { findUserByEmail, verifyPassword } from "./mock-users";
+import { db } from "./db";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -23,16 +24,28 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!parsed.success) return null;
 
         const { email, password } = parsed.data;
-        const user = findUserByEmail(email);
-        if (!user) return null;
 
-        const valid = verifyPassword(password, user.passwordHash);
+        const user = await db.user.findUnique({
+          where: { email },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            passwordHash: true,
+            role: true,
+            organizationId: true,
+          },
+        });
+
+        if (!user?.passwordHash) return null;
+
+        const valid = await compare(password, user.passwordHash);
         if (!valid) return null;
 
         return {
           id: user.id,
           email: user.email,
-          name: user.name,
+          name: user.name ?? undefined,
           role: user.role,
           organizationId: user.organizationId,
         };
