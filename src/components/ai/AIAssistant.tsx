@@ -26,7 +26,7 @@ export function AIAssistant() {
     {
       id: "welcome",
       role: "assistant",
-      content: "Ciao! 👋 Sono il tuo assistente AI per il CRM. Posso analizzare la tua pipeline, identificare affari a rischio, fare forecast e suggerire le prossime azioni. Come posso aiutarti?",
+      content: "Ciao! 👋 Sono il tuo assistente AI di Pipely. Posso analizzare la tua pipeline, identificare affari a rischio, fare forecast e suggerire le prossime azioni. Come posso aiutarti?",
       createdAt: new Date().toISOString(),
     },
   ]);
@@ -91,7 +91,7 @@ export function AIAssistant() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-white">Assistente AI</p>
-              {!minimized && <p className="text-xs text-white/70">CRM Intelligence</p>}
+              {!minimized && <p className="text-xs text-white/70">Pipely Intelligence</p>}
             </div>
             <button
               onClick={() => setMinimized((v) => !v)}

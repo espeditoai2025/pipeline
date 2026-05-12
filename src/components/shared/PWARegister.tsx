@@ -36,7 +36,7 @@ export function PWARegister() {
   return (
     <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] px-4 py-3 shadow-lg">
       <Download className="h-4 w-4 text-[var(--crm-primary)] flex-shrink-0" />
-      <p className="text-sm font-medium">Installa Pipeline CRM sul tuo dispositivo</p>
+      <p className="text-sm font-medium">Installa Pipely sul tuo dispositivo</p>
       <button
         onClick={handleInstall}
         className="rounded-lg bg-[var(--crm-primary)] text-white px-3 py-1.5 text-xs font-medium hover:bg-[var(--crm-primary-dark)] transition-colors"

@@ -100,11 +100,11 @@ export function Sidebar() {
         )}
       >
         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--crm-primary)] shrink-0">
-          <span className="text-white font-bold text-sm">C</span>
+          <span className="text-white font-bold text-sm">P</span>
         </div>
         {!sidebarCollapsed && (
           <span className="font-semibold text-[var(--crm-neutral-900)] dark:text-white text-sm">
-            CRM
+            Pipely
           </span>
         )}
       </div>

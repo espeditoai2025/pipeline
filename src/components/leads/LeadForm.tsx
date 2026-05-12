@@ -72,7 +72,7 @@ export function LeadForm({ open, onClose, lead, onSaved }: Props) {
         <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Titolo *</label>
-            <input {...register("title")} className={inputCls} placeholder="es. Richiesta demo CRM" />
+            <input {...register("title")} className={inputCls} placeholder="es. Richiesta demo Pipely" />
             {errors.title && <p className="mt-1 text-xs text-[var(--crm-danger)]">{errors.title.message}</p>}
           </div>
 

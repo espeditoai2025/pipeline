@@ -24,7 +24,7 @@ export const MOCK_CONTACTS: Contact[] = [
 ];
 
 export const MOCK_LEADS: Lead[] = [
-  { id: "lead-1", title: "Richiesta demo CRM", source: "Website", score: 85, status: "NEW", data: { email: "info@newcorp.it", name: "Giorgio Valli", message: "Interessato a una demo" }, organizationId: "org-1", convertedDealId: null, createdAt: "2024-06-01T10:00:00Z", updatedAt: "2024-06-01T10:00:00Z" },
+  { id: "lead-1", title: "Richiesta demo Pipely", source: "Website", score: 85, status: "NEW", data: { email: "info@newcorp.it", name: "Giorgio Valli", message: "Interessato a una demo" }, organizationId: "org-1", convertedDealId: null, createdAt: "2024-06-01T10:00:00Z", updatedAt: "2024-06-01T10:00:00Z" },
   { id: "lead-2", title: "Contatto da LinkedIn", source: "LinkedIn", score: 60, status: "WORKING", data: { email: "c.marino@corp.com", name: "Carla Marino", company: "Corp SPA" }, organizationId: "org-1", convertedDealId: null, createdAt: "2024-06-05T11:00:00Z", updatedAt: "2024-06-10T14:00:00Z" },
   { id: "lead-3", title: "Fiera di settore", source: "Evento", score: 40, status: "NURTURING", data: { email: "info@startup.io", name: "Filippo Neri" }, organizationId: "org-1", convertedDealId: null, createdAt: "2024-05-20T09:00:00Z", updatedAt: "2024-06-08T10:00:00Z" },
   { id: "lead-4", title: "Referral da cliente", source: "Referral", score: 95, status: "NEW", data: { email: "g.scala@industry.it", name: "Giovanni Scala", phone: "+39 02 111333" }, organizationId: "org-1", convertedDealId: null, createdAt: "2024-06-18T08:00:00Z", updatedAt: "2024-06-18T08:00:00Z" },

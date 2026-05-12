@@ -88,7 +88,7 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
             <input
               {...register("title")}
               className="w-full rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)]"
-              placeholder="es. Implementazione CRM"
+              placeholder="es. Implementazione Pipely"
             />
             {errors.title && <p className="mt-1 text-xs text-[var(--crm-danger)]">{errors.title.message}</p>}
           </div>

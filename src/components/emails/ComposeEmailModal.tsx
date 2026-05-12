@@ -41,11 +41,11 @@ function applyTemplate(tpl: EmailTemplate, replyThread?: EmailThread | null): Pa
     .replace(/{{azienda}}/g, dealTitle)
     .replace(/{{data}}/g, today)
     .replace(/{{mittente}}/g, "Mario Rossi")
-    .replace(/{{prodotto}}/g, "CRM")
+    .replace(/{{prodotto}}/g, "Pipely")
     .replace(/{{oggetto}}/g, replyThread?.subject ?? "")
     .replace(/{{scadenza}}/g, "");
   return {
-    subject: tpl.subject.replace(/{{azienda}}/g, dealTitle).replace(/{{prodotto}}/g, "CRM"),
+    subject: tpl.subject.replace(/{{azienda}}/g, dealTitle).replace(/{{prodotto}}/g, "Pipely"),
     body,
   };
 }

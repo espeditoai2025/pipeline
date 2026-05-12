@@ -60,7 +60,7 @@ export function mockAIReply(message: string): string {
   if (q.includes("contatt") || q.includes("client")) {
     const total = MOCK_CONTACTS.length;
     const withEmail = MOCK_CONTACTS.filter(c => c.email).length;
-    return `👥 **Panoramica contatti**\n\nHai **${total} contatti** nel CRM, di cui ${withEmail} con email registrata.\n\nI contatti più recenti: ${MOCK_CONTACTS.slice(0, 3).map(c => `**${c.firstName} ${c.lastName}**`).join(", ")}.`;
+    return `👥 **Panoramica contatti**\n\nHai **${total} contatti** in Pipely, di cui ${withEmail} con email registrata.\n\nI contatti più recenti: ${MOCK_CONTACTS.slice(0, 3).map(c => `**${c.firstName} ${c.lastName}**`).join(", ")}.`;
   }
 
   // Forecast
@@ -103,7 +103,7 @@ export function mockAIReply(message: string): string {
 
   // Help
   if (q.includes("aiuto") || q.includes("help") || q.includes("cosa sai") || q.includes("cosa puoi")) {
-    return `🤖 **Sono il tuo assistente CRM AI.** Ecco cosa puoi chiedermi:\n\n` +
+    return `🤖 **Sono il tuo assistente Pipely AI.** Ecco cosa puoi chiedermi:\n\n` +
       `• 📊 Panoramica pipeline e valore totale\n` +
       `• ⚠️ Affari a rischio o in stallo\n` +
       `• 🏆 Win rate e tasso di conversione\n` +

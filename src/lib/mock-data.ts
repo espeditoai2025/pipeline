@@ -30,7 +30,7 @@ export const MOCK_PIPELINE: Pipeline = {
       deals: [
         {
           id: "deal-1",
-          title: "Implementazione CRM - TechSolutions",
+          title: "Implementazione Pipely - TechSolutions",
           value: 45000,
           currency: "EUR",
           status: "OPEN",

@@ -98,13 +98,13 @@ export function ProductForm({ open, onClose, product, onSaved }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="block text-sm font-medium mb-1">Nome *</label>
-              <input {...register("name")} className={inputCls} placeholder="es. CRM Enterprise" />
+              <input {...register("name")} className={inputCls} placeholder="es. Pipely Enterprise" />
               {errors.name && <p className="mt-1 text-xs text-[var(--crm-danger)]">{errors.name.message}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-1">Codice *</label>
-              <input {...register("code")} className={inputCls} placeholder="es. CRM-001" />
+              <input {...register("code")} className={inputCls} placeholder="es. PIP-001" />
               {errors.code && <p className="mt-1 text-xs text-[var(--crm-danger)]">{errors.code.message}</p>}
             </div>
 

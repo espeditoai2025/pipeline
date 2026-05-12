@@ -1,4 +1,4 @@
-const CACHE_NAME = "pipeline-crm-v1";
+const CACHE_NAME = "pipely-v1";
 const STATIC_ASSETS = ["/", "/deals", "/contacts", "/activities"];
 
 self.addEventListener("install", (event) => {

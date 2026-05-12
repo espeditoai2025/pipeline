@@ -20,15 +20,15 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Pipeline CRM",
-    template: "%s | Pipeline CRM",
+    default: "Pipely",
+    template: "%s | Pipely",
   },
   description: "Gestisci le tue vendite con efficienza",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Pipeline CRM",
+    title: "Pipely",
   },
 };
 

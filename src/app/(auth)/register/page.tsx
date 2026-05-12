@@ -38,7 +38,7 @@ export default function RegisterPage() {
     <div className="bg-white rounded-xl shadow-sm border border-[var(--crm-neutral-100)] p-8">
       <div className="mb-8 text-center">
         <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-[var(--crm-primary)] mb-4">
-          <span className="text-white font-bold text-lg">C</span>
+          <span className="text-white font-bold text-lg">P</span>
         </div>
         <h1 className="text-2xl font-semibold text-[var(--crm-neutral-900)]">Crea il tuo account</h1>
         <p className="mt-1 text-sm text-[var(--crm-neutral-500)]">

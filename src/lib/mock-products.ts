@@ -3,9 +3,9 @@ import type { Product, DealProduct } from "@/types/products";
 export const MOCK_PRODUCTS: Product[] = [
   {
     id: "prod-1",
-    name: "CRM Enterprise License",
-    code: "CRM-ENT-001",
-    description: "Licenza annuale per CRM Enterprise con supporto illimitato",
+    name: "Pipely Enterprise License",
+    code: "PIP-ENT-001",
+    description: "Licenza annuale per Pipely Enterprise con supporto illimitato",
     category: "LICENSE",
     unitPrice: 2400,
     currency: "EUR",

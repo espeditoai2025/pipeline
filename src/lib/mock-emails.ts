@@ -14,30 +14,30 @@ const THREAD_MESSAGES: Record<string, EmailMessage[]> = {
   "thread-1": [
     {
       id: "msg-1a", threadId: "thread-1",
-      subject: "Proposta CRM Enterprise — Acme S.r.l.",
-      body: `Gentile Luca,\n\ncome concordato in chiamata, allego la proposta commerciale per l'implementazione del CRM Enterprise.\n\nIl pacchetto include:\n• Licenze per 20 utenti\n• Onboarding e formazione (3 giorni)\n• Supporto dedicato 12 mesi\n• Personalizzazioni su richiesta\n\nPrezzo totale: €48.000 + IVA\n\nResto a disposizione per qualsiasi chiarimento.\n\nCordiali saluti,\nMario`,
+      subject: "Proposta Pipely Enterprise — Acme S.r.l.",
+      body: `Gentile Luca,\n\ncome concordato in chiamata, allego la proposta commerciale per l'implementazione di Pipely Enterprise.\n\nIl pacchetto include:\n• Licenze per 20 utenti\n• Onboarding e formazione (3 giorni)\n• Supporto dedicato 12 mesi\n• Personalizzazioni su richiesta\n\nPrezzo totale: €48.000 + IVA\n\nResto a disposizione per qualsiasi chiarimento.\n\nCordiali saluti,\nMario`,
       from: ME, fromName: ME_NAME, to: ["luca.bianchi@acme.it"], cc: [],
       status: "SENT", tracking: "OPENED", openedAt: daysAgo(4, 14), clickedAt: null,
       sentAt: daysAgo(5, 9), createdAt: daysAgo(5, 9),
-      dealId: "deal-1", dealTitle: "CRM Enterprise Acme", contactId: "cnt-1", contactName: "Luca Bianchi",
+      dealId: "deal-1", dealTitle: "Pipely Enterprise Acme", contactId: "cnt-1", contactName: "Luca Bianchi",
     },
     {
       id: "msg-1b", threadId: "thread-1",
-      subject: "RE: Proposta CRM Enterprise — Acme S.r.l.",
+      subject: "RE: Proposta Pipely Enterprise — Acme S.r.l.",
       body: `Ciao Mario,\n\ngrazie per la proposta. L'ho condivisa con il nostro CFO.\n\nAvremmo bisogno di chiarimenti sul piano di formazione: è possibile estenderlo a 5 giorni? E il supporto include assistenza nel weekend?\n\nAttendo risposta.\n\nLuca`,
       from: "luca.bianchi@acme.it", fromName: "Luca Bianchi", to: [ME], cc: [],
       status: "RECEIVED", tracking: "NONE", openedAt: null, clickedAt: null,
       sentAt: daysAgo(4, 11), createdAt: daysAgo(4, 11),
-      dealId: "deal-1", dealTitle: "CRM Enterprise Acme", contactId: "cnt-1", contactName: "Luca Bianchi",
+      dealId: "deal-1", dealTitle: "Pipely Enterprise Acme", contactId: "cnt-1", contactName: "Luca Bianchi",
     },
     {
       id: "msg-1c", threadId: "thread-1",
-      subject: "RE: Proposta CRM Enterprise — Acme S.r.l.",
+      subject: "RE: Proposta Pipely Enterprise — Acme S.r.l.",
       body: `Ciao Luca,\n\nottime domande. Possiamo sicuramente estendere la formazione a 5 giorni con un piccolo supplemento di €2.000.\n\nPer il supporto weekend, lo includiamo nel pacchetto Enterprise senza costi aggiuntivi.\n\nPosso fissare una call domani pomeriggio per discutere i dettagli?\n\nMario`,
       from: ME, fromName: ME_NAME, to: ["luca.bianchi@acme.it"], cc: [],
       status: "SENT", tracking: "SENT", openedAt: null, clickedAt: null,
       sentAt: daysAgo(3, 16), createdAt: daysAgo(3, 16),
-      dealId: "deal-1", dealTitle: "CRM Enterprise Acme", contactId: "cnt-1", contactName: "Luca Bianchi",
+      dealId: "deal-1", dealTitle: "Pipely Enterprise Acme", contactId: "cnt-1", contactName: "Luca Bianchi",
     },
   ],
   "thread-2": [
@@ -86,11 +86,11 @@ const THREAD_MESSAGES: Record<string, EmailMessage[]> = {
 
 export const MOCK_EMAIL_THREADS: EmailThread[] = [
   {
-    id: "thread-1", subject: "Proposta CRM Enterprise — Acme S.r.l.",
+    id: "thread-1", subject: "Proposta Pipely Enterprise — Acme S.r.l.",
     participants: [ME, "luca.bianchi@acme.it"],
     lastMessageAt: daysAgo(3, 16),
     messages: THREAD_MESSAGES["thread-1"]!,
-    dealId: "deal-1", dealTitle: "CRM Enterprise Acme",
+    dealId: "deal-1", dealTitle: "Pipely Enterprise Acme",
     contactId: "cnt-1", contactName: "Luca Bianchi",
     unreadCount: 0,
   },

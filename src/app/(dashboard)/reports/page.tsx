@@ -95,7 +95,7 @@ export default function ReportsPage() {
     },
     {
       title: "Contatti totali", value: String(kpis.contactsCount),
-      sub: "Nel CRM",
+      sub: "In Pipely",
       icon: Users, iconBg: "bg-sky-50 dark:bg-sky-900/20", iconColor: "text-sky-600",
       change: "+4", positive: true,
     },

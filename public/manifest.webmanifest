@@ -1,7 +1,7 @@
 {
-  "name": "Pipeline CRM",
-  "short_name": "Pipeline",
-  "description": "Gestisci le tue vendite con efficienza",
+  "name": "Pipely",
+  "short_name": "Pipely",
+  "description": "Pipely — Gestisci le tue vendite con efficienza",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
