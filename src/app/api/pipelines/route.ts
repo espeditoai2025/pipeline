@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { ApiResponse } from "@/types";
 import type { Pipeline } from "@/types/deals";
 
-function getOrgId(session: Awaited<ReturnType<typeof auth>>) {
+function getOrgId(session: Session | null) {
   return (session?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
 }
 

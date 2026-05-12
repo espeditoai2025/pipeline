@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 
-function getOrgId(session: Awaited<ReturnType<typeof auth>>) {
+function getOrgId(session: Session | null) {
   return (session?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
 }
 
