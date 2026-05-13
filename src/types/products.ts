@@ -1,4 +1,5 @@
-export type ProductCategory = "SOFTWARE" | "HARDWARE" | "SERVICE" | "SUPPORT" | "LICENSE" | "OTHER";
+export type ProductCategory = "SOFTWARE" | "HARDWARE" | "SERVICE" | "SUPPORT" | "LICENSE" | "SAAS" | "WEBSITE" | "AI_AGENT" | "OTHER";
+export type BillingPeriod = "monthly" | "annual";
 
 export type Product = {
   id: string;
@@ -11,6 +12,8 @@ export type Product = {
   taxRate: number;
   unit: string;
   isActive: boolean;
+  isSubscription: boolean;
+  billingPeriod: BillingPeriod | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -41,6 +44,8 @@ export type CreateProductInput = {
   currency: string;
   taxRate: number;
   unit: string;
+  isSubscription?: boolean;
+  billingPeriod?: BillingPeriod | null;
 };
 
 export type UpdateProductInput = Partial<CreateProductInput>;

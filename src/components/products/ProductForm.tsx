@@ -15,11 +15,13 @@ const schema = z.object({
   name: z.string().min(1, "Nome obbligatorio"),
   code: z.string().min(1, "Codice obbligatorio"),
   description: z.string().optional(),
-  category: z.enum(["SOFTWARE", "HARDWARE", "SERVICE", "SUPPORT", "LICENSE", "OTHER"]),
+  category: z.enum(["SOFTWARE", "HARDWARE", "SERVICE", "SUPPORT", "LICENSE", "SAAS", "WEBSITE", "AI_AGENT", "OTHER"]),
   unitPrice: z.number().min(0),
   currency: z.string().min(1),
   taxRate: z.number().min(0).max(100),
   unit: z.string().min(1, "Unità obbligatoria"),
+  isSubscription: z.boolean(),
+  billingPeriod: z.enum(["monthly", "annual"]).nullable().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -30,6 +32,9 @@ const CATEGORIES: { value: ProductCategory; label: string }[] = [
   { value: "SERVICE",   label: "Servizio" },
   { value: "SUPPORT",   label: "Supporto" },
   { value: "LICENSE",   label: "Licenza" },
+  { value: "SAAS",      label: "SaaS" },
+  { value: "WEBSITE",   label: "Sito Web" },
+  { value: "AI_AGENT",  label: "Agenti AI" },
   { value: "OTHER",     label: "Altro" },
 ];
 
@@ -45,10 +50,16 @@ type Props = {
   onSaved: (p: Product) => void;
 };
 
+const defaultValues: FormValues = {
+  name: "", code: "", description: "", category: "SERVICE",
+  unitPrice: 0, currency: "EUR", taxRate: 22, unit: "pezzo",
+  isSubscription: false, billingPeriod: null,
+};
+
 export function ProductForm({ open, onClose, product, onSaved }: Props) {
   const isEditing = !!product;
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: product
       ? {
@@ -60,15 +71,31 @@ export function ProductForm({ open, onClose, product, onSaved }: Props) {
           currency: product.currency,
           taxRate: product.taxRate,
           unit: product.unit,
+          isSubscription: product.isSubscription,
+          billingPeriod: product.billingPeriod ?? null,
         }
-      : { name: "", code: "", description: "", category: "SERVICE", unitPrice: 0, currency: "EUR", taxRate: 22, unit: "pezzo" },
+      : defaultValues,
   });
+
+  const isSubscription = watch("isSubscription");
+  const billingPeriod = watch("billingPeriod");
 
   useEffect(() => {
     if (open) {
       reset(product
-        ? { name: product.name, code: product.code, description: product.description ?? "", category: product.category, unitPrice: product.unitPrice, currency: product.currency, taxRate: product.taxRate, unit: product.unit }
-        : { name: "", code: "", description: "", category: "SERVICE", unitPrice: 0, currency: "EUR", taxRate: 22, unit: "pezzo" }
+        ? {
+            name: product.name,
+            code: product.code,
+            description: product.description ?? "",
+            category: product.category,
+            unitPrice: product.unitPrice,
+            currency: product.currency,
+            taxRate: product.taxRate,
+            unit: product.unit,
+            isSubscription: product.isSubscription,
+            billingPeriod: product.billingPeriod ?? null,
+          }
+        : defaultValues
       );
     }
   }, [open, product, reset]);
@@ -89,83 +116,133 @@ export function ProductForm({ open, onClose, product, onSaved }: Props) {
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+      <SheetContent className="w-full sm:max-w-md flex flex-col">
         <SheetHeader>
           <SheetTitle>{isEditing ? "Modifica prodotto" : "Nuovo prodotto"}</SheetTitle>
         </SheetHeader>
 
         <SheetBody>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <label className="block text-sm font-medium mb-1">Nome *</label>
-              <input {...register("name")} className={inputCls} placeholder="es. Pipely Enterprise" />
-              {errors.name && <p className="mt-1 text-xs text-[var(--crm-danger)]">{errors.name.message}</p>}
+          <form id="product-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className="block text-sm font-medium mb-1">Nome *</label>
+                <input {...register("name")} className={inputCls} placeholder="es. Pipely Enterprise" />
+                {errors.name && <p className="mt-1 text-xs text-[var(--crm-danger)]">{errors.name.message}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Codice *</label>
+                <input {...register("code")} className={inputCls} placeholder="es. PIP-001" />
+                {errors.code && <p className="mt-1 text-xs text-[var(--crm-danger)]">{errors.code.message}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Unità *</label>
+                <input {...register("unit")} className={inputCls} placeholder="es. ora, anno" />
+                {errors.unit && <p className="mt-1 text-xs text-[var(--crm-danger)]">{errors.unit.message}</p>}
+              </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Codice *</label>
-              <input {...register("code")} className={inputCls} placeholder="es. PIP-001" />
-              {errors.code && <p className="mt-1 text-xs text-[var(--crm-danger)]">{errors.code.message}</p>}
+              <label className="block text-sm font-medium mb-1">Descrizione</label>
+              <textarea {...register("description")} rows={2} className={`${inputCls} resize-none`} placeholder="Descrizione opzionale..." />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Unità *</label>
-              <input {...register("unit")} className={inputCls} placeholder="es. ora, anno" />
-              {errors.unit && <p className="mt-1 text-xs text-[var(--crm-danger)]">{errors.unit.message}</p>}
+              <label className="block text-sm font-medium mb-2">Categoria</label>
+              <div className="grid grid-cols-3 gap-2">
+                {CATEGORIES.map(({ value, label }) => (
+                  <label key={value} className="cursor-pointer">
+                    <input {...register("category")} type="radio" value={value} className="sr-only peer" />
+                    <div className="rounded-lg border-2 border-[var(--crm-neutral-100)] p-2 text-xs font-medium text-center transition-colors peer-checked:border-[var(--crm-primary)] peer-checked:bg-[var(--crm-primary)]/5 hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/5">
+                      {label}
+                    </div>
+                  </label>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Descrizione</label>
-            <textarea {...register("description")} rows={2} className={`${inputCls} resize-none`} placeholder="Descrizione opzionale..." />
-          </div>
+            {/* Subscription toggle */}
+            <div className="rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 p-4 space-y-3">
+              <label className="flex items-center justify-between cursor-pointer">
+                <div>
+                  <p className="text-sm font-medium">Abbonamento ricorrente</p>
+                  <p className="text-xs text-[var(--crm-neutral-500)] mt-0.5">Il prodotto viene fatturato periodicamente</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isSubscription}
+                  onClick={() => {
+                    setValue("isSubscription", !isSubscription, { shouldValidate: true });
+                    if (isSubscription) setValue("billingPeriod", null);
+                  }}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] focus:ring-offset-2 ${
+                    isSubscription ? "bg-[var(--crm-primary)]" : "bg-[var(--crm-neutral-200)]"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      isSubscription ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </label>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Categoria</label>
-            <div className="grid grid-cols-3 gap-2">
-              {CATEGORIES.map(({ value, label }) => (
-                <label key={value} className="cursor-pointer">
-                  <input {...register("category")} type="radio" value={value} className="sr-only peer" />
-                  <div className="rounded-lg border-2 border-[var(--crm-neutral-100)] p-2 text-xs font-medium text-center transition-colors peer-checked:border-[var(--crm-primary)] peer-checked:bg-[var(--crm-primary)]/5">
-                    {label}
+              {isSubscription && (
+                <div>
+                  <label className="block text-xs font-medium text-[var(--crm-neutral-500)] uppercase tracking-wide mb-2">Cadenza di fatturazione</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["monthly", "annual"] as const).map((period) => (
+                      <button
+                        key={period}
+                        type="button"
+                        onClick={() => setValue("billingPeriod", period, { shouldValidate: true })}
+                        className={`rounded-lg border-2 py-2.5 text-sm font-medium transition-colors ${
+                          billingPeriod === period
+                            ? "border-[var(--crm-primary)] bg-[var(--crm-primary)]/5 text-[var(--crm-primary)]"
+                            : "border-[var(--crm-neutral-100)] hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/5"
+                        }`}
+                      >
+                        {period === "monthly" ? "Mensile" : "Annuale"}
+                      </button>
+                    ))}
                   </div>
-                </label>
-              ))}
+                </div>
+              )}
             </div>
-          </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-1">
-              <label className="block text-sm font-medium mb-1">Prezzo unitario</label>
-              <input
-                {...register("unitPrice", { valueAsNumber: true })}
-                type="number" min={0} step={0.01}
-                className={inputCls}
-              />
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-1">
+                <label className="block text-sm font-medium mb-1">Prezzo unitario</label>
+                <input
+                  {...register("unitPrice", { valueAsNumber: true })}
+                  type="number" min={0} step={0.01}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Valuta</label>
+                <select {...register("currency")} className={inputCls}>
+                  {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">IVA %</label>
+                <select {...register("taxRate", { valueAsNumber: true })} className={inputCls}>
+                  {TAX_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Valuta</label>
-              <select {...register("currency")} className={inputCls}>
-                {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">IVA %</label>
-              <select {...register("taxRate", { valueAsNumber: true })} className={inputCls}>
-                {TAX_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Annulla</Button>
-            <Button type="submit" disabled={isSubmitting} className="flex-1 bg-[var(--crm-primary)] hover:bg-[var(--crm-primary-dark)] text-white">
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : isEditing ? "Salva" : "Crea"}
-            </Button>
-          </div>
-        </form>
+          </form>
         </SheetBody>
+
+        <div className="px-6 py-4 border-t border-[var(--crm-neutral-100)] dark:border-white/10 flex gap-3">
+          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Annulla</Button>
+          <Button form="product-form" type="submit" disabled={isSubmitting} className="flex-1 bg-[var(--crm-primary)] hover:bg-[var(--crm-primary-dark)] text-white">
+            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : isEditing ? "Salva" : "Crea"}
+          </Button>
+        </div>
       </SheetContent>
     </Sheet>
   );

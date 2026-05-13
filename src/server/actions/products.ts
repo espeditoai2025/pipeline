@@ -5,31 +5,37 @@ import { z } from "zod";
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import type { Product, DealProduct, CreateProductInput, AddDealProductInput } from "@/types/products";
+import type { Product, ProductCategory, BillingPeriod, DealProduct, CreateProductInput, AddDealProductInput } from "@/types/products";
 
 function getOrgId(s: Session | null) {
   return (s?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
 }
 
+type DecimalLike = { toNumber: () => number } | number;
+function toNum(v: DecimalLike): number { return typeof v === "number" ? v : v.toNumber(); }
+
 function mapProduct(p: {
-  id: string; name: string; code: string | null;
-  unitPrice: { toNumber: () => number } | number;
-  currency: string; taxRate: { toNumber: () => number } | number;
-  organizationId: string;
+  id: string; name: string; code: string | null; description: string | null;
+  category: string; unit: string;
+  unitPrice: DecimalLike; currency: string; taxRate: DecimalLike;
+  isActive: boolean; isSubscription: boolean; billingPeriod: string | null;
+  createdAt: Date; updatedAt: Date;
 }): Product {
   return {
     id: p.id,
     name: p.name,
     code: p.code ?? "",
-    description: null,
-    category: "OTHER",
-    unitPrice: typeof p.unitPrice === "number" ? p.unitPrice : p.unitPrice.toNumber(),
+    description: p.description,
+    category: p.category as ProductCategory,
+    unitPrice: toNum(p.unitPrice),
     currency: p.currency,
-    taxRate: typeof p.taxRate === "number" ? p.taxRate : p.taxRate.toNumber(),
-    unit: "pz",
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    taxRate: toNum(p.taxRate),
+    unit: p.unit,
+    isActive: p.isActive,
+    isSubscription: p.isSubscription,
+    billingPeriod: (p.billingPeriod as BillingPeriod | null) ?? null,
+    createdAt: p.createdAt.toISOString(),
+    updatedAt: p.updatedAt.toISOString(),
   };
 }
 
@@ -50,11 +56,13 @@ const productSchema = z.object({
   name: z.string().min(1, "Nome obbligatorio"),
   code: z.string().min(1, "Codice obbligatorio"),
   description: z.string().optional(),
-  category: z.enum(["SOFTWARE", "HARDWARE", "SERVICE", "SUPPORT", "LICENSE", "OTHER"]),
+  category: z.enum(["SOFTWARE", "HARDWARE", "SERVICE", "SUPPORT", "LICENSE", "SAAS", "WEBSITE", "AI_AGENT", "OTHER"]),
   unitPrice: z.number().min(0, "Prezzo non valido"),
   currency: z.string().min(1),
   taxRate: z.number().min(0).max(100),
   unit: z.string().min(1, "Unità obbligatoria"),
+  isSubscription: z.boolean().default(false),
+  billingPeriod: z.enum(["monthly", "annual"]).nullable().optional(),
 });
 
 type ActionResult<T> = { data?: T; error?: string };
@@ -72,9 +80,14 @@ export async function createProduct(input: CreateProductInput): Promise<ActionRe
       data: {
         name: parsed.data.name,
         code: parsed.data.code,
+        description: parsed.data.description ?? null,
+        category: parsed.data.category,
         unitPrice: parsed.data.unitPrice,
         currency: parsed.data.currency,
         taxRate: parsed.data.taxRate,
+        unit: parsed.data.unit,
+        isSubscription: parsed.data.isSubscription ?? false,
+        billingPeriod: parsed.data.isSubscription ? (parsed.data.billingPeriod ?? null) : null,
         organizationId: orgId,
       },
     });
@@ -96,9 +109,12 @@ export async function updateProduct(id: string, input: Partial<CreateProductInpu
       data: {
         ...(input.name && { name: input.name }),
         ...(input.code !== undefined && { code: input.code }),
+        ...(input.description !== undefined && { description: input.description ?? null }),
+        ...(input.category && { category: input.category }),
         ...(input.unitPrice !== undefined && { unitPrice: input.unitPrice }),
         ...(input.currency && { currency: input.currency }),
         ...(input.taxRate !== undefined && { taxRate: input.taxRate }),
+        ...(input.unit && { unit: input.unit }),
       },
     });
     revalidatePath("/products");

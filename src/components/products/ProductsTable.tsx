@@ -9,16 +9,21 @@ import type { Product, ProductCategory } from "@/types/products";
 
 const CATEGORY_LABELS: Record<ProductCategory, string> = {
   SOFTWARE: "Software", HARDWARE: "Hardware", SERVICE: "Servizio",
-  SUPPORT: "Supporto", LICENSE: "Licenza", OTHER: "Altro",
+  SUPPORT: "Supporto", LICENSE: "Licenza",
+  SAAS: "SaaS", WEBSITE: "Sito Web", AI_AGENT: "Agenti AI",
+  OTHER: "Altro",
 };
 
 const CATEGORY_COLORS: Record<ProductCategory, string> = {
-  SOFTWARE: "bg-blue-100 text-blue-700",
-  HARDWARE: "bg-orange-100 text-orange-700",
-  SERVICE:  "bg-purple-100 text-purple-700",
-  SUPPORT:  "bg-yellow-100 text-yellow-700",
-  LICENSE:  "bg-green-100 text-green-700",
-  OTHER:    "bg-gray-100 text-gray-600",
+  SOFTWARE:  "bg-blue-100 text-blue-700",
+  HARDWARE:  "bg-orange-100 text-orange-700",
+  SERVICE:   "bg-purple-100 text-purple-700",
+  SUPPORT:   "bg-yellow-100 text-yellow-700",
+  LICENSE:   "bg-green-100 text-green-700",
+  SAAS:      "bg-indigo-100 text-indigo-700",
+  WEBSITE:   "bg-teal-100 text-teal-700",
+  AI_AGENT:  "bg-pink-100 text-pink-700",
+  OTHER:     "bg-gray-100 text-gray-600",
 };
 
 function formatPrice(price: number, currency: string) {
