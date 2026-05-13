@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Plus, Trash2, Users, ChevronRight, Upload, X, UserPlus, ArrowLeft } from "lucide-react";
+import { useState, useTransition, useRef } from "react";
+import { Plus, Trash2, Users, ChevronRight, Upload, X, UserPlus, ArrowLeft, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import {
-  getEmailListDetail, createEmailList, updateEmailList, deleteEmailList,
+  getEmailListDetail, createEmailList, deleteEmailList,
   addContactToList, removeContactFromList, importContactsToList,
 } from "@/server/actions/campaigns";
 import type { EmailList, EmailListDetail, EmailListContact } from "@/types/emails";
@@ -13,20 +14,107 @@ import type { EmailList, EmailListDetail, EmailListContact } from "@/types/email
 const inputCls = "w-full rounded-lg border border-[var(--crm-neutral-200)] bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-[var(--crm-neutral-900)] dark:text-white placeholder:text-[var(--crm-neutral-400)] focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] focus:border-transparent transition-colors";
 
 type Props = { lists: EmailList[]; onChange: (lists: EmailList[]) => void };
-
 type View = { type: "list" } | { type: "detail"; listId: string };
+
+type ParsedContact = { email: string; firstName?: string; lastName?: string };
+
+// Parse CSV text → contacts
+function parseCSV(text: string): ParsedContact[] {
+  return text
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const cols = line.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+      return { email: cols[0] ?? "", firstName: cols[1], lastName: cols[2] };
+    })
+    .filter((r) => r.email && r.email.includes("@"));
+}
+
+// Parse XLS/XLSX ArrayBuffer → contacts
+function parseXLSX(buffer: ArrayBuffer): ParsedContact[] {
+  const wb = XLSX.read(buffer, { type: "array" });
+  const sheet = wb.Sheets[wb.SheetNames[0]!];
+  if (!sheet) return [];
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+
+  // Detect email column (case-insensitive: email, e-mail, mail, Email...)
+  const emailKey = rows[0]
+    ? Object.keys(rows[0]).find((k) => /^e[-_]?mail$/i.test(k.trim())) ?? Object.keys(rows[0])[0]!
+    : "email";
+
+  const firstKey = rows[0]
+    ? Object.keys(rows[0]).find((k) => /^(first[-_ ]?name|nome|name)$/i.test(k.trim()))
+    : undefined;
+
+  const lastKey = rows[0]
+    ? Object.keys(rows[0]).find((k) => /^(last[-_ ]?name|cognome|surname)$/i.test(k.trim()))
+    : undefined;
+
+  return rows
+    .map((r) => ({
+      email: String(r[emailKey] ?? "").trim(),
+      firstName: firstKey ? String(r[firstKey] ?? "").trim() || undefined : undefined,
+      lastName: lastKey ? String(r[lastKey] ?? "").trim() || undefined : undefined,
+    }))
+    .filter((r) => r.email && r.email.includes("@"));
+}
+
+async function readFile(file: File): Promise<ParsedContact[]> {
+  return new Promise((resolve) => {
+    const isXLSX = /\.(xlsx|xls)$/i.test(file.name);
+    if (isXLSX) {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(parseXLSX(e.target!.result as ArrayBuffer));
+      reader.readAsArrayBuffer(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(parseCSV(e.target!.result as string));
+      reader.readAsText(file);
+    }
+  });
+}
+
+// Reusable file upload button
+function FileImportButton({ onContacts, label = "Importa file" }: { onContacts: (c: ParsedContact[]) => void; label?: string }) {
+  const ref = useRef<HTMLInputElement>(null);
+  async function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const contacts = await readFile(file);
+    onContacts(contacts);
+    e.target.value = "";
+  }
+  return (
+    <>
+      <input ref={ref} type="file" accept=".csv,.xls,.xlsx" className="sr-only" onChange={handleChange} />
+      <button
+        type="button"
+        onClick={() => ref.current?.click()}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--crm-neutral-200)] px-3 py-1.5 text-sm font-medium text-[var(--crm-neutral-700)] hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/5 transition-colors"
+      >
+        <FileSpreadsheet className="h-4 w-4" /> {label}
+      </button>
+    </>
+  );
+}
 
 export function EmailListsTab({ lists, onChange }: Props) {
   const [view, setView] = useState<View>({ type: "list" });
   const [detail, setDetail] = useState<EmailListDetail | null>(null);
+
+  // Create form
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [newEmails, setNewEmails] = useState("");
+  const [pendingContacts, setPendingContacts] = useState<ParsedContact[]>([]);
+
+  // Add single contact
   const [addEmail, setAddEmail] = useState("");
   const [addFirst, setAddFirst] = useState("");
   const [addLast, setAddLast] = useState("");
   const [showAddContact, setShowAddContact] = useState(false);
+
   const [, startTransition] = useTransition();
 
   function openDetail(id: string) {
@@ -38,6 +126,33 @@ export function EmailListsTab({ lists, onChange }: Props) {
     });
   }
 
+  function resetCreate() {
+    setShowCreate(false);
+    setNewName(""); setNewDesc(""); setNewEmails("");
+    setPendingContacts([]);
+  }
+
+  // Merge textarea emails + file-imported contacts, dedup
+  function allPendingContacts(): ParsedContact[] {
+    const fromTextarea = newEmails
+      .split(/[\n,;]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.includes("@"))
+      .map((email) => ({ email }));
+    const combined = [...pendingContacts, ...fromTextarea];
+    const seen = new Set<string>();
+    return combined.filter((c) => {
+      if (seen.has(c.email.toLowerCase())) return false;
+      seen.add(c.email.toLowerCase());
+      return true;
+    });
+  }
+
+  function handleFileImportInCreate(contacts: ParsedContact[]) {
+    setPendingContacts(contacts);
+    toast.success(`${contacts.length} contatti caricati dal file`);
+  }
+
   function handleCreate() {
     if (!newName.trim()) return;
     startTransition(async () => {
@@ -45,25 +160,21 @@ export function EmailListsTab({ lists, onChange }: Props) {
       if (res.error) { toast.error(res.error); return; }
       const created = res.data!;
 
-      // Parse and import emails entered in the textarea
-      const emailLines = newEmails.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
+      const contacts = allPendingContacts();
       let importedCount = 0;
-      if (emailLines.length > 0) {
-        const contacts = emailLines.map((email) => ({ email }));
+      if (contacts.length > 0) {
         const imp = await importContactsToList(created.id, contacts);
         importedCount = imp.data?.added ?? 0;
         created.contactCount = importedCount;
       }
 
       onChange([created, ...lists]);
-      setShowCreate(false);
-      setNewName(""); setNewDesc(""); setNewEmails("");
+      resetCreate();
       toast.success(`Lista creata${importedCount > 0 ? ` con ${importedCount} contatti` : ""}`);
 
-      // Open detail if emails were added
       if (importedCount > 0) {
-        const detail = await getEmailListDetail(created.id);
-        if (detail.data) { setDetail(detail.data); setView({ type: "detail", listId: created.id }); }
+        const refreshed = await getEmailListDetail(created.id);
+        if (refreshed.data) { setDetail(refreshed.data); setView({ type: "detail", listId: created.id }); }
       }
     });
   }
@@ -116,34 +227,22 @@ export function EmailListsTab({ lists, onChange }: Props) {
     });
   }
 
-  function handleImportCSV(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !detail) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const text = ev.target?.result as string;
-      const lines = text.split("\n").filter(Boolean);
-      const rows = lines.map((line) => {
-        const cols = line.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
-        return { email: cols[0] ?? "", firstName: cols[1], lastName: cols[2] };
-      }).filter((r) => r.email);
-
-      startTransition(async () => {
-        const res = await importContactsToList(detail.id, rows);
-        if (res.error) { toast.error(res.error); return; }
-        const { added, skipped } = res.data!;
-        toast.success(`Importati ${added} contatti${skipped > 0 ? `, ${skipped} ignorati` : ""}`);
-        const refreshed = await getEmailListDetail(detail.id);
-        if (refreshed.data) {
-          setDetail(refreshed.data);
-          onChange(lists.map((l) => l.id === detail.id ? { ...l, contactCount: refreshed.data!.contactCount } : l));
-        }
-      });
-    };
-    reader.readAsText(file);
-    e.target.value = "";
+  function handleImportFileInDetail(contacts: ParsedContact[]) {
+    if (!detail) return;
+    startTransition(async () => {
+      const res = await importContactsToList(detail.id, contacts);
+      if (res.error) { toast.error(res.error); return; }
+      const { added, skipped } = res.data!;
+      toast.success(`Importati ${added} contatti${skipped > 0 ? `, ${skipped} già presenti` : ""}`);
+      const refreshed = await getEmailListDetail(detail.id);
+      if (refreshed.data) {
+        setDetail(refreshed.data);
+        onChange(lists.map((l) => l.id === detail.id ? { ...l, contactCount: refreshed.data!.contactCount } : l));
+      }
+    });
   }
 
+  // ─── Detail view ────────────────────────────────────────────────────────────
   if (view.type === "detail" && detail) {
     return (
       <div className="space-y-4">
@@ -159,7 +258,7 @@ export function EmailListsTab({ lists, onChange }: Props) {
           <span className="ml-auto text-xs text-[var(--crm-neutral-400)]">{detail.contactCount} contatti</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             size="sm"
             className="bg-[var(--crm-primary)] hover:bg-[var(--crm-primary-dark)] text-white"
@@ -167,13 +266,13 @@ export function EmailListsTab({ lists, onChange }: Props) {
           >
             <UserPlus className="h-4 w-4 mr-1.5" /> Aggiungi contatto
           </Button>
-          <label className="cursor-pointer">
-            <input type="file" accept=".csv" className="sr-only" onChange={handleImportCSV} />
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--crm-neutral-200)] px-3 py-1.5 text-sm font-medium text-[var(--crm-neutral-700)] hover:bg-[var(--crm-neutral-50)] transition-colors cursor-pointer">
-              <Upload className="h-4 w-4" /> Importa CSV
-            </span>
-          </label>
+          <FileImportButton label="Importa CSV / Excel" onContacts={handleImportFileInDetail} />
         </div>
+
+        <p className="text-xs text-[var(--crm-neutral-400)]">
+          Formati supportati: <strong>.csv</strong> (email, nome, cognome — senza intestazione) ·{" "}
+          <strong>.xls / .xlsx</strong> (colonne: Email, Nome/FirstName, Cognome/LastName)
+        </p>
 
         {showAddContact && (
           <div className="rounded-xl border border-[var(--crm-neutral-100)] p-4 space-y-3">
@@ -190,12 +289,10 @@ export function EmailListsTab({ lists, onChange }: Props) {
           </div>
         )}
 
-        <p className="text-xs text-[var(--crm-neutral-400)]">CSV formato: email, nome, cognome (una riga per contatto, senza intestazione)</p>
-
         {detail.contacts.length === 0 ? (
           <div className="rounded-xl border border-dashed border-[var(--crm-neutral-200)] p-10 text-center">
             <Users className="h-8 w-8 text-[var(--crm-neutral-300)] mx-auto mb-2" />
-            <p className="text-sm text-[var(--crm-neutral-500)]">Nessun contatto. Aggiungine uno o importa un CSV.</p>
+            <p className="text-sm text-[var(--crm-neutral-500)]">Nessun contatto. Aggiungine uno o importa un file.</p>
           </div>
         ) : (
           <div className="rounded-xl border border-[var(--crm-neutral-100)] overflow-hidden">
@@ -239,6 +336,9 @@ export function EmailListsTab({ lists, onChange }: Props) {
     );
   }
 
+  // ─── List view ───────────────────────────────────────────────────────────────
+  const detectedCount = allPendingContacts().length;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -255,39 +355,54 @@ export function EmailListsTab({ lists, onChange }: Props) {
       {showCreate && (
         <div className="rounded-xl border border-[var(--crm-primary)]/30 bg-[var(--crm-primary)]/5 p-4 space-y-3">
           <p className="text-sm font-medium">Nuova lista email</p>
+
           <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nome lista *" className={inputCls} />
           <input value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="Descrizione (opzionale)" className={inputCls} />
+
           <div>
             <label className="block text-xs font-medium text-[var(--crm-neutral-500)] mb-1.5">
-              Email destinatari (opzionale)
+              Email destinatari — incolla qui sotto oppure carica un file
             </label>
             <textarea
               value={newEmails}
               onChange={(e) => setNewEmails(e.target.value)}
-              rows={5}
+              rows={4}
               className={`${inputCls} resize-none font-mono text-xs`}
-              placeholder={"mario@esempio.it\nluca@azienda.it\nsara@email.com\n\nUna email per riga (o separate da virgola/punto e virgola)"}
+              placeholder={"mario@esempio.it\nluca@azienda.it, sara@email.com"}
             />
-            {newEmails.trim() && (
-              <p className="mt-1 text-xs text-[var(--crm-neutral-400)]">
-                {newEmails.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean).length} email rilevate
-              </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <FileImportButton label="Carica CSV / Excel" onContacts={handleFileImportInCreate} />
+            {pendingContacts.length > 0 && (
+              <span className="text-xs text-[var(--crm-neutral-500)]">
+                <strong>{pendingContacts.length}</strong> contatti dal file
+              </span>
             )}
           </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => { setShowCreate(false); setNewName(""); setNewDesc(""); setNewEmails(""); }}>Annulla</Button>
-            <Button size="sm" className="bg-[var(--crm-primary)] text-white" onClick={handleCreate} disabled={!newName.trim()}>Crea</Button>
+
+          {detectedCount > 0 && (
+            <p className="text-xs text-[var(--crm-primary)] font-medium">
+              ✓ {detectedCount} contatti pronti per l&apos;importazione
+            </p>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <Button size="sm" variant="outline" onClick={resetCreate}>Annulla</Button>
+            <Button size="sm" className="bg-[var(--crm-primary)] text-white" onClick={handleCreate} disabled={!newName.trim()}>
+              Crea lista
+            </Button>
           </div>
         </div>
       )}
 
-      {lists.length === 0 ? (
+      {lists.length === 0 && !showCreate ? (
         <div className="rounded-xl border border-dashed border-[var(--crm-neutral-200)] p-12 text-center">
           <Users className="h-10 w-10 text-[var(--crm-neutral-300)] mx-auto mb-3" />
           <p className="text-sm font-medium text-[var(--crm-neutral-600)]">Nessuna lista</p>
           <p className="text-xs text-[var(--crm-neutral-400)] mt-1">Crea la tua prima lista email per le campagne</p>
         </div>
-      ) : (
+      ) : lists.length > 0 ? (
         <div className="rounded-xl border border-[var(--crm-neutral-100)] overflow-hidden divide-y divide-[var(--crm-neutral-100)]">
           {lists.map((list) => (
             <div
@@ -313,7 +428,7 @@ export function EmailListsTab({ lists, onChange }: Props) {
             </div>
           ))}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
