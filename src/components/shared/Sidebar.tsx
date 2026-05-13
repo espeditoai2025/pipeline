@@ -26,7 +26,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { PipelyFavicon, PipelyWordmark, PipelyWordmarkDark } from "@/components/shared/PipelyLogo";
 
 const navItems = [
-  { key: "dashboard", href: "/", icon: LayoutDashboard },
+  { key: "dashboard", href: "/dashboard", icon: LayoutDashboard },
   { key: "deals", href: "/deals", icon: Briefcase },
   { key: "contacts", href: "/contacts", icon: Users },
   { key: "companies", href: "/companies", icon: Building2 },
@@ -49,7 +49,7 @@ export function Sidebar() {
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
 
   function isActive(href: string) {
-    if (href === "/") return pathname === "/";
+    if (href === "/dashboard") return pathname === "/dashboard";
     return pathname.startsWith(href);
   }
 
