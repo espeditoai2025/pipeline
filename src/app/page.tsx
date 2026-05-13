@@ -566,7 +566,7 @@ export default function LandingPage() {
                 features: [
                   "Tutto il piano Pro",
                   "SSO & SAML",
-                  "SLA 99.9% garantito",
+                  "SLA 99.5% (vedi Termini)",
                   "API dedicata",
                   "Onboarding dedicato",
                   "Account manager",

@@ -38,7 +38,7 @@ const PLANS = [
   },
   {
     id: "enterprise", name: "Enterprise", price: null, currency: "€", period: "mese",
-    features: ["Tutto di Pro", "Contatti illimitati", "SLA 99.9%", "SSO / SAML", "Supporto dedicato"],
+    features: ["Tutto di Pro", "Contatti illimitati", "SLA 99.5%", "SSO / SAML", "Supporto dedicato"],
   },
 ];
 

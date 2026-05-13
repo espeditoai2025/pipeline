@@ -554,7 +554,7 @@ const CATEGORIES: Category[] = [
         { type: "para", text: "Per organizzazioni con esigenze avanzate di sicurezza, compliance e supporto." },
         { type: "list", items: [
           "Tutto incluso nel piano Pro",
-          "Contatti illimitati con SLA garantito al 99,9%",
+          "Contatti illimitati con SLA al 99,5%",
           "SSO / SAML per autenticazione aziendale",
           "Supporto dedicato con account manager",
           "Onboarding personalizzato e formazione del team",
