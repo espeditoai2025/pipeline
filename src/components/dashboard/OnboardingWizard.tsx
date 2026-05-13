@@ -120,7 +120,7 @@ const STEPS: Step[] = [
     iconBg: "bg-rose-100 dark:bg-rose-900/30",
     iconColor: "text-rose-600",
     title: "Lancia la prima campagna",
-    description: "Crea e invia una campagna email alla tua lista di contatti.",
+    description: "Crea e invia una campagna email alla tua lista. Monitora aperture e click in tempo reale.",
     cta: "Crea campagna",
     href: "/emails",
   },

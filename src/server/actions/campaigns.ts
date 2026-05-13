@@ -325,6 +325,7 @@ export async function sendCampaign(id: string): Promise<AR<{ sent: number; faile
   let sent = 0;
   let failed = 0;
   const from = FROM_DEFAULT;
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
   for (const contact of contacts) {
     const personalizedBody = campaign.body
@@ -332,20 +333,30 @@ export async function sendCampaign(id: string): Promise<AR<{ sent: number; faile
       .replace(/\{\{cognome\}\}/g, contact.lastName ?? "")
       .replace(/\{\{email\}\}/g, contact.email);
 
+    // Convert plain-text newlines to HTML, then inject tracking
+    let html = personalizedBody.replace(/\n/g, "<br>");
+
+    // Rewrite href links for click tracking
+    html = html.replace(
+      /href=(["'])(https?:\/\/[^"']+)\1/g,
+      (_match, _quote, originalUrl) => {
+        const tracked = `${appUrl}/api/track/click/${campaign.id}/${contact.id}?url=${encodeURIComponent(originalUrl)}`;
+        return `href="${tracked}"`;
+      }
+    );
+
+    // Inject open-tracking pixel (1x1 GIF) at the bottom of the email
+    html += `<img src="${appUrl}/api/track/open/${campaign.id}/${contact.id}" width="1" height="1" style="display:none;border:0" alt="" />`;
+
     if (resend) {
       try {
-        await resend.emails.send({
-          from,
-          to: contact.email,
-          subject: campaign.subject,
-          html: personalizedBody.replace(/\n/g, "<br>"),
-        });
+        await resend.emails.send({ from, to: contact.email, subject: campaign.subject, html });
         sent++;
       } catch {
         failed++;
       }
     } else {
-      // No API key — record to DB only
+      // No Resend API key — record to DB only
       sent++;
     }
   }
