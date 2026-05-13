@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import {
   Search, Rocket, GitBranch, Users, Zap, Calendar, Mail, Megaphone,
   BarChart3, Workflow, Package, Settings, ShieldCheck,
@@ -845,9 +846,9 @@ function CategoryDetail({ cat, onBack, onArticleClick }: { cat: Category; onBack
           <p className="text-xs text-[var(--crm-neutral-500)] mt-1">
             Il nostro team di supporto è disponibile dal lunedì al venerdì, 9:00–18:00 CET.
           </p>
-          <button className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[var(--crm-primary)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--crm-primary-dark)] transition-colors">
+          <Link href="/contatti" className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[var(--crm-primary)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--crm-primary-dark)] transition-colors">
             <ArrowUpRight className="h-3.5 w-3.5" /> Contatta il supporto
-          </button>
+          </Link>
         </div>
       </div>
     </div>
@@ -1114,9 +1115,9 @@ export default function GuidaPage() {
               >
                 <PlayCircle className="h-3.5 w-3.5 text-rose-600" /> Video tutorial
               </button>
-              <button className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--crm-primary)] px-3 py-2 text-xs font-medium text-white hover:bg-[var(--crm-primary-dark)] transition-colors">
+              <Link href="/contatti" className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--crm-primary)] px-3 py-2 text-xs font-medium text-white hover:bg-[var(--crm-primary-dark)] transition-colors">
                 <ArrowUpRight className="h-3.5 w-3.5" /> Contatta il supporto
-              </button>
+              </Link>
             </div>
           </div>
         </>
