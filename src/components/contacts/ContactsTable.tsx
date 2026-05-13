@@ -49,6 +49,11 @@ export function ContactsTable({ initialContacts, companies }: Props) {
 
   const duplicates = useMemo(() => findDuplicates(contacts), [contacts]);
 
+  const refreshContacts = useCallback(async () => {
+    const fresh = await getContacts();
+    setContacts(fresh);
+  }, []);
+
   const columns = useMemo(() => [
     col.accessor((row) => `${row.firstName} ${row.lastName ?? ""}`, {
       id: "name",
@@ -235,10 +240,7 @@ export function ContactsTable({ initialContacts, companies }: Props) {
       <ImportCSVModal
         open={importOpen}
         onClose={() => setImportOpen(false)}
-        onImported={useCallback(async () => {
-          const fresh = await getContacts();
-          setContacts(fresh);
-        }, [])}
+        onImported={refreshContacts}
       />
     </div>
   );
