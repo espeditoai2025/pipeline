@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Plus, Trash2, Loader2, ArrowDown, GripVertical } from "lucide-react";
 import { toast } from "sonner";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { createWorkflow, updateWorkflow } from "@/server/actions/workflows";
 import { TRIGGER_CONFIG, ACTION_CONFIG } from "./WorkflowConfig";
@@ -27,7 +27,7 @@ type Props = {
   onSaved: (w: Workflow) => void;
 };
 
-const inputCls = "w-full rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)]";
+const inputCls = "w-full rounded-lg border border-[var(--crm-neutral-200)] bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-[var(--crm-neutral-900)] dark:text-white placeholder:text-[var(--crm-neutral-400)] focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] focus:border-transparent transition-colors";
 
 const DEFAULT_ACTIONS: Record<ActionType, object> = {
   SEND_EMAIL:         { type: "SEND_EMAIL",        templateId: "tpl-1", to: "contact" },
@@ -95,12 +95,13 @@ export function WorkflowBuilder({ open, onClose, workflow, onSaved }: Props) {
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+      <SheetContent className="w-full sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>{isEditing ? "Modifica automazione" : "Nuova automazione"}</SheetTitle>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-5">
+        <SheetBody>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           {/* Name & description */}
           <div>
             <label className="block text-sm font-medium mb-1">Nome *</label>
@@ -234,6 +235,7 @@ export function WorkflowBuilder({ open, onClose, workflow, onSaved }: Props) {
             </Button>
           </div>
         </form>
+        </SheetBody>
       </SheetContent>
     </Sheet>
   );

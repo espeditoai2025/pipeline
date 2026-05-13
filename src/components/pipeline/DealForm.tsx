@@ -9,6 +9,7 @@ import {
   Sheet,
   SheetContent,
   SheetHeader,
+  SheetBody,
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -82,12 +83,13 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
           <SheetTitle>{isEditing ? "Modifica affare" : "Nuovo affare"}</SheetTitle>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
+        <SheetBody>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Titolo *</label>
             <input
               {...register("title")}
-              className="w-full rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)]"
+              className="w-full rounded-lg border border-[var(--crm-neutral-200)] bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-[var(--crm-neutral-900)] dark:text-white placeholder:text-[var(--crm-neutral-400)] focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] focus:border-transparent transition-colors"
               placeholder="es. Implementazione Pipely"
             />
             {errors.title && <p className="mt-1 text-xs text-[var(--crm-danger)]">{errors.title.message}</p>}
@@ -101,7 +103,7 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
                 min={0}
                 step={100}
                 {...register("value", { valueAsNumber: true })}
-                className="w-full rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)]"
+                className="w-full rounded-lg border border-[var(--crm-neutral-200)] bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-[var(--crm-neutral-900)] dark:text-white placeholder:text-[var(--crm-neutral-400)] focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] focus:border-transparent transition-colors"
               />
               {errors.value && <p className="mt-1 text-xs text-[var(--crm-danger)]">{errors.value.message}</p>}
             </div>
@@ -109,7 +111,7 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
               <label className="block text-sm font-medium mb-1">Valuta</label>
               <select
                 {...register("currency")}
-                className="w-full rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)]"
+                className="w-full rounded-lg border border-[var(--crm-neutral-200)] bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-[var(--crm-neutral-900)] dark:text-white placeholder:text-[var(--crm-neutral-400)] focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] focus:border-transparent transition-colors"
               >
                 <option value="EUR">EUR</option>
                 <option value="USD">USD</option>
@@ -122,7 +124,7 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
             <label className="block text-sm font-medium mb-1">Stage *</label>
             <select
               {...register("stageId")}
-              className="w-full rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)]"
+              className="w-full rounded-lg border border-[var(--crm-neutral-200)] bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-[var(--crm-neutral-900)] dark:text-white placeholder:text-[var(--crm-neutral-400)] focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] focus:border-transparent transition-colors"
             >
               {stages.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
@@ -136,7 +138,7 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
             <input
               type="date"
               {...register("expectedClose")}
-              className="w-full rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)]"
+              className="w-full rounded-lg border border-[var(--crm-neutral-200)] bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-[var(--crm-neutral-900)] dark:text-white placeholder:text-[var(--crm-neutral-400)] focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] focus:border-transparent transition-colors"
             />
           </div>
 
@@ -153,6 +155,7 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
             </Button>
           </div>
         </form>
+        </SheetBody>
       </SheetContent>
     </Sheet>
   );

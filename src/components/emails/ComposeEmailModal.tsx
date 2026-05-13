@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2, FileText, Send, Save } from "lucide-react";
 import { toast } from "sonner";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { sendEmail, saveDraft } from "@/server/actions/emails";
 import { AIEmailWriter } from "@/components/ai/AIEmailWriter";
@@ -30,7 +30,7 @@ type Props = {
   onSent: (msg: EmailMessage) => void;
 };
 
-const inputCls = "w-full rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)]";
+const inputCls = "w-full rounded-lg border border-[var(--crm-neutral-200)] bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-[var(--crm-neutral-900)] dark:text-white placeholder:text-[var(--crm-neutral-400)] focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] focus:border-transparent transition-colors";
 
 function applyTemplate(tpl: EmailTemplate, replyThread?: EmailThread | null): Partial<FormValues> {
   const contactName = replyThread?.contactName ?? "";
@@ -110,101 +110,103 @@ export function ComposeEmailModal({ open, onClose, replyThread, templates, onSen
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="w-full sm:max-w-lg">
+      <SheetContent className="w-full sm:max-w-xl flex flex-col">
         <SheetHeader>
           <SheetTitle>{replyThread ? "Rispondi" : "Nuova email"}</SheetTitle>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit(onSend)} className="mt-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">A *</label>
-            <input {...register("to")} type="email" className={inputCls} placeholder="destinatario@esempio.it" />
-            {errors.to && <p className="mt-1 text-xs text-[var(--crm-danger)]">{errors.to.message}</p>}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">CC</label>
-            <input {...register("cc")} type="email" className={inputCls} placeholder="cc@esempio.it" />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-sm font-medium">Oggetto *</label>
-              <button
-                type="button"
-                className="flex items-center gap-1 text-xs text-[var(--crm-primary)] hover:underline"
-                onClick={() => setShowTemplates((v) => !v)}
-              >
-                <FileText className="h-3 w-3" />
-                {showTemplates ? "Chiudi template" : "Usa template"}
-              </button>
+        <SheetBody>
+          <form id="compose-email-form" onSubmit={handleSubmit(onSend)} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1.5 text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)]">A *</label>
+              <input {...register("to")} type="email" className={inputCls} placeholder="destinatario@esempio.it" />
+              {errors.to && <p className="mt-1 text-xs text-[var(--crm-danger)]">{errors.to.message}</p>}
             </div>
-            <input {...register("subject")} className={inputCls} placeholder="Oggetto dell'email" />
-            {errors.subject && <p className="mt-1 text-xs text-[var(--crm-danger)]">{errors.subject.message}</p>}
-          </div>
 
-          {/* Template picker */}
-          {showTemplates && (
-            <div className="rounded-xl border border-[var(--crm-neutral-100)] overflow-hidden divide-y divide-[var(--crm-neutral-100)]">
-              {templates.map((tpl) => (
+            <div>
+              <label className="block text-sm font-medium mb-1.5 text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)]">CC</label>
+              <input {...register("cc")} type="email" className={inputCls} placeholder="cc@esempio.it" />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-medium text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)]">Oggetto *</label>
                 <button
-                  key={tpl.id}
                   type="button"
-                  className="w-full flex items-start gap-3 px-3 py-2.5 text-left hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/5 transition-colors"
-                  onClick={() => applyTpl(tpl)}
+                  className="flex items-center gap-1 text-xs text-[var(--crm-primary)] hover:underline"
+                  onClick={() => setShowTemplates((v) => !v)}
                 >
-                  <FileText className="h-4 w-4 text-[var(--crm-primary)] mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">{tpl.name}</p>
-                    <p className="text-xs text-[var(--crm-neutral-500)]">{tpl.category} · usato {tpl.usageCount} volte</p>
-                  </div>
+                  <FileText className="h-3 w-3" />
+                  {showTemplates ? "Chiudi template" : "Usa template"}
                 </button>
-              ))}
+              </div>
+              <input {...register("subject")} className={inputCls} placeholder="Oggetto dell'email" />
+              {errors.subject && <p className="mt-1 text-xs text-[var(--crm-danger)]">{errors.subject.message}</p>}
             </div>
-          )}
 
-          <AIEmailWriter
-            context={{
-              contactName: replyThread?.contactName ?? undefined,
-              dealTitle: replyThread?.dealTitle ?? undefined,
-            }}
-            onApply={applyAIDraft}
-          />
+            {/* Template picker */}
+            {showTemplates && (
+              <div className="rounded-xl border border-[var(--crm-neutral-100)] overflow-hidden divide-y divide-[var(--crm-neutral-100)]">
+                {templates.map((tpl) => (
+                  <button
+                    key={tpl.id}
+                    type="button"
+                    className="w-full flex items-start gap-3 px-3 py-2.5 text-left hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/5 transition-colors"
+                    onClick={() => applyTpl(tpl)}
+                  >
+                    <FileText className="h-4 w-4 text-[var(--crm-primary)] mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium">{tpl.name}</p>
+                      <p className="text-xs text-[var(--crm-neutral-500)]">{tpl.category} · usato {tpl.usageCount} volte</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Corpo *</label>
-            <textarea
-              {...register("body")}
-              rows={10}
-              className={`${inputCls} resize-none font-mono text-xs`}
-              placeholder="Scrivi il tuo messaggio..."
+            <AIEmailWriter
+              context={{
+                contactName: replyThread?.contactName ?? undefined,
+                dealTitle: replyThread?.dealTitle ?? undefined,
+              }}
+              onApply={applyAIDraft}
             />
-            {errors.body && <p className="mt-1 text-xs text-[var(--crm-danger)]">{errors.body.message}</p>}
-          </div>
 
-          {replyThread && (
-            <div className="rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2 text-xs text-[var(--crm-neutral-500)]">
-              Risposta a: <strong>{replyThread.subject}</strong>
-              {replyThread.dealTitle && <span className="ml-2">· Affare: {replyThread.dealTitle}</span>}
+            <div>
+              <label className="block text-sm font-medium mb-1.5 text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)]">Corpo *</label>
+              <textarea
+                {...register("body")}
+                rows={10}
+                className={`${inputCls} resize-none font-mono text-xs`}
+                placeholder="Scrivi il tuo messaggio..."
+              />
+              {errors.body && <p className="mt-1 text-xs text-[var(--crm-danger)]">{errors.body.message}</p>}
             </div>
-          )}
 
-          <div className="flex gap-2 pt-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Annulla</Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="flex items-center gap-1.5"
-              onClick={handleSaveDraft}
-            >
-              <Save className="h-4 w-4" /> Bozza
-            </Button>
-            <Button type="submit" disabled={isSubmitting} className="flex-1 bg-[var(--crm-primary)] hover:bg-[var(--crm-primary-dark)] text-white">
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Send className="h-4 w-4 mr-1" />}
-              Invia
-            </Button>
-          </div>
-        </form>
+            {replyThread && (
+              <div className="rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2 text-xs text-[var(--crm-neutral-500)]">
+                Risposta a: <strong>{replyThread.subject}</strong>
+                {replyThread.dealTitle && <span className="ml-2">· Affare: {replyThread.dealTitle}</span>}
+              </div>
+            )}
+          </form>
+        </SheetBody>
+
+        <div className="px-6 py-4 border-t border-[var(--crm-neutral-100)] dark:border-white/10 flex gap-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Annulla</Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="flex items-center gap-1.5"
+            onClick={handleSaveDraft}
+          >
+            <Save className="h-4 w-4" /> Bozza
+          </Button>
+          <Button form="compose-email-form" type="submit" disabled={isSubmitting} className="flex-1 bg-[var(--crm-primary)] hover:bg-[var(--crm-primary-dark)] text-white">
+            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Send className="h-4 w-4 mr-1" />}
+            Invia
+          </Button>
+        </div>
       </SheetContent>
     </Sheet>
   );

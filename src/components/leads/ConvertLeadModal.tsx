@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ArrowRightCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { convertLead } from "@/server/actions/leads";
 import type { Lead } from "@/types/contacts";
@@ -42,7 +42,8 @@ export function ConvertLeadModal({ open, onClose, lead, onConverted }: Props) {
           <SheetTitle>Converti lead in affare</SheetTitle>
         </SheetHeader>
 
-        <div className="mt-6 space-y-5">
+        <SheetBody>
+        <div className="space-y-5">
           <div className="rounded-xl border border-[var(--crm-neutral-100)] p-4 bg-[var(--crm-neutral-50)] dark:bg-white/5">
             <p className="text-sm font-medium">{lead.title}</p>
             {lead.source && <p className="text-xs text-[var(--crm-neutral-500)] mt-1">Sorgente: {lead.source}</p>}
@@ -84,6 +85,7 @@ export function ConvertLeadModal({ open, onClose, lead, onConverted }: Props) {
             </Button>
           </div>
         </div>
+        </SheetBody>
       </SheetContent>
     </Sheet>
   );

@@ -1,11 +1,13 @@
 import type { Company, Contact, Lead } from "@/types/contacts";
 
+const nullCompanyExtras = { city: null, country: null, email: null, phone: null, vatNumber: null, description: null, linkedinUrl: null, referentName: null, referentRole: null, referentEmail: null, referentPhone: null };
+
 export const MOCK_COMPANIES: Company[] = [
-  { id: "co-1", name: "Acme S.r.l.", website: "https://acme.it", industry: "Tecnologia", size: "50-200", address: "Via Roma 1, Milano", organizationId: "org-1", createdAt: "2024-01-10T08:00:00Z", updatedAt: "2024-06-01T10:00:00Z", _count: { contacts: 3, deals: 4 } },
-  { id: "co-2", name: "Beta Consulting", website: "https://betaconsulting.it", industry: "Consulenza", size: "10-50", address: "Corso Vittorio 22, Torino", organizationId: "org-1", createdAt: "2024-02-15T09:00:00Z", updatedAt: "2024-05-20T11:00:00Z", _count: { contacts: 2, deals: 2 } },
-  { id: "co-3", name: "Gamma Industrie", website: null, industry: "Manifatturiero", size: "200-1000", address: "Via Industriale 5, Brescia", organizationId: "org-1", createdAt: "2024-03-01T07:00:00Z", updatedAt: "2024-06-10T09:00:00Z", _count: { contacts: 1, deals: 3 } },
-  { id: "co-4", name: "Delta Finance", website: "https://deltafinance.com", industry: "Finanza", size: "10-50", address: "Piazza Affari 10, Milano", organizationId: "org-1", createdAt: "2024-01-20T10:00:00Z", updatedAt: "2024-04-15T12:00:00Z", _count: { contacts: 2, deals: 1 } },
-  { id: "co-5", name: "Epsilon Media", website: "https://epsilonmedia.it", industry: "Media", size: "1-10", address: "Via del Corso 88, Roma", organizationId: "org-1", createdAt: "2024-04-05T08:30:00Z", updatedAt: "2024-06-20T14:00:00Z", _count: { contacts: 1, deals: 2 } },
+  { id: "co-1", name: "Acme S.r.l.", website: "https://acme.it", industry: "Tecnologia", size: "50-200", address: "Via Roma 1, Milano", ...nullCompanyExtras, organizationId: "org-1", createdAt: "2024-01-10T08:00:00Z", updatedAt: "2024-06-01T10:00:00Z", _count: { contacts: 3, deals: 4 } },
+  { id: "co-2", name: "Beta Consulting", website: "https://betaconsulting.it", industry: "Consulenza", size: "10-50", address: "Corso Vittorio 22, Torino", ...nullCompanyExtras, organizationId: "org-1", createdAt: "2024-02-15T09:00:00Z", updatedAt: "2024-05-20T11:00:00Z", _count: { contacts: 2, deals: 2 } },
+  { id: "co-3", name: "Gamma Industrie", website: null, industry: "Manifatturiero", size: "200-1000", address: "Via Industriale 5, Brescia", ...nullCompanyExtras, organizationId: "org-1", createdAt: "2024-03-01T07:00:00Z", updatedAt: "2024-06-10T09:00:00Z", _count: { contacts: 1, deals: 3 } },
+  { id: "co-4", name: "Delta Finance", website: "https://deltafinance.com", industry: "Finanza", size: "10-50", address: "Piazza Affari 10, Milano", ...nullCompanyExtras, organizationId: "org-1", createdAt: "2024-01-20T10:00:00Z", updatedAt: "2024-04-15T12:00:00Z", _count: { contacts: 2, deals: 1 } },
+  { id: "co-5", name: "Epsilon Media", website: "https://epsilonmedia.it", industry: "Media", size: "1-10", address: "Via del Corso 88, Roma", ...nullCompanyExtras, organizationId: "org-1", createdAt: "2024-04-05T08:30:00Z", updatedAt: "2024-06-20T14:00:00Z", _count: { contacts: 1, deals: 2 } },
 ];
 
 const OWNER = { id: "owner-1", name: "Mario Rossi", email: "mario@acme.com" };

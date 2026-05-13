@@ -7,7 +7,7 @@ import { z } from "zod";
 import { Plus, Pencil, Trash2, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { createTemplate, updateTemplate, deleteTemplate } from "@/server/actions/emails";
 import type { EmailTemplate } from "@/types/emails";
 
@@ -24,7 +24,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-const inputCls = "w-full rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)]";
+const inputCls = "w-full rounded-lg border border-[var(--crm-neutral-200)] bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-[var(--crm-neutral-900)] dark:text-white placeholder:text-[var(--crm-neutral-400)] focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] focus:border-transparent transition-colors";
 const CATEGORIES = ["Vendita", "Follow-up", "Chiusura", "Onboarding", "Supporto", "Altro"];
 
 const VARIABLE_HINTS = ["{{nome}}", "{{azienda}}", "{{data}}", "{{prodotto}}", "{{mittente}}", "{{oggetto}}", "{{scadenza}}"];
@@ -129,7 +129,8 @@ export function TemplatesManager({ initialTemplates }: Props) {
             <SheetTitle>{editing ? "Modifica template" : "Nuovo template"}</SheetTitle>
           </SheetHeader>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
+          <SheetBody>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium mb-1">Nome *</label>
@@ -172,6 +173,7 @@ export function TemplatesManager({ initialTemplates }: Props) {
               </Button>
             </div>
           </form>
+          </SheetBody>
         </SheetContent>
       </Sheet>
     </div>

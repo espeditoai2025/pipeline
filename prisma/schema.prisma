@@ -172,6 +172,17 @@ model Company {
   industry       String?
   size           String?
   address        String?
+  city           String?
+  country        String?
+  email          String?
+  phone          String?
+  vatNumber      String?
+  description    String?
+  linkedinUrl    String?
+  referentName   String?
+  referentRole   String?
+  referentEmail  String?
+  referentPhone  String?
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 

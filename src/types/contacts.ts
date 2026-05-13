@@ -5,6 +5,17 @@ export type Company = {
   industry: string | null;
   size: string | null;
   address: string | null;
+  city: string | null;
+  country: string | null;
+  email: string | null;
+  phone: string | null;
+  vatNumber: string | null;
+  description: string | null;
+  linkedinUrl: string | null;
+  referentName: string | null;
+  referentRole: string | null;
+  referentEmail: string | null;
+  referentPhone: string | null;
   organizationId: string;
   createdAt: string;
   updatedAt: string;

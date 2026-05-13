@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { createProduct, updateProduct } from "@/server/actions/products";
 import type { Product, ProductCategory } from "@/types/products";
@@ -36,7 +36,7 @@ const CATEGORIES: { value: ProductCategory; label: string }[] = [
 const CURRENCIES = ["EUR", "USD", "GBP", "CHF"];
 const TAX_RATES = [0, 4, 5, 10, 22];
 
-const inputCls = "w-full rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)]";
+const inputCls = "w-full rounded-lg border border-[var(--crm-neutral-200)] bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-[var(--crm-neutral-900)] dark:text-white placeholder:text-[var(--crm-neutral-400)] focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] focus:border-transparent transition-colors";
 
 type Props = {
   open: boolean;
@@ -94,7 +94,8 @@ export function ProductForm({ open, onClose, product, onSaved }: Props) {
           <SheetTitle>{isEditing ? "Modifica prodotto" : "Nuovo prodotto"}</SheetTitle>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
+        <SheetBody>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="block text-sm font-medium mb-1">Nome *</label>
@@ -164,6 +165,7 @@ export function ProductForm({ open, onClose, product, onSaved }: Props) {
             </Button>
           </div>
         </form>
+        </SheetBody>
       </SheetContent>
     </Sheet>
   );

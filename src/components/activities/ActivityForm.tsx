@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { createActivity, updateActivity } from "@/server/actions/activities";
 import { ACTIVITY_CONFIG } from "./ActivityTypeIcon";
@@ -34,7 +34,7 @@ type Props = {
   onSaved: (a: Activity) => void;
 };
 
-const inputCls = "w-full rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)]";
+const inputCls = "w-full rounded-lg border border-[var(--crm-neutral-200)] bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-[var(--crm-neutral-900)] dark:text-white placeholder:text-[var(--crm-neutral-400)] focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] focus:border-transparent transition-colors";
 
 const DURATION_OPTIONS = [
   { value: "", label: "Non specificata" },
@@ -99,7 +99,8 @@ export function ActivityForm({ open, onClose, activity, defaultType, defaultDueD
           <SheetTitle>{isEditing ? "Modifica attività" : "Nuova attività"}</SheetTitle>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
+        <SheetBody>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-2">Tipo</label>
             <div className="grid grid-cols-3 gap-2">
@@ -160,6 +161,7 @@ export function ActivityForm({ open, onClose, activity, defaultType, defaultDueD
             </Button>
           </div>
         </form>
+        </SheetBody>
       </SheetContent>
     </Sheet>
   );

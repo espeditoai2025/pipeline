@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { Upload, X, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { importContacts } from "@/server/actions/contacts";
 import type { ImportRow } from "@/types/contacts";
@@ -98,7 +98,8 @@ export function ImportCSVModal({ open, onClose, onImported }: Props) {
           <SheetTitle>Importa contatti CSV</SheetTitle>
         </SheetHeader>
 
-        <div className="mt-6 space-y-5">
+        <SheetBody>
+        <div className="space-y-5">
           <div className="rounded-lg border border-dashed border-[var(--crm-neutral-200)] p-4 text-sm text-[var(--crm-neutral-500)]">
             <p className="font-medium mb-1">Colonne supportate:</p>
             <p className="text-xs">
@@ -187,6 +188,7 @@ export function ImportCSVModal({ open, onClose, onImported }: Props) {
             )}
           </div>
         </div>
+        </SheetBody>
       </SheetContent>
     </Sheet>
   );
