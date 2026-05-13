@@ -570,13 +570,6 @@ export default function SettingsPage() {
                   : <div className="flex items-center gap-2 text-sm text-[var(--crm-neutral-400)]"><Loader2 className="h-4 w-4 animate-spin" /> Caricamento…</div>
                 }
               </div>
-
-              <div className="rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 p-4 bg-[var(--crm-neutral-50)] dark:bg-white/5">
-                <p className="text-xs font-medium text-[var(--crm-neutral-600)] dark:text-[var(--crm-neutral-300)] mb-2">Variabile d&apos;ambiente opzionale</p>
-                <p className="text-xs text-[var(--crm-neutral-500)] leading-relaxed">
-                  Imposta <code className="rounded bg-[var(--crm-neutral-200)] dark:bg-white/10 px-1 py-0.5 font-mono">SMTP_ENCRYPTION_KEY</code> in Vercel (min. 32 caratteri) per una cifratura più sicura delle credenziali. Senza di essa viene usata una chiave di sviluppo di default.
-                </p>
-              </div>
             </div>
           )}
 
