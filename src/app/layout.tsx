@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { Providers } from "@/components/shared/Providers";
 import { PWARegister } from "@/components/shared/PWARegister";
+import { CookieBanner } from "@/components/shared/CookieBanner";
 import "./globals.css";
 
 const inter = Inter({
@@ -54,6 +55,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <Providers>{children}</Providers>
         </NextIntlClientProvider>
         <PWARegister />
+        <CookieBanner />
       </body>
     </html>
   );

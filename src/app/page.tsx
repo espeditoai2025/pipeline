@@ -700,15 +700,22 @@ export default function LandingPage() {
               <PipelyAppIcon size={28} className="rounded-lg" />
               <span className="font-semibold text-white">Pipely</span>
             </div>
-            <div className="flex gap-6 text-sm text-slate-400">
+            <div className="flex flex-wrap justify-center gap-5 text-sm text-slate-400">
               <a href="#features" className="hover:text-white transition-colors">Funzionalità</a>
               <a href="#automations" className="hover:text-white transition-colors">Automazioni</a>
               <a href="#pricing" className="hover:text-white transition-colors">Prezzi</a>
               <Link href="/login" className="hover:text-white transition-colors">Accedi</Link>
               <Link href="/register" className="hover:text-white transition-colors">Registrati</Link>
             </div>
-            <div className="text-sm text-slate-500">
-              © {new Date().getFullYear()} Pipely. Tutti i diritti riservati.
+            <div className="flex flex-col items-end gap-1.5">
+              <div className="text-sm text-slate-500">
+                © {new Date().getFullYear()} Pipely. Tutti i diritti riservati.
+              </div>
+              <div className="flex gap-4 text-xs text-slate-600">
+                <Link href="/privacy" className="hover:text-slate-300 transition-colors">Privacy Policy</Link>
+                <Link href="/termini" className="hover:text-slate-300 transition-colors">Termini di Servizio</Link>
+                <Link href="/cookie" className="hover:text-slate-300 transition-colors">Cookie Policy</Link>
+              </div>
             </div>
           </div>
         </div>
