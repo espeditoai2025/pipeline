@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import {
-  User, Shield, CreditCard, Sliders, Building2,
+  User, Shield, CreditCard, Sliders, Building2, Mail,
   Save, Loader2, Eye, EyeOff, Plus, Trash2,
   CheckCircle2, Clock, Key, Users, LogOut,
   Smartphone, Monitor, Package, Briefcase, Activity,
@@ -12,8 +12,11 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { getOrgData, updateOrgName, getTeamMembers, getUsageStats } from "@/server/actions/settings";
+import { getSmtpConfig } from "@/server/actions/smtp";
+import { SmtpWizard } from "@/components/settings/SmtpWizard";
+import type { SmtpConfigPublic } from "@/server/actions/smtp";
 
-type Tab = "profile" | "security" | "billing" | "preferences" | "organization";
+type Tab = "profile" | "security" | "billing" | "preferences" | "organization" | "email";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "profile",      label: "Profilo",        icon: User },
@@ -21,6 +24,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "billing",      label: "Billing",        icon: CreditCard },
   { id: "preferences",  label: "Preferenze",     icon: Sliders },
   { id: "organization", label: "Organizzazione", icon: Building2 },
+  { id: "email",        label: "Email",          icon: Mail },
 ];
 
 const PLANS = [
@@ -121,10 +125,15 @@ export default function SettingsPage() {
   const [members, setMembers] = useState<Members>([]);
   const [usage, setUsage] = useState<Usage>(null);
 
+  // SMTP
+  const [smtpConfig, setSmtpConfig] = useState<SmtpConfigPublic | null>(null);
+  const [smtpLoaded, setSmtpLoaded] = useState(false);
+
   useEffect(() => {
     getOrgData().then((d) => { setOrgData(d); if (d) setOrgName(d.name); });
     getTeamMembers().then(setMembers);
     getUsageStats().then(setUsage);
+    getSmtpConfig().then((c) => { setSmtpConfig(c); setSmtpLoaded(true); });
   }, []);
 
   async function handleSaveProfile() {
@@ -542,6 +551,31 @@ export default function SettingsPage() {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {tab === "email" && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-base font-semibold">Provider email</h2>
+                <p className="text-sm text-[var(--crm-neutral-500)] mt-0.5">
+                  Configura il tuo account email per inviare messaggi direttamente da Pipely.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 bg-white dark:bg-[#1a1a2e] p-5 shadow-sm">
+                {smtpLoaded
+                  ? <SmtpWizard initial={smtpConfig} />
+                  : <div className="flex items-center gap-2 text-sm text-[var(--crm-neutral-400)]"><Loader2 className="h-4 w-4 animate-spin" /> Caricamento…</div>
+                }
+              </div>
+
+              <div className="rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 p-4 bg-[var(--crm-neutral-50)] dark:bg-white/5">
+                <p className="text-xs font-medium text-[var(--crm-neutral-600)] dark:text-[var(--crm-neutral-300)] mb-2">Variabile d&apos;ambiente opzionale</p>
+                <p className="text-xs text-[var(--crm-neutral-500)] leading-relaxed">
+                  Imposta <code className="rounded bg-[var(--crm-neutral-200)] dark:bg-white/10 px-1 py-0.5 font-mono">SMTP_ENCRYPTION_KEY</code> in Vercel (min. 32 caratteri) per una cifratura più sicura delle credenziali. Senza di essa viene usata una chiave di sviluppo di default.
+                </p>
               </div>
             </div>
           )}

@@ -32,6 +32,7 @@ model Organization {
   emailTemplates EmailTemplate[]
   emailLists     EmailList[]
   emailCampaigns EmailCampaign[]
+  smtpConfig     SmtpConfig?
 }
 
 enum Plan {
@@ -491,4 +492,23 @@ enum CampaignStatus {
   SENDING
   SENT
   PAUSED
+}
+
+// ============ SMTP CONFIG ============
+
+model SmtpConfig {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  provider       String   // gmail | aruba | libero | custom
+  host           String
+  port           Int
+  secure         Boolean  @default(false) // true = SSL/TLS, false = STARTTLS
+  fromEmail      String
+  fromName       String?
+  username       String
+  passwordEnc    String   // AES-256 encrypted
+  isVerified     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
