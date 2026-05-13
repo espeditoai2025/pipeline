@@ -22,6 +22,7 @@ export function EmailListsTab({ lists, onChange }: Props) {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
+  const [newEmails, setNewEmails] = useState("");
   const [addEmail, setAddEmail] = useState("");
   const [addFirst, setAddFirst] = useState("");
   const [addLast, setAddLast] = useState("");
@@ -42,10 +43,28 @@ export function EmailListsTab({ lists, onChange }: Props) {
     startTransition(async () => {
       const res = await createEmailList({ name: newName.trim(), description: newDesc.trim() || undefined });
       if (res.error) { toast.error(res.error); return; }
-      onChange([res.data!, ...lists]);
+      const created = res.data!;
+
+      // Parse and import emails entered in the textarea
+      const emailLines = newEmails.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
+      let importedCount = 0;
+      if (emailLines.length > 0) {
+        const contacts = emailLines.map((email) => ({ email }));
+        const imp = await importContactsToList(created.id, contacts);
+        importedCount = imp.data?.added ?? 0;
+        created.contactCount = importedCount;
+      }
+
+      onChange([created, ...lists]);
       setShowCreate(false);
-      setNewName(""); setNewDesc("");
-      toast.success("Lista creata");
+      setNewName(""); setNewDesc(""); setNewEmails("");
+      toast.success(`Lista creata${importedCount > 0 ? ` con ${importedCount} contatti` : ""}`);
+
+      // Open detail if emails were added
+      if (importedCount > 0) {
+        const detail = await getEmailListDetail(created.id);
+        if (detail.data) { setDetail(detail.data); setView({ type: "detail", listId: created.id }); }
+      }
     });
   }
 
@@ -238,8 +257,25 @@ export function EmailListsTab({ lists, onChange }: Props) {
           <p className="text-sm font-medium">Nuova lista email</p>
           <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nome lista *" className={inputCls} />
           <input value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="Descrizione (opzionale)" className={inputCls} />
+          <div>
+            <label className="block text-xs font-medium text-[var(--crm-neutral-500)] mb-1.5">
+              Email destinatari (opzionale)
+            </label>
+            <textarea
+              value={newEmails}
+              onChange={(e) => setNewEmails(e.target.value)}
+              rows={5}
+              className={`${inputCls} resize-none font-mono text-xs`}
+              placeholder={"mario@esempio.it\nluca@azienda.it\nsara@email.com\n\nUna email per riga (o separate da virgola/punto e virgola)"}
+            />
+            {newEmails.trim() && (
+              <p className="mt-1 text-xs text-[var(--crm-neutral-400)]">
+                {newEmails.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean).length} email rilevate
+              </p>
+            )}
+          </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => { setShowCreate(false); setNewName(""); setNewDesc(""); }}>Annulla</Button>
+            <Button size="sm" variant="outline" onClick={() => { setShowCreate(false); setNewName(""); setNewDesc(""); setNewEmails(""); }}>Annulla</Button>
             <Button size="sm" className="bg-[var(--crm-primary)] text-white" onClick={handleCreate} disabled={!newName.trim()}>Crea</Button>
           </div>
         </div>
