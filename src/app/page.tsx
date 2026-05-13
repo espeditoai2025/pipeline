@@ -554,7 +554,7 @@ export default function LandingPage() {
                   "Supporto prioritario",
                 ],
                 excluded: [],
-                cta: "Inizia la prova",
+                cta: "Passa a Pro",
                 href: "/register",
                 highlight: true,
               },
