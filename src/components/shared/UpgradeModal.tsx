@@ -1,7 +1,7 @@
 "use client";
 
 import { X, Zap, Check } from "lucide-react";
-import { PRO_FEATURES } from "@/lib/plan-client";
+import { PRO_FEATURES, PRO_PRICING } from "@/lib/plan-client";
 
 interface UpgradeModalProps {
   message: string;
@@ -52,9 +52,10 @@ export function UpgradeModal({ message, onClose }: UpgradeModalProps) {
           </div>
 
           <div className="rounded-xl bg-slate-800 border border-white/5 p-4 flex items-baseline gap-1.5">
-            <span className="text-3xl font-bold text-white">€29</span>
+            <span className="text-sm line-through text-slate-500 mr-1">{PRO_PRICING.monthlyFull}</span>
+            <span className="text-3xl font-bold text-white">{PRO_PRICING.monthly}</span>
             <span className="text-sm text-slate-400">/mese</span>
-            <span className="ml-auto text-xs text-slate-500">oppure €290/anno (2 mesi omaggio)</span>
+            <span className="ml-auto text-xs text-slate-500">oppure {PRO_PRICING.yearly}/anno ({PRO_PRICING.yearlyNote})</span>
           </div>
 
           <a

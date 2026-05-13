@@ -10,6 +10,15 @@ import { decrypt } from "./crypto";
 import nodemailer from "nodemailer";
 import type { TriggerConfig, WorkflowStep } from "@/types/workflows";
 
+function esc(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // ─── Payload types per trigger ────────────────────────────────────────────────
 
 export type WorkflowPayload =
@@ -100,9 +109,10 @@ async function executeStep(
       if (!tpl) return `SKIP SEND_EMAIL: template ${action.templateId} non trovato`;
 
       const entityLabel = "dealTitle" in payload ? payload.dealTitle : "contactName" in payload ? payload.contactName : "leadTitle" in payload ? payload.leadTitle : "";
+      const safeLabel = esc(entityLabel);
 
       const subject = tpl.subject.replace(/\{\{deal\}\}/gi, entityLabel).replace(/\{\{nome\}\}/gi, entityLabel);
-      const html    = tpl.body   .replace(/\{\{deal\}\}/gi, entityLabel).replace(/\{\{nome\}\}/gi, entityLabel);
+      const html    = tpl.body   .replace(/\{\{deal\}\}/gi, safeLabel).replace(/\{\{nome\}\}/gi, safeLabel);
 
       await sendMail(orgId, { to: toEmail, subject, html });
       return `SEND_EMAIL → ${toEmail} (template: ${tpl.name})`;

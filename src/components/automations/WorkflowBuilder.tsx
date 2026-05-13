@@ -215,7 +215,7 @@ export function WorkflowBuilder({ open, onClose, workflow, onSaved }: Props) {
             <div className="mt-3">
               <p className="text-xs font-medium text-[var(--crm-neutral-500)] mb-1.5">Aggiungi azione:</p>
               <div className="flex flex-wrap gap-1.5">
-                {(Object.keys(ACTION_CONFIG) as ActionType[]).map((t) => {
+                {(Object.keys(ACTION_CONFIG) as ActionType[]).filter((t) => !ACTION_CONFIG[t].disabled).map((t) => {
                   const { label, icon: Icon, color } = ACTION_CONFIG[t];
                   return (
                     <button
