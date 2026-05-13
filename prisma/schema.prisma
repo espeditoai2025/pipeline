@@ -19,16 +19,17 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users        User[]
-  pipelines    Pipeline[]
-  deals        Deal[]
-  contacts     Contact[]
-  companies    Company[]
-  activities   Activity[]
-  leads        Lead[]
-  products     Product[]
-  workflows    Workflow[]
-  customFields CustomField[]
+  users          User[]
+  pipelines      Pipeline[]
+  deals          Deal[]
+  contacts       Contact[]
+  companies      Company[]
+  activities     Activity[]
+  leads          Lead[]
+  products       Product[]
+  workflows      Workflow[]
+  customFields   CustomField[]
+  emailTemplates EmailTemplate[]
 }
 
 enum Plan {
@@ -274,21 +275,45 @@ model EmailAccount {
 }
 
 model Email {
-  id          String    @id @default(cuid())
-  subject     String
-  body        String    @db.Text
-  fromAddress String
-  toAddresses String[]
-  sentAt      DateTime?
-  openedAt    DateTime?
-  clickedAt   DateTime?
-  contactId   String?
-  contact     Contact?  @relation(fields: [contactId], references: [id])
-  dealId      String?
-  deal        Deal?     @relation(fields: [dealId], references: [id])
-  trackingId  String    @unique @default(cuid())
+  id             String    @id @default(cuid())
+  subject        String
+  body           String    @db.Text
+  fromAddress    String
+  fromName       String?
+  toAddresses    String[]
+  ccAddresses    String[]  @default([])
+  status         String    @default("SENT") // SENT, DRAFT, RECEIVED
+  threadId       String?
+  sentAt         DateTime?
+  openedAt       DateTime?
+  clickedAt      DateTime?
+  contactId      String?
+  contact        Contact?  @relation(fields: [contactId], references: [id])
+  dealId         String?
+  deal           Deal?     @relation(fields: [dealId], references: [id])
+  trackingId     String    @unique @default(cuid())
+  organizationId String?
 
   createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([threadId])
+}
+
+model EmailTemplate {
+  id             String   @id @default(cuid())
+  name           String
+  subject        String
+  body           String   @db.Text
+  category       String
+  usageCount     Int      @default(0)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
 }
 
 // ============ PRODUCTS ============
@@ -322,15 +347,17 @@ model DealProduct {
 model Workflow {
   id             String       @id @default(cuid())
   name           String
+  description    String?
   isActive       Boolean      @default(false)
-  trigger        Json         // trigger configuration
-  steps          Json         // array of steps
+  trigger        Json
+  steps          Json
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   executions WorkflowExecution[]
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model WorkflowExecution {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -8,7 +9,7 @@ import { Loader2, FileText, Send, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { sendEmail, saveDraft } from "@/server/actions/emails";
+import { sendEmail, saveDraft, incrementTemplateUsage } from "@/server/actions/emails";
 import { AIEmailWriter } from "@/components/ai/AIEmailWriter";
 import type { EmailThread, EmailTemplate, EmailMessage } from "@/types/emails";
 import type { AIEmailDraft } from "@/types/ai";
@@ -32,7 +33,7 @@ type Props = {
 
 const inputCls = "w-full rounded-lg border border-[var(--crm-neutral-200)] bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-[var(--crm-neutral-900)] dark:text-white placeholder:text-[var(--crm-neutral-400)] focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] focus:border-transparent transition-colors";
 
-function applyTemplate(tpl: EmailTemplate, replyThread?: EmailThread | null): Partial<FormValues> {
+function applyTemplate(tpl: EmailTemplate, senderName: string, replyThread?: EmailThread | null): Partial<FormValues> {
   const contactName = replyThread?.contactName ?? "";
   const dealTitle = replyThread?.dealTitle ?? "";
   const today = new Date().toLocaleDateString("it-IT");
@@ -40,7 +41,7 @@ function applyTemplate(tpl: EmailTemplate, replyThread?: EmailThread | null): Pa
     .replace(/{{nome}}/g, contactName)
     .replace(/{{azienda}}/g, dealTitle)
     .replace(/{{data}}/g, today)
-    .replace(/{{mittente}}/g, "Mario Rossi")
+    .replace(/{{mittente}}/g, senderName)
     .replace(/{{prodotto}}/g, "Pipely")
     .replace(/{{oggetto}}/g, replyThread?.subject ?? "")
     .replace(/{{scadenza}}/g, "");
@@ -52,9 +53,12 @@ function applyTemplate(tpl: EmailTemplate, replyThread?: EmailThread | null): Pa
 
 export function ComposeEmailModal({ open, onClose, replyThread, templates, onSent }: Props) {
   const [showTemplates, setShowTemplates] = useState(false);
+  const { data: session } = useSession();
+  const myEmail = session?.user?.email ?? "";
+  const myName = session?.user?.name ?? "Pipely CRM";
 
   const lastMsg = replyThread?.messages[replyThread.messages.length - 1];
-  const defaultTo = replyThread ? (lastMsg?.from === "mario@acme.com" ? lastMsg?.to[0] : lastMsg?.from) ?? "" : "";
+  const defaultTo = replyThread ? (lastMsg?.from === myEmail ? lastMsg?.to[0] : lastMsg?.from) ?? "" : "";
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -95,10 +99,11 @@ export function ComposeEmailModal({ open, onClose, replyThread, templates, onSen
   }
 
   function applyTpl(tpl: EmailTemplate) {
-    const applied = applyTemplate(tpl, replyThread);
+    const applied = applyTemplate(tpl, myName, replyThread);
     if (applied.subject) setValue("subject", applied.subject);
     if (applied.body) setValue("body", applied.body);
     setShowTemplates(false);
+    incrementTemplateUsage(tpl.id);
     toast.success(`Template "${tpl.name}" applicato`);
   }
 

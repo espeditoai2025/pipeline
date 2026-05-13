@@ -1,21 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { Workflow as WorkflowIcon, Plus, ScrollText } from "lucide-react";
-import { MOCK_WORKFLOWS, MOCK_WORKFLOW_LOGS } from "@/lib/mock-workflows";
 import { WorkflowCard } from "@/components/automations/WorkflowCard";
 import { WorkflowBuilder } from "@/components/automations/WorkflowBuilder";
 import { AutomationLogView } from "@/components/automations/AutomationLogView";
 import { Button } from "@/components/ui/button";
+import { getWorkflows, getWorkflowLogs } from "@/server/actions/workflows";
 import type { Workflow } from "@/types/workflows";
+import type { WorkflowLog } from "@/types/workflows";
 
 type Tab = "workflows" | "logs";
 
 export default function AutomationsPage() {
   const [tab, setTab] = useState<Tab>("workflows");
-  const [workflows, setWorkflows] = useState(MOCK_WORKFLOWS);
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [logs, setLogs] = useState<WorkflowLog[]>([]);
   const [builderOpen, setBuilderOpen] = useState(false);
   const [editing, setEditing] = useState<Workflow | null>(null);
+  const [, startTransition] = useTransition();
+
+  useEffect(() => {
+    startTransition(async () => {
+      const [wfs, wlogs] = await Promise.all([getWorkflows(), getWorkflowLogs()]);
+      setWorkflows(wfs);
+      setLogs(wlogs);
+    });
+  }, []);
 
   const activeCount = workflows.filter((w) => w.isActive).length;
   const totalRuns = workflows.reduce((s, w) => s + w.executionCount, 0);
@@ -68,9 +79,9 @@ export default function AutomationsPage() {
       {/* Stats strip */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "Automazioni totali",  value: workflows.length },
-          { label: "Attive",              value: activeCount },
-          { label: "Esecuzioni totali",   value: totalRuns },
+          { label: "Automazioni totali", value: workflows.length },
+          { label: "Attive",             value: activeCount },
+          { label: "Esecuzioni totali",  value: totalRuns },
         ].map((s) => (
           <div key={s.label} className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] px-4 py-3 text-center">
             <p className="text-2xl font-bold text-[var(--crm-primary)]">{s.value}</p>
@@ -92,6 +103,11 @@ export default function AutomationsPage() {
           className={`flex items-center gap-1.5 px-4 py-2 text-sm transition-colors border-l border-[var(--crm-neutral-100)] ${tab === "logs" ? "bg-[var(--crm-primary)] text-white" : "text-[var(--crm-neutral-600)] hover:bg-[var(--crm-neutral-50)]"}`}
         >
           <ScrollText className="h-4 w-4" /> Log esecuzioni
+          {logs.length > 0 && (
+            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${tab === "logs" ? "bg-white/20" : "bg-[var(--crm-neutral-200)] text-[var(--crm-neutral-600)]"}`}>
+              {logs.length}
+            </span>
+          )}
         </button>
       </div>
 
@@ -124,7 +140,7 @@ export default function AutomationsPage() {
           )}
         </div>
       ) : (
-        <AutomationLogView logs={MOCK_WORKFLOW_LOGS} />
+        <AutomationLogView logs={logs} />
       )}
 
       <WorkflowBuilder

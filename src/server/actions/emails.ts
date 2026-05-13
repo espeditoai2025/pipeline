@@ -2,9 +2,61 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
-import { MOCK_EMAIL_TEMPLATES } from "@/lib/mock-emails";
+import { db } from "@/lib/db";
+import { resend, FROM_DEFAULT, isEmailEnabled } from "@/lib/resend";
 import type { EmailMessage, EmailTemplate } from "@/types/emails";
+
+function getOrgId(s: Session | null) {
+  return (s?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
+}
+
+function mapEmail(row: {
+  id: string; subject: string; body: string; fromAddress: string; fromName: string | null;
+  toAddresses: string[]; ccAddresses: string[]; status: string; threadId: string | null;
+  sentAt: Date | null; openedAt: Date | null; clickedAt: Date | null; trackingId: string;
+  createdAt: Date; contactId: string | null; dealId: string | null;
+}, dealTitle?: string | null, contactName?: string | null): EmailMessage {
+  return {
+    id: row.id,
+    threadId: row.threadId ?? row.id,
+    subject: row.subject,
+    body: row.body,
+    from: row.fromAddress,
+    fromName: row.fromName ?? "",
+    to: row.toAddresses,
+    cc: row.ccAddresses,
+    status: row.status as EmailMessage["status"],
+    tracking: row.openedAt ? "OPENED" : row.sentAt ? "SENT" : "NONE",
+    openedAt: row.openedAt?.toISOString() ?? null,
+    clickedAt: row.clickedAt?.toISOString() ?? null,
+    sentAt: row.sentAt?.toISOString() ?? null,
+    createdAt: row.createdAt.toISOString(),
+    dealId: row.dealId,
+    dealTitle: dealTitle ?? null,
+    contactId: row.contactId,
+    contactName: contactName ?? null,
+  };
+}
+
+function mapTemplate(row: {
+  id: string; name: string; subject: string; body: string; category: string;
+  usageCount: number; createdAt: Date; updatedAt: Date;
+}): EmailTemplate {
+  return {
+    id: row.id,
+    name: row.name,
+    subject: row.subject,
+    body: row.body,
+    category: row.category,
+    usageCount: row.usageCount,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+// ─── Schemas ─────────────────────────────────────────────────────────────────
 
 const composeSchema = z.object({
   to: z.string().email("Email destinatario non valida"),
@@ -24,124 +76,173 @@ const templateSchema = z.object({
   category: z.string().min(1, "Categoria obbligatoria"),
 });
 
+// ─── Read ─────────────────────────────────────────────────────────────────────
+
+export async function getEmails(): Promise<EmailMessage[]> {
+  const session = await auth();
+  const orgId = getOrgId(session);
+  if (!orgId) return [];
+
+  const rows = await db.email.findMany({
+    where: { organizationId: orgId },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+    include: { deal: { select: { title: true } }, contact: { select: { firstName: true, lastName: true } } },
+  });
+
+  return rows.map((r) =>
+    mapEmail(r, r.deal?.title, r.contact ? `${r.contact.firstName} ${r.contact.lastName ?? ""}`.trim() : null)
+  );
+}
+
+export async function getTemplates(): Promise<EmailTemplate[]> {
+  const session = await auth();
+  const orgId = getOrgId(session);
+  if (!orgId) return [];
+
+  const rows = await db.emailTemplate.findMany({
+    where: { organizationId: orgId },
+    orderBy: { usageCount: "desc" },
+  });
+  return rows.map(mapTemplate);
+}
+
+// ─── Send ─────────────────────────────────────────────────────────────────────
+
 export async function sendEmail(input: z.infer<typeof composeSchema>): Promise<{ data: EmailMessage | null; error: string | null }> {
   const session = await auth();
-  if (!session) return { data: null, error: "Non autorizzato" };
+  const orgId = getOrgId(session);
+  if (!session || !orgId) return { data: null, error: "Non autorizzato" };
 
   const parsed = composeSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
 
-  // TODO: integrate real email provider (Resend, SendGrid, etc.)
-  const message: EmailMessage = {
-    id: `msg-${Date.now()}`,
-    threadId: `thread-${Date.now()}`,
-    subject: parsed.data.subject,
-    body: parsed.data.body,
-    from: session.user?.email ?? "",
-    fromName: session.user?.name ?? "",
-    to: [parsed.data.to],
-    cc: parsed.data.cc ? [parsed.data.cc] : [],
-    status: "SENT",
-    tracking: "SENT",
-    openedAt: null,
-    clickedAt: null,
-    sentAt: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
-    dealId: parsed.data.dealId || null,
-    dealTitle: parsed.data.dealTitle || null,
-    contactId: parsed.data.contactId || null,
-    contactName: parsed.data.contactName || null,
-  };
+  const { to, cc, subject, body, dealId, contactId } = parsed.data;
+  const fromAddress = session.user?.email ?? "noreply@pipely.app";
+  const fromName = session.user?.name ?? "Pipely CRM";
+  const threadId = `thread-${Date.now()}`;
+  const now = new Date();
+
+  // Attempt real send via Resend if configured
+  if (isEmailEnabled() && resend) {
+    try {
+      await resend.emails.send({
+        from: FROM_DEFAULT,
+        to: [to],
+        cc: cc ? [cc] : undefined,
+        subject,
+        html: body.replace(/\n/g, "<br>"),
+        replyTo: fromAddress,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Errore invio email";
+      console.error("[sendEmail] Resend error:", msg);
+      return { data: null, error: `Errore invio: ${msg}` };
+    }
+  }
+
+  // Save to DB
+  const row = await db.email.create({
+    data: {
+      subject,
+      body,
+      fromAddress,
+      fromName,
+      toAddresses: [to],
+      ccAddresses: cc ? [cc] : [],
+      status: "SENT",
+      threadId,
+      sentAt: now,
+      dealId: dealId || null,
+      contactId: contactId || null,
+      organizationId: orgId,
+    },
+  });
 
   revalidatePath("/emails");
-  return { data: message, error: null };
+  return { data: mapEmail(row, parsed.data.dealTitle, parsed.data.contactName), error: null };
 }
 
 export async function saveDraft(input: z.infer<typeof composeSchema>): Promise<{ data: EmailMessage | null; error: string | null }> {
   const session = await auth();
-  if (!session) return { data: null, error: "Non autorizzato" };
+  const orgId = getOrgId(session);
+  if (!session || !orgId) return { data: null, error: "Non autorizzato" };
 
   const parsed = composeSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
 
-  // TODO: real DB insert
-  const message: EmailMessage = {
-    id: `msg-draft-${Date.now()}`,
-    threadId: `thread-draft-${Date.now()}`,
-    subject: parsed.data.subject,
-    body: parsed.data.body,
-    from: session.user?.email ?? "",
-    fromName: session.user?.name ?? "",
-    to: [parsed.data.to],
-    cc: parsed.data.cc ? [parsed.data.cc] : [],
-    status: "DRAFT",
-    tracking: "NONE",
-    openedAt: null,
-    clickedAt: null,
-    sentAt: null,
-    createdAt: new Date().toISOString(),
-    dealId: parsed.data.dealId || null,
-    dealTitle: parsed.data.dealTitle || null,
-    contactId: parsed.data.contactId || null,
-    contactName: parsed.data.contactName || null,
-  };
+  const { to, cc, subject, body, dealId, contactId } = parsed.data;
+
+  const row = await db.email.create({
+    data: {
+      subject,
+      body,
+      fromAddress: session.user?.email ?? "",
+      fromName: session.user?.name ?? "",
+      toAddresses: [to],
+      ccAddresses: cc ? [cc] : [],
+      status: "DRAFT",
+      dealId: dealId || null,
+      contactId: contactId || null,
+      organizationId: orgId,
+    },
+  });
 
   revalidatePath("/emails");
-  return { data: message, error: null };
+  return { data: mapEmail(row, parsed.data.dealTitle, parsed.data.contactName), error: null };
 }
+
+// ─── Templates CRUD ──────────────────────────────────────────────────────────
 
 export async function createTemplate(input: z.infer<typeof templateSchema>): Promise<{ data: EmailTemplate | null; error: string | null }> {
   const session = await auth();
-  if (!session) return { data: null, error: "Non autorizzato" };
+  const orgId = getOrgId(session);
+  if (!session || !orgId) return { data: null, error: "Non autorizzato" };
 
   const parsed = templateSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
 
-  // TODO: real DB insert
-  const template: EmailTemplate = {
-    id: `tpl-${Date.now()}`,
-    name: parsed.data.name,
-    subject: parsed.data.subject,
-    body: parsed.data.body,
-    category: parsed.data.category,
-    usageCount: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+  const row = await db.emailTemplate.create({
+    data: { ...parsed.data, organizationId: orgId },
+  });
 
   revalidatePath("/emails");
-  return { data: template, error: null };
+  return { data: mapTemplate(row), error: null };
 }
 
 export async function updateTemplate(input: z.infer<typeof templateSchema> & { id: string }): Promise<{ data: EmailTemplate | null; error: string | null }> {
   const session = await auth();
-  if (!session) return { data: null, error: "Non autorizzato" };
+  const orgId = getOrgId(session);
+  if (!session || !orgId) return { data: null, error: "Non autorizzato" };
 
   const parsed = templateSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
 
-  const existing = MOCK_EMAIL_TEMPLATES.find((t) => t.id === input.id);
-  if (!existing) return { data: null, error: "Template non trovato" };
-
-  // TODO: real DB update
-  const updated: EmailTemplate = {
-    ...existing,
-    name: parsed.data.name,
-    subject: parsed.data.subject,
-    body: parsed.data.body,
-    category: parsed.data.category,
-    updatedAt: new Date().toISOString(),
-  };
+  const row = await db.emailTemplate.update({
+    where: { id: input.id, organizationId: orgId },
+    data: parsed.data,
+  });
 
   revalidatePath("/emails");
-  return { data: updated, error: null };
+  return { data: mapTemplate(row), error: null };
 }
 
 export async function deleteTemplate(id: string): Promise<{ error: string | null }> {
   const session = await auth();
-  if (!session) return { error: "Non autorizzato" };
+  const orgId = getOrgId(session);
+  if (!orgId) return { error: "Non autorizzato" };
 
-  // TODO: real DB delete
+  await db.emailTemplate.delete({ where: { id, organizationId: orgId } });
   revalidatePath("/emails");
   return { error: null };
+}
+
+export async function incrementTemplateUsage(id: string): Promise<void> {
+  const session = await auth();
+  const orgId = getOrgId(session);
+  if (!orgId) return;
+  await db.emailTemplate.update({
+    where: { id, organizationId: orgId },
+    data: { usageCount: { increment: 1 } },
+  });
 }
