@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -13,7 +13,7 @@ import {
 import { ArrowUpDown, Pencil, Trash2, Plus, Upload, Building2, Mail, Phone, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { deleteContact } from "@/server/actions/contacts";
+import { deleteContact, getContacts } from "@/server/actions/contacts";
 import { ContactForm } from "./ContactForm";
 import { ImportCSVModal } from "./ImportCSVModal";
 import type { Contact, Company, DuplicateGroup } from "@/types/contacts";
@@ -235,7 +235,10 @@ export function ContactsTable({ initialContacts, companies }: Props) {
       <ImportCSVModal
         open={importOpen}
         onClose={() => setImportOpen(false)}
-        onImported={() => {}}
+        onImported={useCallback(async () => {
+          const fresh = await getContacts();
+          setContacts(fresh);
+        }, [])}
       />
     </div>
   );

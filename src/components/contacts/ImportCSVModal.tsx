@@ -128,6 +128,7 @@ export function ImportCSVModal({ open, onClose, onImported }: Props) {
     } else {
       setResult({ imported: res.imported, duplicates: res.duplicates });
       toast.success(`Importati ${res.imported} contatti`);
+      onImported();
     }
   }
 
@@ -139,7 +140,6 @@ export function ImportCSVModal({ open, onClose, onImported }: Props) {
     parsedRowsRef.current = [];
     if (fileRef.current) fileRef.current.value = "";
     onClose();
-    if (result) onImported();
   }
 
   const previewHeaders = preview.length > 0 ? Object.keys(preview[0]!) : [];
