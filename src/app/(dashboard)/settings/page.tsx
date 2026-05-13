@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import {
   User, Shield, CreditCard, Sliders, Building2,
   Save, Loader2, Eye, EyeOff, Plus, Trash2, Download,
@@ -80,9 +81,20 @@ const inputCls = "w-full rounded-lg border border-[var(--crm-neutral-100)] px-3 
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>("profile");
+  const { data: session } = useSession();
 
-  // Profile state
-  const [profile, setProfile] = useState({ name: "Mario Rossi", email: "mario@acme.com", phone: "+39 02 1234567", timezone: "Europe/Rome", jobTitle: "Sales Director" });
+  // Profile state — inizializzato con dati reali dalla sessione
+  const [profile, setProfile] = useState({ name: "", email: "", phone: "", timezone: "Europe/Rome", jobTitle: "" });
+
+  useEffect(() => {
+    if (session?.user) {
+      setProfile(p => ({
+        ...p,
+        name: session.user.name ?? "",
+        email: session.user.email ?? "",
+      }));
+    }
+  }, [session]);
   const [savingProfile, setSavingProfile] = useState(false);
 
   // Security state
