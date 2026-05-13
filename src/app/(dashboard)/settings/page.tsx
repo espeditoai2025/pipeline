@@ -87,11 +87,12 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState({ name: "", email: "", phone: "", timezone: "Europe/Rome", jobTitle: "" });
 
   useEffect(() => {
-    if (session?.user) {
+    const user = session?.user;
+    if (user) {
       setProfile(p => ({
         ...p,
-        name: session.user.name ?? "",
-        email: session.user.email ?? "",
+        name: user.name ?? "",
+        email: user.email ?? "",
       }));
     }
   }, [session]);

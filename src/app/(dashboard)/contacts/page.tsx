@@ -1,9 +1,10 @@
 import { Users } from "lucide-react";
-import { MOCK_CONTACTS } from "@/lib/mock-contacts";
-import { MOCK_COMPANIES } from "@/lib/mock-contacts";
+import { getContacts, getCompanies } from "@/server/actions/contacts";
 import { ContactsTable } from "@/components/contacts/ContactsTable";
 
-export default function ContactsPage() {
+export default async function ContactsPage() {
+  const [contacts, companies] = await Promise.all([getContacts(), getCompanies()]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -12,11 +13,11 @@ export default function ContactsPage() {
         </div>
         <div>
           <h1 className="text-xl font-bold">Contatti</h1>
-          <p className="text-sm text-[var(--crm-neutral-500)]">{MOCK_CONTACTS.length} contatti totali</p>
+          <p className="text-sm text-[var(--crm-neutral-500)]">{contacts.length} contatti totali</p>
         </div>
       </div>
 
-      <ContactsTable initialContacts={MOCK_CONTACTS} companies={MOCK_COMPANIES} />
+      <ContactsTable initialContacts={contacts} companies={companies} />
     </div>
   );
 }

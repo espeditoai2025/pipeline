@@ -1,9 +1,10 @@
 import { Zap } from "lucide-react";
-import { MOCK_LEADS } from "@/lib/mock-contacts";
+import { getLeads } from "@/server/actions/leads";
 import { LeadsTable } from "@/components/leads/LeadsTable";
 
-export default function LeadsPage() {
-  const newCount = MOCK_LEADS.filter((l) => l.status === "NEW").length;
+export default async function LeadsPage() {
+  const leads = await getLeads();
+  const newCount = leads.filter((l) => l.status === "NEW").length;
 
   return (
     <div className="space-y-6">
@@ -14,12 +15,12 @@ export default function LeadsPage() {
         <div>
           <h1 className="text-xl font-bold">Lead</h1>
           <p className="text-sm text-[var(--crm-neutral-500)]">
-            {MOCK_LEADS.length} lead totali · {newCount} nuovi
+            {leads.length} lead totali · {newCount} nuovi
           </p>
         </div>
       </div>
 
-      <LeadsTable initialLeads={MOCK_LEADS} />
+      <LeadsTable initialLeads={leads} />
     </div>
   );
 }
