@@ -111,12 +111,16 @@ export async function getDashboardData() {
 }
 
 export type OnboardingStatus = {
-  hasCompany: boolean;
-  hasContact: boolean;
-  hasProduct: boolean;
-  hasDeal: boolean;
-  hasActivity: boolean;
-  hasPipeline: boolean;
+  hasCompany:   boolean;
+  hasContact:   boolean;
+  hasProduct:   boolean;
+  hasDeal:      boolean;
+  hasActivity:  boolean;
+  hasPipeline:  boolean;
+  hasSmtp:      boolean;
+  hasWorkflow:  boolean;
+  hasEmailList: boolean;
+  hasCampaign:  boolean;
 };
 
 export async function getOnboardingStatus(): Promise<OnboardingStatus | null> {
@@ -124,22 +128,30 @@ export async function getOnboardingStatus(): Promise<OnboardingStatus | null> {
   const orgId = getOrgId(session);
   if (!orgId) return null;
 
-  const [companies, contacts, products, deals, activities, pipelines] = await Promise.all([
+  const [companies, contacts, products, deals, activities, pipelines, smtp, workflows, emailLists, campaigns] = await Promise.all([
     db.company.count({ where: { organizationId: orgId } }),
     db.contact.count({ where: { organizationId: orgId } }),
     db.product.count({ where: { organizationId: orgId } }),
     db.deal.count({ where: { organizationId: orgId } }),
     db.activity.count({ where: { organizationId: orgId } }),
     db.pipeline.count({ where: { organizationId: orgId } }),
+    db.smtpConfig.count({ where: { organizationId: orgId } }),
+    db.workflow.count({ where: { organizationId: orgId } }),
+    db.emailList.count({ where: { organizationId: orgId } }),
+    db.emailCampaign.count({ where: { organizationId: orgId } }),
   ]);
 
   return {
-    hasCompany:  companies  > 0,
-    hasContact:  contacts   > 0,
-    hasProduct:  products   > 0,
-    hasDeal:     deals      > 0,
-    hasActivity: activities > 0,
-    hasPipeline: pipelines  > 0,
+    hasCompany:   companies  > 0,
+    hasContact:   contacts   > 0,
+    hasProduct:   products   > 0,
+    hasDeal:      deals      > 0,
+    hasActivity:  activities > 0,
+    hasPipeline:  pipelines  > 0,
+    hasSmtp:      smtp       > 0,
+    hasWorkflow:  workflows  > 0,
+    hasEmailList: emailLists > 0,
+    hasCampaign:  campaigns  > 0,
   };
 }
 

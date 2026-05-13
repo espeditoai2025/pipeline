@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Building2, Users, Package, Briefcase, Calendar,
   CheckCircle2, ChevronRight, X, Sparkles, Rocket, GitMerge,
+  Mail, Zap, ListChecks, Megaphone,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import type { OnboardingStatus } from "@/server/actions/dashboard";
@@ -82,6 +83,46 @@ const STEPS: Step[] = [
     description: "Aggiungi una chiamata, un meeting o un task su un affare o contatto.",
     cta: "Pianifica attività",
     href: "/activities",
+  },
+  {
+    id: "hasSmtp",
+    icon: Mail,
+    iconBg: "bg-sky-100 dark:bg-sky-900/30",
+    iconColor: "text-sky-600",
+    title: "Collega il tuo account email",
+    description: "Configura Gmail, Aruba, Libero o un provider SMTP custom per inviare email reali da Pipely.",
+    cta: "Configura email",
+    href: "/settings",
+  },
+  {
+    id: "hasWorkflow",
+    icon: Zap,
+    iconBg: "bg-yellow-100 dark:bg-yellow-900/30",
+    iconColor: "text-yellow-600",
+    title: "Crea un'automazione",
+    description: "Automatizza follow-up, notifiche e assegnazioni con workflow trigger-action senza codice.",
+    cta: "Crea automazione",
+    href: "/automations",
+  },
+  {
+    id: "hasEmailList",
+    icon: ListChecks,
+    iconBg: "bg-indigo-100 dark:bg-indigo-900/30",
+    iconColor: "text-indigo-600",
+    title: "Crea una lista email",
+    description: "Organizza i tuoi contatti in liste per le campagne. Importa da CSV o Excel.",
+    cta: "Crea lista",
+    href: "/emails",
+  },
+  {
+    id: "hasCampaign",
+    icon: Megaphone,
+    iconBg: "bg-rose-100 dark:bg-rose-900/30",
+    iconColor: "text-rose-600",
+    title: "Lancia la prima campagna",
+    description: "Crea e invia una campagna email alla tua lista. Monitora aperture e click.",
+    cta: "Crea campagna",
+    href: "/emails",
   },
 ];
 
