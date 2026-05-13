@@ -27,6 +27,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
         <div className="mx-auto max-w-4xl flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-400">
           <span>© {new Date().getFullYear()} Pipely — Tutti i diritti riservati</span>
           <div className="flex gap-5">
+            <Link href="/contatti" className="hover:text-slate-700 transition-colors">Contatti</Link>
             <Link href="/privacy" className="hover:text-slate-700 transition-colors">Privacy Policy</Link>
             <Link href="/termini" className="hover:text-slate-700 transition-colors">Termini di Servizio</Link>
             <Link href="/cookie" className="hover:text-slate-700 transition-colors">Cookie Policy</Link>

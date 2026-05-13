@@ -704,6 +704,7 @@ export default function LandingPage() {
               <a href="#features" className="hover:text-white transition-colors">Funzionalità</a>
               <a href="#automations" className="hover:text-white transition-colors">Automazioni</a>
               <a href="#pricing" className="hover:text-white transition-colors">Prezzi</a>
+              <Link href="/contatti" className="hover:text-white transition-colors">Contatti</Link>
               <Link href="/login" className="hover:text-white transition-colors">Accedi</Link>
               <Link href="/register" className="hover:text-white transition-colors">Registrati</Link>
             </div>
