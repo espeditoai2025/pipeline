@@ -1,8 +1,9 @@
 import { getAdminOrgDetail } from "@/server/actions/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, Mail } from "lucide-react";
 import { PlanChanger } from "./PlanChanger";
+import { DeleteOrgButton } from "./DeleteOrgButton";
 
 
 const ROLE_BADGE: Record<string, string> = {
@@ -49,11 +50,22 @@ export default async function OrgDetailPage(ctx: { params: Promise<{ id: string 
             · slug: <span className="font-mono text-slate-300">{org.slug}</span>
           </p>
         </div>
-        <div className={`flex items-center gap-1.5 text-xs ${org.hasSmtp ? "text-emerald-400" : "text-slate-500"}`}>
-          {org.hasSmtp
-            ? <><CheckCircle2 className="h-4 w-4" /> SMTP configurato</>
-            : <><XCircle className="h-4 w-4" /> SMTP non configurato</>
-          }
+        <div className="flex flex-col items-end gap-2">
+          <div className={`flex items-center gap-1.5 text-xs ${org.hasSmtp ? "text-emerald-400" : "text-slate-500"}`}>
+            {org.hasSmtp
+              ? <><CheckCircle2 className="h-4 w-4" /> SMTP configurato</>
+              : <><XCircle className="h-4 w-4" /> SMTP non configurato</>
+            }
+          </div>
+          {org.users[0]?.email && (
+            <a
+              href={`mailto:${org.users[0].email}?subject=Pipely%20—%20${encodeURIComponent(org.name)}`}
+              className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-slate-800 px-3 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+            >
+              <Mail className="h-3.5 w-3.5" />
+              Scrivi all&apos;owner
+            </a>
+          )}
         </div>
       </div>
 
@@ -75,6 +87,12 @@ export default async function OrgDetailPage(ctx: { params: Promise<{ id: string 
           <StatCard label="Liste email" value={stats.emailLists} />
           <StatCard label="Campagne inviate" value={stats.campaignsSent} />
         </div>
+      </div>
+
+      {/* Danger zone */}
+      <div className="rounded-xl border border-red-900/30 bg-red-950/10 p-5">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-red-500/70 mb-3">Zona pericolosa</p>
+        <DeleteOrgButton orgId={org.id} orgName={org.name} />
       </div>
 
       {/* Users */}

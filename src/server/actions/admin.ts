@@ -203,3 +203,143 @@ export async function getAdminOrgDetail(id: string): Promise<AdminOrgDetail | nu
     },
   };
 }
+
+// ─── Delete organization ───────────────────────────────────────────────────────
+
+export async function deleteOrganization(orgId: string): Promise<{ error: string | null }> {
+  if (!(await requireAdmin())) return { error: "Non autorizzato" };
+  await db.organization.delete({ where: { id: orgId } });
+  revalidatePath("/admin/organizations");
+  return { error: null };
+}
+
+// ─── Global users list ────────────────────────────────────────────────────────
+
+export type AdminUser = {
+  id: string;
+  name: string | null;
+  email: string;
+  role: string;
+  orgId: string;
+  orgName: string;
+  orgPlan: string;
+  createdAt: string;
+};
+
+export async function getAdminUsers(): Promise<AdminUser[] | null> {
+  if (!(await requireAdmin())) return null;
+  const rows = await db.user.findMany({
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true, name: true, email: true, role: true, createdAt: true,
+      organization: { select: { id: true, name: true, plan: true } },
+    },
+  });
+  return rows.map((u) => ({
+    id: u.id, name: u.name, email: u.email, role: u.role,
+    orgId: u.organization.id, orgName: u.organization.name, orgPlan: u.organization.plan,
+    createdAt: u.createdAt.toISOString(),
+  }));
+}
+
+// ─── Workflow execution logs ──────────────────────────────────────────────────
+
+export type AdminWorkflowLog = {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  orgId: string;
+  orgName: string;
+  status: string;
+  trigger: string;
+  entityLabel: string;
+  startedAt: string;
+  finishedAt: string | null;
+};
+
+export async function getAdminWorkflowLogs(limit = 100): Promise<AdminWorkflowLog[] | null> {
+  if (!(await requireAdmin())) return null;
+  const rows = await db.workflowExecution.findMany({
+    orderBy: { startedAt: "desc" },
+    take: limit,
+    include: {
+      workflow: { select: { name: true, organizationId: true, organization: { select: { name: true } } } },
+    },
+  });
+  return rows.map((r) => {
+    const payload = r.payload as Record<string, string>;
+    return {
+      id: r.id,
+      workflowId: r.workflowId,
+      workflowName: r.workflow.name,
+      orgId: r.workflow.organizationId,
+      orgName: r.workflow.organization.name,
+      status: r.status,
+      trigger: payload.trigger ?? "",
+      entityLabel: payload.entityLabel ?? "",
+      startedAt: r.startedAt.toISOString(),
+      finishedAt: r.finishedAt?.toISOString() ?? null,
+    };
+  });
+}
+
+// ─── Global campaigns ─────────────────────────────────────────────────────────
+
+export type AdminCampaign = {
+  id: string;
+  name: string;
+  subject: string;
+  status: string;
+  orgId: string;
+  orgName: string;
+  totalSent: number;
+  totalOpened: number;
+  totalClicked: number;
+  openRate: number;
+  clickRate: number;
+  sentAt: string | null;
+  createdAt: string;
+};
+
+export async function getAdminCampaigns(): Promise<AdminCampaign[] | null> {
+  if (!(await requireAdmin())) return null;
+  const rows = await db.emailCampaign.findMany({
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true, name: true, subject: true, status: true,
+      totalSent: true, totalOpened: true, totalClicked: true,
+      sentAt: true, createdAt: true,
+      organization: { select: { id: true, name: true } },
+    },
+  });
+  return rows.map((c) => ({
+    id: c.id, name: c.name, subject: c.subject, status: c.status,
+    orgId: c.organization.id, orgName: c.organization.name,
+    totalSent: c.totalSent, totalOpened: c.totalOpened, totalClicked: c.totalClicked,
+    openRate: c.totalSent > 0 ? Math.round((c.totalOpened / c.totalSent) * 100) : 0,
+    clickRate: c.totalSent > 0 ? Math.round((c.totalClicked / c.totalSent) * 100) : 0,
+    sentAt: c.sentAt?.toISOString() ?? null,
+    createdAt: c.createdAt.toISOString(),
+  }));
+}
+
+// ─── MRR / plan distribution ──────────────────────────────────────────────────
+
+export type AdminPlanStats = {
+  distribution: { plan: string; count: number; mrr: number }[];
+  totalMrr: number;
+  totalOrgs: number;
+};
+
+const MRR_BY_PLAN: Record<string, number> = { STARTER: 0, FREE: 0, PRO: 29, PROFESSIONAL: 29, ADVANCED: 29, ESSENTIAL: 29, ENTERPRISE: 99 };
+
+export async function getAdminPlanStats(): Promise<AdminPlanStats | null> {
+  if (!(await requireAdmin())) return null;
+  const groups = await db.organization.groupBy({ by: ["plan"], _count: { id: true } });
+  const distribution = groups.map((g) => ({
+    plan: g.plan, count: g._count.id, mrr: (MRR_BY_PLAN[g.plan] ?? 0) * g._count.id,
+  }));
+  const totalMrr = distribution.reduce((s, d) => s + d.mrr, 0);
+  const totalOrgs = distribution.reduce((s, d) => s + d.count, 0);
+  return { distribution, totalMrr, totalOrgs };
+}
