@@ -572,7 +572,7 @@ export default function LandingPage() {
                 ],
                 excluded: [],
                 cta: "Contattaci",
-                href: "mailto:support@pipely.it?subject=Piano%20Enterprise",
+                href: "/contatti",
                 highlight: false,
               },
             ].map((plan) => (
