@@ -139,7 +139,7 @@ const CATEGORIES: Category[] = [
       { id: "ca3", title: "Importare contatti in una lista da CSV o Excel", excerpt: "Carica un file CSV, XLS o XLSX con le email dei destinatari. I duplicati vengono gestiti automaticamente.", readTime: 4 },
       { id: "ca4", title: "Creare e inviare una campagna email", excerpt: "Scegli la lista, imposta oggetto, mittente e corpo del messaggio, poi invia subito o pianifica.", readTime: 5, popular: true },
       { id: "ca5", title: "Personalizzare il messaggio con variabili dinamiche", excerpt: "Usa {{nome}}, {{cognome}} e {{email}} per personalizzare ogni email con i dati del destinatario.", readTime: 3 },
-      { id: "ca6", title: "Monitorare aperture, click e disiscrizioni", excerpt: "Leggi le statistiche della campagna: tasso di apertura, click e quanti contatti si sono disiscritti.", readTime: 4 },
+      { id: "ca6", title: "Statistiche campagna: email inviate e contatti raggiunti", excerpt: "Dopo l'invio puoi vedere quante email sono state consegnate. Il tracciamento aperture e click è in arrivo.", readTime: 3 },
     ],
   },
   {
