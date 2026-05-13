@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { Contact, Company } from "@/types/contacts";
 import { getOrgPlan, checkContactLimit } from "@/lib/plan";
+import { runWorkflows } from "@/lib/workflow-engine";
 
 function getOrgId(s: Session | null) {
   return (s?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
@@ -149,6 +150,13 @@ export async function createContact(input: z.infer<typeof contactSchema>): Promi
     });
 
     revalidatePath("/contacts");
+    runWorkflows({
+      trigger: "CONTACT_CREATED",
+      orgId, contactId: row.id,
+      contactName: `${row.firstName} ${row.lastName ?? ""}`.trim(),
+      contactEmail: row.email ?? undefined,
+      ownerId: row.ownerId,
+    }).catch(console.error);
     return {
       data: {
         id: row.id,

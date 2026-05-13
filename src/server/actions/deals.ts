@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { runWorkflows } from "@/lib/workflow-engine";
 
 function getOrgId(session: Session | null) {
   return (session?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
@@ -29,11 +30,18 @@ export async function moveDeal(input: z.infer<typeof moveSchema>) {
   const { dealId, newStageId } = parsed.data;
 
   try {
-    await db.deal.update({
+    const deal = await db.deal.update({
       where: { id: dealId, organizationId: orgId },
       data: { stageId: newStageId, updatedAt: new Date() },
+      select: { id: true, title: true, ownerId: true, contactId: true },
     });
     revalidatePath("/deals");
+    runWorkflows({
+      trigger: "DEAL_STAGE_CHANGED",
+      orgId, dealId, dealTitle: deal.title,
+      fromStageId: parsed.data.oldStageId, toStageId: newStageId,
+      ownerId: deal.ownerId, contactId: deal.contactId ?? undefined,
+    }).catch(console.error);
     return { ok: true };
   } catch {
     return { error: "Errore durante lo spostamento dell'affare" };
@@ -66,7 +74,9 @@ export async function updateDeal(input: z.infer<typeof updateSchema>) {
   const { id, expectedClose, status, ...rest } = parsed.data;
 
   try {
-    await db.deal.update({
+    const prev = await db.deal.findUnique({ where: { id, organizationId: orgId }, select: { value: true, title: true, ownerId: true, contactId: true } });
+
+    const updated = await db.deal.update({
       where: { id, organizationId: orgId },
       data: {
         ...rest,
@@ -75,8 +85,20 @@ export async function updateDeal(input: z.infer<typeof updateSchema>) {
         closedAt: status === "WON" || status === "LOST" ? new Date() : status === "OPEN" ? null : undefined,
         updatedAt: new Date(),
       },
+      select: { id: true, title: true, value: true, ownerId: true, contactId: true },
     });
+
     revalidatePath("/deals");
+
+    const base = { orgId, dealId: updated.id, dealTitle: updated.title, ownerId: updated.ownerId, contactId: updated.contactId ?? undefined };
+    if (status === "WON") {
+      runWorkflows({ trigger: "DEAL_WON", ...base, dealValue: Number(updated.value) }).catch(console.error);
+    } else if (status === "LOST") {
+      runWorkflows({ trigger: "DEAL_LOST", ...base }).catch(console.error);
+    } else if (rest.value !== undefined && prev && Number(rest.value) !== Number(prev.value)) {
+      runWorkflows({ trigger: "DEAL_VALUE_CHANGED", ...base, newValue: Number(updated.value) }).catch(console.error);
+    }
+
     return { ok: true };
   } catch {
     return { error: "Errore durante l'aggiornamento" };
@@ -117,6 +139,11 @@ export async function createDeal(input: z.infer<typeof createSchema>) {
       },
     });
     revalidatePath("/deals");
+    runWorkflows({
+      trigger: "DEAL_CREATED",
+      orgId, dealId: deal.id, dealTitle: deal.title, dealValue: Number(deal.value),
+      ownerId, stageId: deal.stageId, contactId: deal.contactId ?? undefined,
+    }).catch(console.error);
     return { ok: true, id: deal.id };
   } catch {
     return { error: "Errore durante la creazione" };

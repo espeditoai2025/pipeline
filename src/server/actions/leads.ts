@@ -6,6 +6,7 @@ import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { Lead, LeadStatus } from "@/types/contacts";
+import { runWorkflows } from "@/lib/workflow-engine";
 
 function getOrgId(s: Session | null) {
   return (s?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
@@ -80,6 +81,7 @@ export async function createLead(input: z.infer<typeof leadSchema>): Promise<{ d
     });
 
     revalidatePath("/leads");
+    runWorkflows({ trigger: "LEAD_CREATED", orgId, leadId: row.id, leadTitle: row.title }).catch(console.error);
     return {
       data: {
         id: row.id,
