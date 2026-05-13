@@ -7,6 +7,7 @@ import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { encrypt, decrypt } from "@/lib/crypto";
+import { getOrgPlan, checkFeature } from "@/lib/plan";
 
 function getOrgId(s: Session | null) {
   return (s?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
@@ -77,6 +78,10 @@ export async function saveSmtpConfig(input: SmtpConfigInput): Promise<AR<SmtpCon
 
   const parsed = configSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Input non valido" };
+
+  const plan = await getOrgPlan(orgId);
+  const featureError = checkFeature(plan, "smtp");
+  if (featureError) return { error: featureError };
 
   const passwordEnc = encrypt(parsed.data.password);
 

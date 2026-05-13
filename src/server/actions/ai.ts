@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { chatCompletion } from "@/lib/openrouter";
 import type { AIInsight, AIEmailDraft } from "@/types/ai";
+import { getOrgPlan, checkFeature } from "@/lib/plan";
 
 type ActionResult<T> = { data?: T; error?: string };
 
@@ -89,6 +90,10 @@ export async function askAssistant(message: string): Promise<ActionResult<string
   const orgId = getOrgId(session);
   if (!orgId) return { error: "Non autorizzato" };
 
+  const plan = await getOrgPlan(orgId);
+  const featureError = checkFeature(plan, "ai");
+  if (featureError) return { error: featureError };
+
   try {
     const crmContext = await buildCrmContext(orgId);
 
@@ -120,6 +125,9 @@ export async function fetchAIInsights(): Promise<ActionResult<AIInsight[]>> {
   const session = await auth();
   const orgId = getOrgId(session);
   if (!orgId) return { data: [] };
+
+  const plan = await getOrgPlan(orgId);
+  if (checkFeature(plan, "ai")) return { data: [] };
 
   try {
     const now = new Date();
@@ -217,6 +225,10 @@ export async function generateEmail(
   const session = await auth();
   const orgId = getOrgId(session);
   if (!orgId) return { error: "Non autorizzato" };
+
+  const plan = await getOrgPlan(orgId);
+  const featureError = checkFeature(plan, "ai");
+  if (featureError) return { error: featureError };
 
   try {
     const contextNote = [

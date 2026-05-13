@@ -6,6 +6,7 @@ import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { Workflow, TriggerConfig, WorkflowStep } from "@/types/workflows";
+import { getOrgPlan, checkFeature } from "@/lib/plan";
 
 function getOrgId(s: Session | null) {
   return (s?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
@@ -118,6 +119,10 @@ export async function createWorkflow(input: z.infer<typeof workflowSchema>): Pro
 
   const parsed = workflowSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
+
+  const plan = await getOrgPlan(orgId);
+  const featureError = checkFeature(plan, "automations");
+  if (featureError) return { data: null, error: featureError };
 
   const row = await db.workflow.create({
     data: {

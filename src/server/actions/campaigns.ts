@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { resend, FROM_DEFAULT } from "@/lib/resend";
 import type { EmailList, EmailListDetail, EmailListContact, EmailCampaign } from "@/types/emails";
+import { getOrgPlan, checkFeature } from "@/lib/plan";
 
 function getOrgId(s: Session | null) {
   return (s?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
@@ -254,6 +255,10 @@ export async function createCampaign(input: z.infer<typeof campaignSchema>): Pro
 
   const parsed = campaignSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Input non valido" };
+
+  const plan = await getOrgPlan(orgId);
+  const featureError = checkFeature(plan, "emailCampaigns");
+  if (featureError) return { error: featureError };
 
   const list = await db.emailList.findFirst({ where: { id: parsed.data.listId, organizationId: orgId } });
   if (!list) return { error: "Lista non trovata" };

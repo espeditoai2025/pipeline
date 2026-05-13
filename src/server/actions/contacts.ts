@@ -6,6 +6,7 @@ import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { Contact, Company } from "@/types/contacts";
+import { getOrgPlan, checkContactLimit } from "@/lib/plan";
 
 function getOrgId(s: Session | null) {
   return (s?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
@@ -124,6 +125,11 @@ export async function createContact(input: z.infer<typeof contactSchema>): Promi
   const parsed = contactSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
 
+  const plan = await getOrgPlan(orgId);
+  const currentCount = await db.contact.count({ where: { organizationId: orgId } });
+  const limitError = checkContactLimit(plan, currentCount);
+  if (limitError) return { data: null, error: limitError };
+
   try {
     const row = await db.contact.create({
       data: {
@@ -236,6 +242,11 @@ export async function importContacts(rows: Array<{ firstName: string; lastName?:
   const session = await auth();
   const orgId = getOrgId(session);
   if (!session || !orgId) return { imported: 0, duplicates: 0, error: "Non autorizzato" };
+
+  const plan = await getOrgPlan(orgId);
+  const currentCount = await db.contact.count({ where: { organizationId: orgId } });
+  const limitError = checkContactLimit(plan, currentCount, rows.length);
+  if (limitError) return { imported: 0, duplicates: 0, error: limitError };
 
   const existingEmails = new Set(
     (await db.contact.findMany({ where: { organizationId: orgId }, select: { email: true } }))

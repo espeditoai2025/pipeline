@@ -1,9 +1,11 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { Pipeline } from "@/types/deals";
+import { getOrgPlan, checkPipelineLimit } from "@/lib/plan";
 
 function daysBetween(a: Date, b: Date) {
   return Math.floor((b.getTime() - a.getTime()) / 86_400_000);
@@ -118,6 +120,29 @@ export async function getPipeline(): Promise<Pipeline | null> {
       };
     }),
   };
+}
+
+export async function createPipeline(name: string): Promise<{ error: string | null; id?: string }> {
+  const session = await auth();
+  if (!session?.user) return { error: "Non autorizzato" };
+  const orgId = (session.user as { organizationId?: string }).organizationId;
+  if (!orgId) return { error: "Non autorizzato" };
+
+  const plan = await getOrgPlan(orgId);
+  const currentCount = await db.pipeline.count({ where: { organizationId: orgId } });
+  const limitError = checkPipelineLimit(plan, currentCount);
+  if (limitError) return { error: limitError };
+
+  const row = await db.pipeline.create({
+    data: {
+      name,
+      organizationId: orgId,
+      position: currentCount,
+    },
+  });
+
+  revalidatePath("/pipeline");
+  return { error: null, id: row.id };
 }
 
 export async function getPipelineOwners() {

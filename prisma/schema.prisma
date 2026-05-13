@@ -15,7 +15,7 @@ model Organization {
   id        String   @id @default(cuid())
   name      String
   slug      String   @unique
-  plan      Plan     @default(FREE)
+  plan      Plan     @default(STARTER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -36,11 +36,14 @@ model Organization {
 }
 
 enum Plan {
+  STARTER      // piano gratuito (nuovo default)
+  PRO          // €29/mese
+  ENTERPRISE   // custom
+  // valori legacy — non usare per nuovi utenti
   FREE
   ESSENTIAL
   ADVANCED
   PROFESSIONAL
-  ENTERPRISE
 }
 
 model User {
