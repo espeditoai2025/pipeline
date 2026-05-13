@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Bot, X, Send, Loader2, Minimize2, Maximize2, Sparkles } from "lucide-react";
 import { askAssistant } from "@/server/actions/ai";
 import { UpgradeModal } from "@/components/shared/UpgradeModal";
-import { isPlanError } from "@/lib/plan";
+import { isPlanError } from "@/lib/plan-client";
 import type { AIMessage } from "@/types/ai";
 
 function parseMarkdown(text: string): string {

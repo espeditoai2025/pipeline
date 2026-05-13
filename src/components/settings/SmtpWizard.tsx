@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { saveSmtpConfig, testSmtpConfig, deleteSmtpConfig } from "@/server/actions/smtp";
 import { UpgradeModal } from "@/components/shared/UpgradeModal";
-import { isPlanError } from "@/lib/plan";
+import { isPlanError } from "@/lib/plan-client";
 import type { SmtpConfigPublic, SmtpProvider } from "@/server/actions/smtp";
 
 const inputCls = "w-full rounded-lg border border-[var(--crm-neutral-200)] bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-[var(--crm-neutral-900)] dark:text-white placeholder:text-[var(--crm-neutral-400)] focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] focus:border-transparent transition-colors";

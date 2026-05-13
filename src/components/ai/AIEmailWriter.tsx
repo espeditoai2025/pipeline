@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Sparkles, Loader2, Check, RefreshCw } from "lucide-react";
 import { generateEmail } from "@/server/actions/ai";
 import { UpgradeModal } from "@/components/shared/UpgradeModal";
-import { isPlanError } from "@/lib/plan";
+import { isPlanError } from "@/lib/plan-client";
 import type { AIEmailDraft } from "@/types/ai";
 
 type Props = {

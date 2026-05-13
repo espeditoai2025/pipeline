@@ -107,18 +107,4 @@ export function checkPipelineLimit(plan: Plan | string, currentCount: number): s
   return null;
 }
 
-export function isPlanError(error: string): boolean {
-  return error.includes("piano Pro") || error.includes("piano Starter") || error.includes("piano Enterprise");
-}
-
-// ─── Upgrade info (used by UpgradeModal) ─────────────────────────────────────
-
-export const PRO_FEATURES = [
-  "Pipeline illimitate",
-  "Contatti illimitati",
-  "AI Assistant integrato",
-  "Automazioni avanzate (workflow)",
-  "Email marketing con tracking aperture e click",
-  "Configurazione SMTP (Gmail, Aruba, Libero, custom)",
-  "Report personalizzati",
-];
+export { isPlanError, PRO_FEATURES } from "./plan-client";

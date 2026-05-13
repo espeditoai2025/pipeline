@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { createWorkflow, updateWorkflow } from "@/server/actions/workflows";
 import { TRIGGER_CONFIG, ACTION_CONFIG } from "./WorkflowConfig";
 import { UpgradeModal } from "@/components/shared/UpgradeModal";
-import { isPlanError } from "@/lib/plan";
+import { isPlanError } from "@/lib/plan-client";
 import type { Workflow, TriggerType, ActionType, WorkflowStep } from "@/types/workflows";
 
 const schema = z.object({

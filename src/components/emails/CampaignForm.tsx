@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/compo
 import { Button } from "@/components/ui/button";
 import { createCampaign, updateCampaign } from "@/server/actions/campaigns";
 import { UpgradeModal } from "@/components/shared/UpgradeModal";
-import { isPlanError } from "@/lib/plan";
+import { isPlanError } from "@/lib/plan-client";
 import type { EmailCampaign, EmailList, EmailTemplate } from "@/types/emails";
 
 const schema = z.object({

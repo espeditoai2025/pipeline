@@ -1,7 +1,7 @@
 "use client";
 
 import { X, Zap, Check } from "lucide-react";
-import { PRO_FEATURES } from "@/lib/plan";
+import { PRO_FEATURES } from "@/lib/plan-client";
 
 interface UpgradeModalProps {
   message: string;
