@@ -2,8 +2,9 @@ import { getTranslations } from "next-intl/server";
 import { ArrowUpRight, ArrowDownRight, Briefcase, CheckCircle, Euro, TrendingUp, Target } from "lucide-react";
 import type { Metadata } from "next";
 import { PipelineOverviewChart } from "@/components/charts/PipelineOverviewChart";
-import { getDashboardData } from "@/server/actions/dashboard";
+import { getDashboardData, getOnboardingStatus } from "@/server/actions/dashboard";
 import { AIInsightsStrip } from "@/components/ai/AIInsightsStrip";
+import { OnboardingWizard } from "@/components/dashboard/OnboardingWizard";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("dashboard");
@@ -52,7 +53,7 @@ function KpiCard({ title, value, sub, change, positive, icon: Icon, iconColor, i
 
 export default async function DashboardPage() {
   const t = await getTranslations("dashboard");
-  const data = await getDashboardData();
+  const [data, onboarding] = await Promise.all([getDashboardData(), getOnboardingStatus()]);
 
   const kpis = data?.kpis ?? {
     openDeals: 0, totalValue: 0, wonDeals: 0, wonValue: 0,
@@ -102,6 +103,8 @@ export default async function DashboardPage() {
         <h1 className="text-xl font-semibold text-[var(--crm-neutral-900)] dark:text-white">{t("title")}</h1>
         <p className="text-sm text-[var(--crm-neutral-500)] mt-0.5">{t("welcome")}</p>
       </div>
+
+      {onboarding && <OnboardingWizard status={onboarding} />}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {kpiCards.map((kpi) => <KpiCard key={kpi.title} {...kpi} />)}
