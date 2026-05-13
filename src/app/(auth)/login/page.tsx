@@ -31,7 +31,7 @@ export default function LoginPage() {
     if (result?.error) {
       setError("Email o password non corretti");
     } else {
-      router.push("/deals");
+      router.push("/dashboard");
     }
   }
 
@@ -118,7 +118,7 @@ export default function LoginPage() {
         </div>
 
         <button
-          onClick={() => signIn("google", { callbackUrl: "/" })}
+          onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
           className="mt-4 w-full flex items-center justify-center gap-2 px-3 py-2 border border-[var(--crm-neutral-100)] rounded-lg text-sm text-[var(--crm-neutral-900)] hover:bg-[var(--crm-neutral-50)] transition-colors"
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24">
