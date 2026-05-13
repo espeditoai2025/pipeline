@@ -7,10 +7,18 @@ import type { AdminOrg } from "@/server/actions/admin";
 
 const PLAN_BADGE: Record<string, string> = {
   FREE: "bg-slate-700 text-slate-300",
+  STARTER: "bg-slate-700 text-slate-300",
   ESSENTIAL: "bg-blue-900/50 text-blue-300",
-  ADVANCED: "bg-violet-900/50 text-violet-300",
+  ADVANCED: "bg-blue-900/50 text-blue-300",
   PROFESSIONAL: "bg-emerald-900/50 text-emerald-300",
+  PRO: "bg-emerald-900/50 text-emerald-300",
   ENTERPRISE: "bg-amber-900/50 text-amber-300",
+};
+
+const PLAN_LABEL: Record<string, string> = {
+  FREE: "Starter", STARTER: "Starter",
+  ESSENTIAL: "Pro", ADVANCED: "Pro", PROFESSIONAL: "Pro", PRO: "Pro",
+  ENTERPRISE: "Enterprise",
 };
 
 export function OrgsTable({ orgs }: { orgs: AdminOrg[] }) {
@@ -101,7 +109,7 @@ export function OrgsTable({ orgs }: { orgs: AdminOrg[] }) {
                     <td className="px-4 py-3.5 text-xs text-slate-400">{o.ownerEmail ?? "—"}</td>
                     <td className="px-4 py-3.5 text-right">
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${PLAN_BADGE[o.plan] ?? "bg-slate-700 text-slate-300"}`}>
-                        {o.plan}
+                        {PLAN_LABEL[o.plan] ?? o.plan}
                       </span>
                     </td>
                     <td className="px-4 py-3.5 text-right text-xs text-slate-300">{o.userCount}</td>

@@ -7,10 +7,18 @@ import type { AdminOverview } from "@/server/actions/admin";
 
 const PLAN_BADGE: Record<string, string> = {
   FREE: "bg-slate-700 text-slate-300",
+  STARTER: "bg-slate-700 text-slate-300",
   ESSENTIAL: "bg-blue-900/50 text-blue-300",
-  ADVANCED: "bg-violet-900/50 text-violet-300",
+  ADVANCED: "bg-blue-900/50 text-blue-300",
   PROFESSIONAL: "bg-emerald-900/50 text-emerald-300",
+  PRO: "bg-emerald-900/50 text-emerald-300",
   ENTERPRISE: "bg-amber-900/50 text-amber-300",
+};
+
+const PLAN_LABEL: Record<string, string> = {
+  FREE: "Starter", STARTER: "Starter",
+  ESSENTIAL: "Pro", ADVANCED: "Pro", PROFESSIONAL: "Pro", PRO: "Pro",
+  ENTERPRISE: "Enterprise",
 };
 
 function KpiCard({
@@ -112,7 +120,7 @@ export function AdminDashboard({ data }: { data: AdminOverview }) {
                   <p className="text-xs text-slate-500 truncate">{o.ownerEmail ?? o.slug}</p>
                 </div>
                 <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${PLAN_BADGE[o.plan] ?? "bg-slate-700 text-slate-300"}`}>
-                  {o.plan}
+                  {PLAN_LABEL[o.plan] ?? o.plan}
                 </span>
               </Link>
             ))}
