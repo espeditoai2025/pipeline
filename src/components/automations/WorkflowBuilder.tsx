@@ -10,6 +10,8 @@ import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/compo
 import { Button } from "@/components/ui/button";
 import { createWorkflow, updateWorkflow } from "@/server/actions/workflows";
 import { TRIGGER_CONFIG, ACTION_CONFIG } from "./WorkflowConfig";
+import { UpgradeModal } from "@/components/shared/UpgradeModal";
+import { isPlanError } from "@/lib/plan";
 import type { Workflow, TriggerType, ActionType, WorkflowStep } from "@/types/workflows";
 
 const schema = z.object({
@@ -41,6 +43,7 @@ const DEFAULT_ACTIONS: Record<ActionType, object> = {
 export function WorkflowBuilder({ open, onClose, workflow, onSaved }: Props) {
   const isEditing = !!workflow;
   const [steps, setSteps] = useState<WorkflowStep[]>(workflow?.steps ?? []);
+  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -85,7 +88,8 @@ export function WorkflowBuilder({ open, onClose, workflow, onSaved }: Props) {
       : await createWorkflow(payload);
 
     if (result.error) {
-      toast.error(result.error);
+      if (isPlanError(result.error)) setUpgradeMsg(result.error);
+      else toast.error(result.error);
     } else {
       toast.success(isEditing ? "Automazione aggiornata" : "Automazione creata");
       onSaved(result.data!);
@@ -94,6 +98,7 @@ export function WorkflowBuilder({ open, onClose, workflow, onSaved }: Props) {
   }
 
   return (
+    <>
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="w-full sm:max-w-lg">
         <SheetHeader>
@@ -238,5 +243,7 @@ export function WorkflowBuilder({ open, onClose, workflow, onSaved }: Props) {
         </SheetBody>
       </SheetContent>
     </Sheet>
+    {upgradeMsg && <UpgradeModal message={upgradeMsg} onClose={() => setUpgradeMsg(null)} />}
+    </>
   );
 }

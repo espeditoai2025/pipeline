@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { createCampaign, updateCampaign } from "@/server/actions/campaigns";
+import { UpgradeModal } from "@/components/shared/UpgradeModal";
+import { isPlanError } from "@/lib/plan";
 import type { EmailCampaign, EmailList, EmailTemplate } from "@/types/emails";
 
 const schema = z.object({
@@ -41,6 +43,7 @@ const PLACEHOLDERS = [
 
 export function CampaignForm({ open, onClose, campaign, lists, templates, onSaved }: Props) {
   const isEditing = !!campaign;
+  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -68,13 +71,18 @@ export function CampaignForm({ open, onClose, campaign, lists, templates, onSave
       ? await updateCampaign(campaign!.id, data)
       : await createCampaign(data);
 
-    if (result.error) { toast.error(result.error); return; }
+    if (result.error) {
+      if (isPlanError(result.error)) setUpgradeMsg(result.error);
+      else toast.error(result.error);
+      return;
+    }
     toast.success(isEditing ? "Campagna aggiornata" : "Campagna creata");
     onSaved(result.data!);
     onClose();
   }
 
   return (
+    <>
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="w-full sm:max-w-lg flex flex-col">
         <SheetHeader>
@@ -171,5 +179,7 @@ export function CampaignForm({ open, onClose, campaign, lists, templates, onSave
         </div>
       </SheetContent>
     </Sheet>
+    {upgradeMsg && <UpgradeModal message={upgradeMsg} onClose={() => setUpgradeMsg(null)} />}
+    </>
   );
 }

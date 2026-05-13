@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Bot, X, Send, Loader2, Minimize2, Maximize2, Sparkles } from "lucide-react";
 import { askAssistant } from "@/server/actions/ai";
+import { UpgradeModal } from "@/components/shared/UpgradeModal";
+import { isPlanError } from "@/lib/plan";
 import type { AIMessage } from "@/types/ai";
 
 function parseMarkdown(text: string): string {
@@ -32,6 +34,7 @@ export function AIAssistant() {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -56,6 +59,11 @@ export function AIAssistant() {
 
     const res = await askAssistant(msg);
     setLoading(false);
+
+    if (res.error && isPlanError(res.error)) {
+      setUpgradeMsg(res.error);
+      return;
+    }
 
     const assistantMsg: AIMessage = {
       id: `a-${Date.now()}`,
@@ -185,6 +193,7 @@ export function AIAssistant() {
           )}
         </div>
       )}
+      {upgradeMsg && <UpgradeModal message={upgradeMsg} onClose={() => setUpgradeMsg(null)} />}
     </>
   );
 }

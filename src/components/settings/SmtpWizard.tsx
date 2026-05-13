@@ -11,6 +11,8 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { saveSmtpConfig, testSmtpConfig, deleteSmtpConfig } from "@/server/actions/smtp";
+import { UpgradeModal } from "@/components/shared/UpgradeModal";
+import { isPlanError } from "@/lib/plan";
 import type { SmtpConfigPublic, SmtpProvider } from "@/server/actions/smtp";
 
 const inputCls = "w-full rounded-lg border border-[var(--crm-neutral-200)] bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-[var(--crm-neutral-900)] dark:text-white placeholder:text-[var(--crm-neutral-400)] focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] focus:border-transparent transition-colors";
@@ -109,6 +111,7 @@ export function SmtpWizard({ initial }: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [testing, setTesting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
 
   const {
     register, handleSubmit, setValue, watch, reset,
@@ -146,7 +149,10 @@ export function SmtpWizard({ initial }: Props) {
 
   async function onSubmit(data: FormValues) {
     const res = await saveSmtpConfig(data);
-    if (res.error) { toast.error(res.error); return; }
+    if (res.error) {
+      if (isPlanError(res.error)) { setUpgradeMsg(res.error); return; }
+      toast.error(res.error); return;
+    }
     setConfig(res.data!);
     setStep("done");
     toast.success("Configurazione salvata");
@@ -338,6 +344,7 @@ export function SmtpWizard({ initial }: Props) {
   if (!config) return null;
 
   return (
+    <>
     <div className="space-y-4">
       {/* Status card */}
       <div className={`rounded-xl border p-4 flex items-start gap-4 ${
@@ -420,5 +427,7 @@ export function SmtpWizard({ initial }: Props) {
         </p>
       )}
     </div>
+    {upgradeMsg && <UpgradeModal message={upgradeMsg} onClose={() => setUpgradeMsg(null)} />}
+    </>
   );
 }

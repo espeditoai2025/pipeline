@@ -107,6 +107,10 @@ export function checkPipelineLimit(plan: Plan | string, currentCount: number): s
   return null;
 }
 
+export function isPlanError(error: string): boolean {
+  return error.includes("piano Pro") || error.includes("piano Starter") || error.includes("piano Enterprise");
+}
+
 // ─── Upgrade info (used by UpgradeModal) ─────────────────────────────────────
 
 export const PRO_FEATURES = [

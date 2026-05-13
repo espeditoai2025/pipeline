@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Sparkles, Loader2, Check, RefreshCw } from "lucide-react";
 import { generateEmail } from "@/server/actions/ai";
+import { UpgradeModal } from "@/components/shared/UpgradeModal";
+import { isPlanError } from "@/lib/plan";
 import type { AIEmailDraft } from "@/types/ai";
 
 type Props = {
@@ -22,6 +24,7 @@ export function AIEmailWriter({ context, onApply }: Props) {
   const [prompt, setPrompt] = useState("");
   const [draft, setDraft] = useState<AIEmailDraft | null>(null);
   const [loading, setLoading] = useState(false);
+  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
 
   async function generate(text?: string) {
     const p = text ?? prompt;
@@ -30,6 +33,7 @@ export function AIEmailWriter({ context, onApply }: Props) {
     setDraft(null);
     const res = await generateEmail(p, context);
     setLoading(false);
+    if (res.error && isPlanError(res.error)) { setUpgradeMsg(res.error); return; }
     if (res.data) setDraft(res.data);
   }
 
@@ -43,6 +47,7 @@ export function AIEmailWriter({ context, onApply }: Props) {
   }
 
   return (
+    <>
     <div className="rounded-xl border border-[var(--crm-primary)]/20 bg-[var(--crm-primary)]/5 overflow-hidden">
       {/* Toggle header */}
       <button
@@ -131,5 +136,7 @@ export function AIEmailWriter({ context, onApply }: Props) {
         </div>
       )}
     </div>
+    {upgradeMsg && <UpgradeModal message={upgradeMsg} onClose={() => setUpgradeMsg(null)} />}
+    </>
   );
 }
