@@ -1,15 +1,18 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
-import { Mail, FileText, PenSquare } from "lucide-react";
+import { Mail, FileText, PenSquare, Megaphone, Users } from "lucide-react";
 import { InboxView } from "@/components/emails/InboxView";
 import { ComposeEmailModal } from "@/components/emails/ComposeEmailModal";
 import { TemplatesManager } from "@/components/emails/TemplatesManager";
+import { EmailListsTab } from "@/components/emails/EmailListsTab";
+import { CampaignsTab } from "@/components/emails/CampaignsTab";
 import { Button } from "@/components/ui/button";
 import { getEmails, getTemplates } from "@/server/actions/emails";
-import type { EmailThread, EmailMessage, EmailTemplate } from "@/types/emails";
+import { getEmailLists, getCampaigns } from "@/server/actions/campaigns";
+import type { EmailThread, EmailMessage, EmailTemplate, EmailList, EmailCampaign } from "@/types/emails";
 
-type Tab = "inbox" | "templates";
+type Tab = "inbox" | "templates" | "lists" | "campaigns";
 
 function groupIntoThreads(messages: EmailMessage[]): EmailThread[] {
   const map = new Map<string, EmailThread>();
@@ -37,19 +40,32 @@ function groupIntoThreads(messages: EmailMessage[]): EmailThread[] {
   return Array.from(map.values()).sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
 }
 
+const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  { id: "inbox",     label: "Inbox",      icon: <Mail className="h-4 w-4" /> },
+  { id: "templates", label: "Template",   icon: <FileText className="h-4 w-4" /> },
+  { id: "lists",     label: "Liste",      icon: <Users className="h-4 w-4" /> },
+  { id: "campaigns", label: "Campagne",   icon: <Megaphone className="h-4 w-4" /> },
+];
+
 export default function EmailsPage() {
   const [tab, setTab] = useState<Tab>("inbox");
   const [threads, setThreads] = useState<EmailThread[]>([]);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [lists, setLists] = useState<EmailList[]>([]);
+  const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
   const [composeOpen, setComposeOpen] = useState(false);
   const [replyThread, setReplyThread] = useState<EmailThread | null>(null);
   const [, startTransition] = useTransition();
 
   useEffect(() => {
     startTransition(async () => {
-      const [msgs, tpls] = await Promise.all([getEmails(), getTemplates()]);
+      const [msgs, tpls, lsts, camps] = await Promise.all([
+        getEmails(), getTemplates(), getEmailLists(), getCampaigns(),
+      ]);
       setThreads(groupIntoThreads(msgs));
       setTemplates(tpls);
+      setLists(lsts);
+      setCampaigns(camps);
     });
   }, []);
 
@@ -100,7 +116,7 @@ export default function EmailsPage() {
           <div>
             <h1 className="text-xl font-bold">Email</h1>
             <p className="text-sm text-[var(--crm-neutral-500)]">
-              {threads.length} conversazioni{unreadCount > 0 && ` · ${unreadCount} non lette`}
+              {threads.length} conversazioni · {campaigns.length} campagne · {lists.length} liste
             </p>
           </div>
         </div>
@@ -117,34 +133,35 @@ export default function EmailsPage() {
 
       {/* Tab switcher */}
       <div className="flex rounded-lg border border-[var(--crm-neutral-100)] overflow-hidden w-fit">
-        <button
-          onClick={() => setTab("inbox")}
-          className={`flex items-center gap-1.5 px-4 py-2 text-sm transition-colors ${tab === "inbox" ? "bg-[var(--crm-primary)] text-white" : "text-[var(--crm-neutral-600)] hover:bg-[var(--crm-neutral-50)]"}`}
-        >
-          <Mail className="h-4 w-4" /> Inbox
-          {unreadCount > 0 && (
-            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${tab === "inbox" ? "bg-white/20 text-white" : "bg-[var(--crm-primary)]/10 text-[var(--crm-primary)]"}`}>
-              {unreadCount}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setTab("templates")}
-          className={`flex items-center gap-1.5 px-4 py-2 text-sm transition-colors border-l border-[var(--crm-neutral-100)] ${tab === "templates" ? "bg-[var(--crm-primary)] text-white" : "text-[var(--crm-neutral-600)] hover:bg-[var(--crm-neutral-50)]"}`}
-        >
-          <FileText className="h-4 w-4" /> Template
-          {templates.length > 0 && (
-            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${tab === "templates" ? "bg-white/20 text-white" : "bg-[var(--crm-neutral-200)] text-[var(--crm-neutral-600)]"}`}>
-              {templates.length}
-            </span>
-          )}
-        </button>
+        {TABS.map((t, i) => {
+          const badge =
+            t.id === "inbox" && unreadCount > 0 ? unreadCount :
+            t.id === "templates" && templates.length > 0 ? templates.length :
+            t.id === "lists" && lists.length > 0 ? lists.length :
+            t.id === "campaigns" && campaigns.length > 0 ? campaigns.length :
+            null;
+
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex items-center gap-1.5 px-4 py-2 text-sm transition-colors ${i > 0 ? "border-l border-[var(--crm-neutral-100)]" : ""} ${tab === t.id ? "bg-[var(--crm-primary)] text-white" : "text-[var(--crm-neutral-600)] hover:bg-[var(--crm-neutral-50)]"}`}
+            >
+              {t.icon} {t.label}
+              {badge !== null && (
+                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${tab === t.id ? "bg-white/20 text-white" : "bg-[var(--crm-neutral-200)] text-[var(--crm-neutral-600)]"}`}>
+                  {badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {tab === "inbox"
-        ? <InboxView threads={threads} onCompose={handleCompose} />
-        : <TemplatesManager initialTemplates={templates} />
-      }
+      {tab === "inbox"     && <InboxView threads={threads} onCompose={handleCompose} />}
+      {tab === "templates" && <TemplatesManager initialTemplates={templates} />}
+      {tab === "lists"     && <EmailListsTab lists={lists} onChange={setLists} />}
+      {tab === "campaigns" && <CampaignsTab campaigns={campaigns} lists={lists} templates={templates} onChange={setCampaigns} />}
 
       <ComposeEmailModal
         open={composeOpen}

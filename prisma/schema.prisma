@@ -30,6 +30,8 @@ model Organization {
   workflows      Workflow[]
   customFields   CustomField[]
   emailTemplates EmailTemplate[]
+  emailLists     EmailList[]
+  emailCampaigns EmailCampaign[]
 }
 
 enum Plan {
@@ -322,13 +324,22 @@ model Product {
   id             String       @id @default(cuid())
   name           String
   code           String?
+  description    String?
+  category       String       @default("OTHER")
+  unit           String       @default("pz")
   unitPrice      Decimal
   currency       String       @default("EUR")
   taxRate        Decimal      @default(22)
+  isActive       Boolean      @default(true)
+  isSubscription Boolean      @default(false)
+  billingPeriod  String?      // "monthly" | "annual" | null
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   dealProducts DealProduct[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model DealProduct {
@@ -420,4 +431,64 @@ model Notification {
   link      String?
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
+}
+
+// ============ EMAIL CAMPAIGNS ============
+
+model EmailList {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contacts       EmailListContact[]
+  campaigns      EmailCampaign[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+model EmailListContact {
+  id           String    @id @default(cuid())
+  listId       String
+  list         EmailList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  email        String
+  firstName    String?
+  lastName     String?
+  unsubscribed Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+
+  @@unique([listId, email])
+  @@index([listId])
+}
+
+model EmailCampaign {
+  id             String         @id @default(cuid())
+  name           String
+  subject        String
+  body           String         @db.Text
+  fromName       String?
+  listId         String
+  list           EmailList      @relation(fields: [listId], references: [id])
+  status         CampaignStatus @default(DRAFT)
+  scheduledAt    DateTime?
+  sentAt         DateTime?
+  totalSent      Int            @default(0)
+  totalOpened    Int            @default(0)
+  totalClicked   Int            @default(0)
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([organizationId])
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  PAUSED
 }

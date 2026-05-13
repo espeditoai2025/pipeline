@@ -55,3 +55,45 @@ export type ComposeData = {
   dealId?: string;
   contactId?: string;
 };
+
+export type CampaignStatus = "DRAFT" | "SCHEDULED" | "SENDING" | "SENT" | "PAUSED";
+
+export type EmailListContact = {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  unsubscribed: boolean;
+  createdAt: string;
+};
+
+export type EmailList = {
+  id: string;
+  name: string;
+  description: string | null;
+  contactCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type EmailListDetail = EmailList & {
+  contacts: EmailListContact[];
+};
+
+export type EmailCampaign = {
+  id: string;
+  name: string;
+  subject: string;
+  body: string;
+  fromName: string | null;
+  listId: string;
+  listName: string;
+  status: CampaignStatus;
+  scheduledAt: string | null;
+  sentAt: string | null;
+  totalSent: number;
+  totalOpened: number;
+  totalClicked: number;
+  createdAt: string;
+  updatedAt: string;
+};
