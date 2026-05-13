@@ -579,7 +579,7 @@ export default function LandingPage() {
             ].map((plan) => (
               <div
                 key={plan.name}
-                className={`relative rounded-2xl p-8 ${
+                className={`relative flex flex-col rounded-2xl p-8 ${
                   plan.highlight
                     ? "bg-blue-600 text-white shadow-xl shadow-blue-600/30"
                     : "border border-slate-200 bg-white"
@@ -616,7 +616,7 @@ export default function LandingPage() {
                     {plan.description}
                   </div>
                 </div>
-                <ul className="mb-6 space-y-2.5">
+                <ul className="mb-6 flex-1 space-y-2.5">
                   {plan.features.map((f) => (
                     <li key={f} className="flex items-center gap-2.5 text-sm">
                       <CheckCircle2 className={`h-4 w-4 shrink-0 ${plan.highlight ? "text-teal-300" : "text-blue-500"}`} />
