@@ -2,22 +2,8 @@ import { getAdminOrgDetail } from "@/server/actions/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
+import { PlanChanger } from "./PlanChanger";
 
-const PLAN_BADGE: Record<string, string> = {
-  FREE: "bg-slate-700 text-slate-300",
-  STARTER: "bg-slate-700 text-slate-300",
-  ESSENTIAL: "bg-blue-900/50 text-blue-300",
-  ADVANCED: "bg-blue-900/50 text-blue-300",
-  PROFESSIONAL: "bg-emerald-900/50 text-emerald-300",
-  PRO: "bg-emerald-900/50 text-emerald-300",
-  ENTERPRISE: "bg-amber-900/50 text-amber-300",
-};
-
-const PLAN_LABEL: Record<string, string> = {
-  FREE: "Starter", STARTER: "Starter",
-  ESSENTIAL: "Pro", ADVANCED: "Pro", PROFESSIONAL: "Pro", PRO: "Pro",
-  ENTERPRISE: "Enterprise",
-};
 
 const ROLE_BADGE: Record<string, string> = {
   OWNER: "bg-amber-900/50 text-amber-300",
@@ -54,12 +40,7 @@ export default async function OrgDetailPage(ctx: { params: Promise<{ id: string 
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <div className="flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-bold text-white">{org.name}</h1>
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${PLAN_BADGE[org.plan] ?? "bg-slate-700 text-slate-300"}`}>
-              {PLAN_LABEL[org.plan] ?? org.plan}
-            </span>
-          </div>
+          <h1 className="text-xl font-bold text-white">{org.name}</h1>
           <p className="text-sm text-slate-400 mt-0.5">
             Iscritto il{" "}
             {new Date(org.createdAt).toLocaleDateString("it-IT", {
@@ -74,6 +55,11 @@ export default async function OrgDetailPage(ctx: { params: Promise<{ id: string 
             : <><XCircle className="h-4 w-4" /> SMTP non configurato</>
           }
         </div>
+      </div>
+
+      {/* Plan management */}
+      <div className="rounded-xl bg-slate-900 border border-white/10 p-5">
+        <PlanChanger orgId={org.id} currentPlan={org.plan} />
       </div>
 
       {/* Usage stats */}

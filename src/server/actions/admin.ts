@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 
@@ -11,6 +12,20 @@ function isAdmin(email: string | null | undefined) {
 async function requireAdmin() {
   const session = await auth();
   return isAdmin((session?.user as { email?: string } | undefined)?.email);
+}
+
+// ─── Plan management ──────────────────────────────────────────────────────────
+
+export type AdminPlan = "STARTER" | "PRO" | "ENTERPRISE";
+
+export async function updateOrgPlan(orgId: string, plan: AdminPlan): Promise<{ error: string | null }> {
+  if (!(await requireAdmin())) return { error: "Non autorizzato" };
+  if (!["STARTER", "PRO", "ENTERPRISE"].includes(plan)) return { error: "Piano non valido" };
+
+  await db.organization.update({ where: { id: orgId }, data: { plan } });
+  revalidatePath(`/admin/organizations/${orgId}`);
+  revalidatePath("/admin/organizations");
+  return { error: null };
 }
 
 // ─── Overview ─────────────────────────────────────────────────────────────────
