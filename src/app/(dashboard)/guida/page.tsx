@@ -6,10 +6,19 @@ import {
   BarChart3, Workflow, Package, Settings, ShieldCheck,
   Plug, Smartphone, CreditCard, HelpCircle, PlayCircle,
   ChevronRight, ChevronLeft, ArrowUpRight, BookOpen, Star,
-  Clock, CheckCircle2, X,
+  Clock, CheckCircle2, X, ExternalLink, Lightbulb, AlertTriangle, ListChecks,
 } from "lucide-react";
 
 // ─── Data ────────────────────────────────────────────────────────────────────
+
+export type Block =
+  | { type: "para"; text: string }
+  | { type: "heading"; text: string }
+  | { type: "list"; items: string[] }
+  | { type: "steps"; items: string[] }
+  | { type: "tip"; text: string }
+  | { type: "warning"; text: string }
+  | { type: "link"; text: string; href: string };
 
 type Article = {
   id: string;
@@ -17,6 +26,7 @@ type Article = {
   excerpt: string;
   readTime: number;
   popular?: boolean;
+  blocks?: Block[];
 };
 
 type Category = {
@@ -38,12 +48,98 @@ const CATEGORIES: Category[] = [
     color: "text-violet-600",
     bgColor: "bg-violet-50 dark:bg-violet-900/20",
     articles: [
-      { id: "i1", title: "Come creare il tuo account Pipely", excerpt: "Guida passo-passo alla registrazione e configurazione iniziale del tuo CRM.", readTime: 3, popular: true },
-      { id: "i2", title: "Configurare la tua organizzazione", excerpt: "Imposta il nome, il logo e le informazioni della tua azienda in Pipely.", readTime: 4 },
-      { id: "i3", title: "Invitare i membri del team", excerpt: "Come aggiungere collaboratori e assegnare ruoli e permessi.", readTime: 5, popular: true },
-      { id: "i4", title: "Importare contatti da CSV o Excel", excerpt: "Trasferisci i tuoi dati esistenti in Pipely: carica file CSV, XLS o XLSX oppure scarica il template Excel precompilato.", readTime: 6 },
-      { id: "i5", title: "Panoramica della dashboard", excerpt: "Scopri i KPI principali, la pipeline overview, i widget e la guida wizard per i primi passi.", readTime: 3 },
-      { id: "i6", title: "Personalizzare le impostazioni iniziali", excerpt: "Lingua, fuso orario, valuta e altre preferenze dell'account.", readTime: 4 },
+      { id: "i1", title: "Come creare il tuo account Pipely", excerpt: "Guida passo-passo alla registrazione e configurazione iniziale del tuo CRM.", readTime: 3, popular: true, blocks: [
+        { type: "heading", text: "Prima di iniziare" },
+        { type: "para", text: "Pipely è un CRM progettato per gestire vendite, contatti e attività in un unico posto. La registrazione richiede meno di 2 minuti." },
+        { type: "heading", text: "Registrazione" },
+        { type: "steps", items: [
+          "Vai alla pagina di registrazione e clicca su \"Crea account\"",
+          "Inserisci nome, email e scegli una password sicura (min. 8 caratteri)",
+          "Scegli il nome della tua organizzazione — sarà visibile ai tuoi colleghi",
+          "Clicca \"Crea account\" per completare la registrazione",
+        ]},
+        { type: "tip", text: "Puoi registrarti anche con Google per un accesso più rapido, senza dover memorizzare una password aggiuntiva." },
+        { type: "heading", text: "Cosa succede dopo" },
+        { type: "para", text: "Dopo la registrazione entri direttamente nella dashboard. Pipely mostra un wizard guidato per completare i primi passi: configurare la pipeline, aggiungere contatti, creare il primo affare e altro." },
+        { type: "tip", text: "Se crei l'account per un team, invita subito i tuoi colleghi da Impostazioni → Team." },
+      ]},
+      { id: "i2", title: "Configurare la tua organizzazione", excerpt: "Imposta il nome, il logo e le informazioni della tua azienda in Pipely.", readTime: 4, blocks: [
+        { type: "heading", text: "Dove si trovano le impostazioni" },
+        { type: "para", text: "Clicca sull'icona ingranaggio nella sidebar per accedere al pannello Impostazioni." },
+        { type: "heading", text: "Nome e slug" },
+        { type: "para", text: "Il nome dell'organizzazione è visibile a tutti i membri del team. Lo slug è un identificatore univoco assegnato alla registrazione e non è modificabile successivamente." },
+        { type: "heading", text: "Piano attivo" },
+        { type: "para", text: "Nella sezione Impostazioni puoi visualizzare il piano attivo: FREE, ESSENTIAL, ADVANCED, PROFESSIONAL o ENTERPRISE. Ogni piano sblocca funzionalità aggiuntive." },
+        { type: "tip", text: "Mantieni i dati dell'organizzazione aggiornati — il nome viene usato come mittente predefinito nelle email inviate tramite Pipely." },
+      ]},
+      { id: "i3", title: "Invitare i membri del team", excerpt: "Come aggiungere collaboratori e assegnare ruoli e permessi.", readTime: 5, popular: true, blocks: [
+        { type: "heading", text: "Ruoli disponibili" },
+        { type: "list", items: [
+          "OWNER — accesso completo, può modificare il piano e gestire tutti i dati",
+          "ADMIN — accesso completo eccetto la gestione del piano",
+          "MANAGER — gestisce affari, contatti e team ma non le impostazioni avanzate",
+          "SALES — crea e gestisce affari e contatti, non accede alle impostazioni",
+          "VIEWER — solo visualizzazione, nessuna modifica",
+        ]},
+        { type: "heading", text: "Come invitare un membro" },
+        { type: "steps", items: [
+          "Vai su Impostazioni → Team",
+          "Clicca su \"Invita membro\"",
+          "Inserisci l'email del collega e scegli il ruolo appropriato",
+          "Clicca \"Invia invito\" — il collega riceve un'email con il link di accesso",
+        ]},
+        { type: "tip", text: "Un venditore che deve solo inserire affari e contatti ha bisogno del ruolo SALES. Assegna ADMIN solo a chi gestisce l'account." },
+      ]},
+      { id: "i4", title: "Importare contatti da CSV o Excel", excerpt: "Trasferisci i tuoi dati esistenti in Pipely: carica file CSV, XLS o XLSX oppure scarica il template Excel precompilato.", readTime: 6, blocks: [
+        { type: "heading", text: "Formati supportati" },
+        { type: "para", text: "Pipely accetta file CSV, XLS e XLSX. Puoi preparare il file con Excel, Google Sheets o LibreOffice." },
+        { type: "heading", text: "Scaricare il template Excel" },
+        { type: "steps", items: [
+          "Vai su Contatti nella sidebar",
+          "Clicca sull'icona \"Importa\" in alto a destra",
+          "Nella finestra che si apre, clicca \"Scarica template Excel\"",
+          "Compila il file con i tuoi dati e salvalo",
+        ]},
+        { type: "heading", text: "Importare il file" },
+        { type: "steps", items: [
+          "Apri la finestra di importazione (Contatti → Importa)",
+          "Trascina il file nell'area di upload oppure clicca per selezionarlo",
+          "Verifica la preview: Pipely mostra le prime 5 righe rilevate",
+          "Controlla che le colonne siano mappate correttamente",
+          "Clicca \"Importa N contatti\" per avviare l'importazione",
+        ]},
+        { type: "heading", text: "Colonne riconosciute automaticamente" },
+        { type: "list", items: ["Nome / First Name", "Cognome / Last Name", "Email", "Telefono / Phone", "Azienda / Company"] },
+        { type: "tip", text: "I duplicati (stessa email) vengono ignorati automaticamente. Puoi importare lo stesso file più volte senza creare duplicati." },
+        { type: "warning", text: "Il file non deve superare i 5 MB. Per file molto grandi, dividili in più batch da importare separatamente." },
+      ]},
+      { id: "i5", title: "Panoramica della dashboard", excerpt: "Scopri i KPI principali, la pipeline overview, i widget e la guida wizard per i primi passi.", readTime: 3, blocks: [
+        { type: "heading", text: "I KPI principali" },
+        { type: "list", items: [
+          "Affari aperti — numero totale di trattative attive nella pipeline",
+          "Valore pipeline — somma del valore di tutti gli affari aperti",
+          "Revenue vinta — totale degli affari chiusi come Vinti negli ultimi 30 giorni",
+          "Win rate — percentuale di affari vinti sul totale chiusi (vinti + persi)",
+          "Previsione ponderata — stima del fatturato basata sulla probabilità di ogni stage",
+          "Attività scadute — attività con data di scadenza superata e non completate",
+        ]},
+        { type: "heading", text: "Grafico pipeline per stage" },
+        { type: "para", text: "Il grafico a barre mostra la distribuzione degli affari e del valore per ogni stage. Usalo per identificare colli di bottiglia (es. molti affari bloccati nello stage Proposta)." },
+        { type: "heading", text: "La guida di avvio rapido" },
+        { type: "para", text: "Se sei nuovo, in cima alla dashboard trovi il wizard che ti accompagna in 10 passi: configurare la pipeline, aggiungere aziende, contatti, prodotti, affari, attività, email SMTP, automazioni, liste e campagne." },
+        { type: "tip", text: "Una volta completati tutti i passi, la guida può essere nascosta cliccando sulla X in alto a destra. Lo stato viene salvato nel browser." },
+      ]},
+      { id: "i6", title: "Personalizzare le impostazioni iniziali", excerpt: "Lingua, fuso orario, valuta e altre preferenze dell'account.", readTime: 4, blocks: [
+        { type: "heading", text: "Profilo personale" },
+        { type: "para", text: "In Impostazioni → Profilo puoi aggiornare il nome visualizzato e la foto profilo. L'email non è modificabile in quanto usata per l'autenticazione." },
+        { type: "heading", text: "Configurazione email (SMTP)" },
+        { type: "para", text: "In Impostazioni → Email configuri il provider per inviare email reali ai tuoi contatti. Pipely supporta Gmail, Aruba, Libero e qualsiasi provider SMTP custom." },
+        { type: "tip", text: "Senza SMTP configurato, le email mostrate nell'app sono simulate. Configura SMTP per abilitare l'invio reale ai destinatari." },
+        { type: "heading", text: "Gestione team" },
+        { type: "para", text: "In Impostazioni → Team gestisci i membri: inviti, modifica ruoli, rimozione utenti." },
+        { type: "heading", text: "Pipeline e stage" },
+        { type: "para", text: "In Impostazioni → Pipeline personalizzi gli stage: nome, probabilità di chiusura, colore e ordine. Puoi creare pipeline multiple per processi diversi (es. vendite, supporto)." },
+      ]},
     ],
   },
   {
@@ -54,8 +150,47 @@ const CATEGORIES: Category[] = [
     color: "text-blue-600",
     bgColor: "bg-blue-50 dark:bg-blue-900/20",
     articles: [
-      { id: "p1", title: "Come creare e configurare una pipeline", excerpt: "Imposta gli stage, la probabilità di chiusura e i tempi di rotting per la tua pipeline.", readTime: 5, popular: true },
-      { id: "p2", title: "Aggiungere e gestire gli affari", excerpt: "Crea nuovi affari, assegnali ai responsabili e collegali a contatti e aziende.", readTime: 4, popular: true },
+      { id: "p1", title: "Come creare e configurare una pipeline", excerpt: "Imposta gli stage, la probabilità di chiusura e i tempi di rotting per la tua pipeline.", readTime: 5, popular: true, blocks: [
+        { type: "heading", text: "Cos'è una pipeline" },
+        { type: "para", text: "Una pipeline rappresenta il processo di vendita suddiviso in stage progressivi. Ogni affare avanza da uno stage all'altro verso la chiusura." },
+        { type: "heading", text: "Creare la prima pipeline" },
+        { type: "steps", items: [
+          "Vai su Impostazioni → Pipeline",
+          "Clicca \"Nuova pipeline\" e assegna un nome (es. Vendite B2B)",
+          "Aggiungi gli stage cliccando il pulsante + accanto all'ultimo stage",
+          "Per ogni stage imposta: nome, probabilità di chiusura (0–100%), colore opzionale",
+          "Riordina gli stage trascinandoli con il drag handle",
+          "Clicca Salva",
+        ]},
+        { type: "heading", text: "Stage consigliati" },
+        { type: "list", items: [
+          "Prospect (0%) — contatto identificato, non ancora qualificato",
+          "Qualificato (20%) — interesse confermato",
+          "Proposta inviata (50%) — offerta presentata al cliente",
+          "Negoziazione (75%) — trattativa in corso",
+          "Chiusura (90%) — accordo quasi finalizzato",
+        ]},
+        { type: "tip", text: "La probabilità di ogni stage viene usata per calcolare la previsione ponderata nella dashboard: valore affare × probabilità stage." },
+        { type: "heading", text: "Rotting" },
+        { type: "para", text: "Il rotting è un avviso visivo per gli affari fermi in uno stage da troppo tempo. Puoi configurare il numero di giorni soglia nelle impostazioni della pipeline." },
+      ]},
+      { id: "p2", title: "Aggiungere e gestire gli affari", excerpt: "Crea nuovi affari, assegnali ai responsabili e collegali a contatti e aziende.", readTime: 4, popular: true, blocks: [
+        { type: "heading", text: "Creare un nuovo affare" },
+        { type: "steps", items: [
+          "Vai su Affari nella sidebar",
+          "Clicca \"Nuovo affare\" in alto a destra",
+          "Inserisci il titolo dell'affare e il valore stimato",
+          "Seleziona lo stage di partenza nella pipeline",
+          "Collega un contatto e/o un'azienda",
+          "Assegna un responsabile e una data di chiusura prevista",
+          "Clicca Crea",
+        ]},
+        { type: "heading", text: "Gestire gli affari nella vista Kanban" },
+        { type: "para", text: "Nella vista Kanban puoi trascinare le card direttamente da uno stage all'altro. Lo stage dell'affare si aggiorna automaticamente." },
+        { type: "heading", text: "Aggiungere prodotti a un affare" },
+        { type: "para", text: "Apri la scheda dell'affare e cerca la sezione Prodotti. Aggiungi prodotti dal catalogo, imposta quantità e sconto. Il valore dell'affare si ricalcola in automatico." },
+        { type: "tip", text: "Imposta sempre una data di chiusura prevista: viene usata per i report di previsione e per calcolare il tasso di conversione nel tempo." },
+      ]},
       { id: "p3", title: "Spostare gli affari tra gli stage", excerpt: "Come trascinare le card nella vista Kanban e aggiornare lo stato degli affari.", readTime: 3 },
       { id: "p4", title: "Rotting: affari in attesa troppo a lungo", excerpt: "Cos'è il rotting, come configurarlo e come ricevere notifiche sugli affari fermi.", readTime: 4 },
       { id: "p5", title: "Marcare un affare come vinto o perso", excerpt: "Come chiudere un affare e registrare il motivo della perdita per le analisi.", readTime: 3 },
@@ -70,7 +205,27 @@ const CATEGORIES: Category[] = [
     color: "text-emerald-600",
     bgColor: "bg-emerald-50 dark:bg-emerald-900/20",
     articles: [
-      { id: "c1", title: "Creare e modificare un contatto", excerpt: "Aggiungi nome, email, telefono, azienda di riferimento e campi personalizzati.", readTime: 3, popular: true },
+      { id: "c1", title: "Creare e modificare un contatto", excerpt: "Aggiungi nome, email, telefono, azienda di riferimento e campi personalizzati.", readTime: 3, popular: true, blocks: [
+        { type: "heading", text: "Creare un nuovo contatto" },
+        { type: "steps", items: [
+          "Vai su Contatti nella sidebar",
+          "Clicca \"Nuovo contatto\" in alto a destra",
+          "Inserisci nome, cognome ed email",
+          "Aggiungi telefono, ruolo/qualifica e azienda di riferimento",
+          "Clicca Crea contatto",
+        ]},
+        { type: "heading", text: "Campi principali" },
+        { type: "list", items: [
+          "Nome e Cognome — usati per personalizzare le email con {{nome}} e {{cognome}}",
+          "Email — indirizzo principale per comunicazioni e campagne",
+          "Telefono — visibile nella scheda per chiamate rapide",
+          "Azienda — collega il contatto a un'azienda esistente in Pipely",
+          "Ruolo/Qualifica — posizione nella sua azienda (es. Responsabile Acquisti)",
+        ]},
+        { type: "heading", text: "Modificare un contatto" },
+        { type: "para", text: "Clicca sul nome di qualsiasi contatto per aprire il dettaglio. Da lì puoi modificare tutti i campi, vedere lo storico delle attività, gli affari collegati e le email inviate." },
+        { type: "tip", text: "Collegare i contatti alle aziende ti permette di vedere tutti i referenti di un'azienda in un unico posto, nella scheda dell'azienda stessa." },
+      ]},
       { id: "c2", title: "Collegare contatti alle aziende", excerpt: "Come associare un contatto a una o più aziende e gestire i ruoli.", readTime: 4 },
       { id: "c3", title: "Importare contatti in massa", excerpt: "Guida al formato CSV corretto, mapping dei campi e gestione dei duplicati.", readTime: 7 },
       { id: "c4", title: "Gestire le aziende e i loro contatti", excerpt: "Vista aziendale, elenco dipendenti, affari collegati e storico attività.", readTime: 5 },
@@ -118,7 +273,31 @@ const CATEGORIES: Category[] = [
     color: "text-sky-600",
     bgColor: "bg-sky-50 dark:bg-sky-900/20",
     articles: [
-      { id: "em1", title: "Configurare il tuo account email (SMTP wizard)", excerpt: "Usa il wizard in Impostazioni → Email per collegare Gmail, Aruba, Libero o un provider SMTP custom in pochi clic.", readTime: 5, popular: true },
+      { id: "em1", title: "Configurare il tuo account email (SMTP wizard)", excerpt: "Usa il wizard in Impostazioni → Email per collegare Gmail, Aruba, Libero o un provider SMTP custom in pochi clic.", readTime: 5, popular: true, blocks: [
+        { type: "heading", text: "Perché configurare l'SMTP" },
+        { type: "para", text: "Senza SMTP configurato, le email create in Pipely vengono registrate nel CRM ma non recapitate realmente. Con SMTP attivo ogni email parte dalla tua casella di posta." },
+        { type: "heading", text: "Provider supportati" },
+        { type: "list", items: [
+          "Gmail — email Google con App Password dedicata",
+          "Aruba — configurazione automatica per domini su Aruba",
+          "Libero — configurazione automatica per @libero.it",
+          "Custom SMTP — qualsiasi provider con supporto SMTP (Outlook, Yahoo, hosting privato...)",
+        ]},
+        { type: "heading", text: "Come configurare Gmail" },
+        { type: "steps", items: [
+          "Vai su Impostazioni → Email",
+          "Seleziona Gmail come provider",
+          "Inserisci la tua email Gmail",
+          "Per la password devi usare un'App Password (non la password Gmail normale)",
+          "Vai su myaccount.google.com → Sicurezza → Verifica in due passaggi → App password",
+          "Crea una nuova App Password per \"Pipely\" e copiala",
+          "Incollala nel campo password e clicca \"Testa connessione\"",
+        ]},
+        { type: "warning", text: "Gmail richiede la verifica in due passaggi attiva per poter creare un'App Password. Abilitala prima di procedere." },
+        { type: "heading", text: "Come configurare Aruba o Libero" },
+        { type: "para", text: "Seleziona il provider nel wizard: host, porta e protocollo vengono precompilati automaticamente. Inserisci solo email e password del tuo account." },
+        { type: "tip", text: "Le credenziali vengono cifrate con AES-256 prima di essere salvate nel database. La password non viene mai memorizzata in chiaro." },
+      ]},
       { id: "em2", title: "Configurare Gmail con App Password", excerpt: "Gmail richiede una App Password dedicata (non la password principale). Guida passo-passo con link alla pagina Google.", readTime: 4 },
       { id: "em3", title: "Configurare Aruba o Libero come provider SMTP", excerpt: "Impostazioni host, porta e crittografia per i provider italiani più diffusi.", readTime: 3 },
       { id: "em4", title: "Creare template email riutilizzabili", excerpt: "Risparmia tempo con modelli predefiniti per i messaggi più frequenti.", readTime: 5 },
@@ -134,10 +313,50 @@ const CATEGORIES: Category[] = [
     color: "text-rose-600",
     bgColor: "bg-rose-50 dark:bg-rose-900/20",
     articles: [
-      { id: "ca1", title: "Creare una lista email", excerpt: "Crea una lista, assegna un nome e una descrizione, poi aggiungi contatti manualmente o via import.", readTime: 3, popular: true },
+      { id: "ca1", title: "Creare una lista email", excerpt: "Crea una lista, assegna un nome e una descrizione, poi aggiungi contatti manualmente o via import.", readTime: 3, popular: true, blocks: [
+        { type: "heading", text: "Creare la lista" },
+        { type: "steps", items: [
+          "Vai su Email → Liste nella sidebar",
+          "Clicca \"Nuova lista\"",
+          "Inserisci nome e descrizione opzionale",
+          "Aggiungi le prime email nel campo testo (una per riga o separate da virgola)",
+          "In alternativa, carica un file CSV/XLS/XLSX con le email",
+          "Clicca Crea lista",
+        ]},
+        { type: "heading", text: "Aggiungere contatti in seguito" },
+        { type: "para", text: "Apri una lista esistente e usa il pulsante Aggiungi contatti per inserire nuove email manualmente o importare un file." },
+        { type: "tip", text: "Le email duplicate vengono ignorate automaticamente in fase di creazione e importazione." },
+      ]},
       { id: "ca2", title: "Aggiungere contatti a una lista: inserimento manuale", excerpt: "Incolla una o più email nel campo testo per aggiungerle rapidamente alla lista.", readTime: 2 },
       { id: "ca3", title: "Importare contatti in una lista da CSV o Excel", excerpt: "Carica un file CSV, XLS o XLSX con le email dei destinatari. I duplicati vengono gestiti automaticamente.", readTime: 4 },
-      { id: "ca4", title: "Creare e inviare una campagna email", excerpt: "Scegli la lista, imposta oggetto, mittente e corpo del messaggio, poi invia subito o pianifica.", readTime: 5, popular: true },
+      { id: "ca4", title: "Creare e inviare una campagna email", excerpt: "Scegli la lista, imposta oggetto, mittente e corpo del messaggio, poi invia subito o pianifica.", readTime: 5, popular: true, blocks: [
+        { type: "heading", text: "Prerequisiti" },
+        { type: "list", items: [
+          "Account SMTP configurato in Impostazioni → Email",
+          "Almeno una lista email con contatti",
+        ]},
+        { type: "heading", text: "Creare la campagna" },
+        { type: "steps", items: [
+          "Vai su Email → Campagne",
+          "Clicca \"Nuova campagna\"",
+          "Seleziona la lista di destinatari",
+          "Inserisci nome mittente e oggetto dell'email",
+          "Scrivi il corpo del messaggio — puoi usare le variabili {{nome}}, {{cognome}}, {{email}}",
+          "Facoltativamente imposta una data/ora di invio programmato",
+          "Clicca Crea campagna",
+        ]},
+        { type: "heading", text: "Variabili dinamiche" },
+        { type: "list", items: [
+          "{{nome}} — sostituito con il nome del contatto",
+          "{{cognome}} — sostituito con il cognome",
+          "{{email}} — sostituito con l'indirizzo email",
+        ]},
+        { type: "heading", text: "Inviare la campagna" },
+        { type: "para", text: "Nella lista campagne trova la campagna con stato BOZZA e clicca Invia ora. Pipely invia a ogni contatto non disiscritto della lista e aggiorna lo stato in INVIATA." },
+        { type: "heading", text: "Statistiche" },
+        { type: "para", text: "Dopo l'invio puoi vedere: email consegnate, aperture (tramite pixel di tracciamento 1×1 px) e click (ogni link viene reindirizzato attraverso un URL di tracciamento)." },
+        { type: "tip", text: "Alcuni client email bloccano le immagini remote: in quei casi l'apertura non viene rilevata. I click sui link sono invece sempre tracciati con precisione." },
+      ]},
       { id: "ca5", title: "Personalizzare il messaggio con variabili dinamiche", excerpt: "Usa {{nome}}, {{cognome}} e {{email}} per personalizzare ogni email con i dati del destinatario.", readTime: 3 },
       { id: "ca6", title: "Monitorare aperture e click della campagna", excerpt: "Ogni email contiene un pixel di tracciamento e link con redirect. Dopo l'invio vedi quante email sono state aperte e quanti link cliccati.", readTime: 3 },
     ],
@@ -167,7 +386,34 @@ const CATEGORIES: Category[] = [
     bgColor: "bg-pink-50 dark:bg-pink-900/20",
     articles: [
       { id: "au1", title: "Cos'è un'automazione in Pipely", excerpt: "Introduzione ai workflow automatici: trigger, condizioni e azioni disponibili.", readTime: 5 },
-      { id: "au2", title: "Creare la tua prima automazione", excerpt: "Guida passo-passo alla creazione di un workflow per automatizzare i follow-up.", readTime: 7, popular: true },
+      { id: "au2", title: "Creare la tua prima automazione", excerpt: "Guida passo-passo alla creazione di un workflow per automatizzare i follow-up.", readTime: 7, popular: true, blocks: [
+        { type: "heading", text: "Cosa sono le automazioni" },
+        { type: "para", text: "Un'automazione (workflow) è una regola trigger-action: quando accade un evento (trigger), Pipely esegue automaticamente un'azione, senza intervento manuale." },
+        { type: "heading", text: "Esempi pratici" },
+        { type: "list", items: [
+          "Quando un affare cambia stage → invia email di follow-up al contatto",
+          "Quando un lead viene creato → crea un'attività di richiamo per il responsabile",
+          "Quando un affare viene vinto → invia notifica al team commerciale",
+          "Quando un'attività scade → promemoria automatico via notifica",
+        ]},
+        { type: "heading", text: "Creare un workflow" },
+        { type: "steps", items: [
+          "Vai su Automazioni nella sidebar",
+          "Clicca \"Nuova automazione\"",
+          "Scegli il trigger: l'evento che avvia il workflow",
+          "Configura eventuali condizioni (es. solo se valore affare > 1000€)",
+          "Aggiungi l'azione da eseguire (email, notifica, crea attività...)",
+          "Attiva il workflow con il toggle ON/OFF",
+        ]},
+        { type: "heading", text: "Trigger disponibili" },
+        { type: "list", items: [
+          "Affare: creato, cambiato stage, vinto, perso",
+          "Contatto: creato, modificato",
+          "Attività: completata, scaduta",
+          "Lead: creato, convertito",
+        ]},
+        { type: "tip", text: "Inizia con automazioni semplici (un trigger, un'azione) e aggiungine di più complesse man mano che prendi confidenza con lo strumento." },
+      ]},
       { id: "au3", title: "Automazioni per il follow-up dopo una chiamata", excerpt: "Invia automaticamente un'email o crea un'attività dopo ogni chiamata completata.", readTime: 5 },
       { id: "au4", title: "Notifiche automatiche al team", excerpt: "Avvisa i colleghi quando un affare cambia stage o raggiunge un valore soglia.", readTime: 4 },
       { id: "au5", title: "Automazioni per i lead in entrata", excerpt: "Assegna automaticamente i lead ai responsabili in base a regole personalizzate.", readTime: 5 },
@@ -182,7 +428,28 @@ const CATEGORIES: Category[] = [
     color: "text-teal-600",
     bgColor: "bg-teal-50 dark:bg-teal-900/20",
     articles: [
-      { id: "pr1", title: "Aggiungere prodotti al catalogo", excerpt: "Come creare schede prodotto con nome, codice, prezzo, IVA e attivare la fatturazione ricorrente mensile o annuale.", readTime: 3, popular: true },
+      { id: "pr1", title: "Aggiungere prodotti al catalogo", excerpt: "Come creare schede prodotto con nome, codice, prezzo, IVA e attivare la fatturazione ricorrente mensile o annuale.", readTime: 3, popular: true, blocks: [
+        { type: "heading", text: "Creare una scheda prodotto" },
+        { type: "steps", items: [
+          "Vai su Prodotti nella sidebar",
+          "Clicca \"Nuovo prodotto\"",
+          "Inserisci il nome del prodotto",
+          "Scegli la categoria (Software, SaaS, Sito Web, Agente AI, Hardware, Servizi, Consulenza, Formazione, Altro)",
+          "Imposta il prezzo e l'aliquota IVA",
+          "Se è un prodotto ricorrente, attiva il toggle \"Abbonamento\" e scegli il periodo (Mensile / Annuale)",
+          "Clicca Crea prodotto",
+        ]},
+        { type: "heading", text: "Collegare prodotti agli affari" },
+        { type: "para", text: "Apri la scheda di un affare e trova la sezione Prodotti. Clicca Aggiungi prodotto, cerca nel catalogo, imposta quantità e sconto. Il valore dell'affare si aggiorna automaticamente." },
+        { type: "heading", text: "Categorie disponibili" },
+        { type: "list", items: [
+          "Software, SaaS, Sito Web, Agente AI — per prodotti digitali",
+          "Hardware — per prodotti fisici",
+          "Servizi, Consulenza, Formazione — per prestazioni professionali",
+          "Altro — per tutto il resto",
+        ]},
+        { type: "tip", text: "Impostare la categoria correttamente ti aiuta a filtrare il catalogo e a generare report di vendita suddivisi per tipologia." },
+      ]},
       { id: "pr2", title: "Associare prodotti agli affari", excerpt: "Aggiungi prodotti o servizi a un affare per calcolare il valore totale.", readTime: 4 },
       { id: "pr3", title: "Gestire quantità, sconti e IVA", excerpt: "Imposta quantità, percentuale di sconto e aliquota IVA per ogni riga prodotto.", readTime: 4 },
       { id: "pr4", title: "Categorie e unità di misura", excerpt: "Organizza il catalogo per categorie: Software, SaaS, Sito Web, Agente AI, Hardware, Servizi, Consulenza, Formazione, Altro.", readTime: 3 },
@@ -334,9 +601,134 @@ function CategoryCard({ cat, onClick }: { cat: Category; onClick: () => void }) 
   );
 }
 
-function ArticleRow({ article, compact = false }: { article: Article; compact?: boolean }) {
+function ArticleView({ article, cat, onBack }: { article: Article; cat: Category; onBack: () => void }) {
+  const Icon = cat.icon;
   return (
-    <div className="flex items-start gap-3 py-3 border-b border-[var(--crm-neutral-100)] dark:border-white/10 last:border-0 group cursor-pointer hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/5 -mx-4 px-4 rounded-lg transition-colors">
+    <div className="space-y-6 max-w-3xl">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-1.5 text-xs text-[var(--crm-neutral-500)]">
+        <button onClick={onBack} className="hover:text-[var(--crm-primary)] transition-colors">
+          Tutte le categorie
+        </button>
+        <ChevronRight className="h-3 w-3" />
+        <button onClick={onBack} className="hover:text-[var(--crm-primary)] transition-colors">
+          {cat.label}
+        </button>
+        <ChevronRight className="h-3 w-3" />
+        <span className="text-[var(--crm-neutral-900)] dark:text-white truncate">{article.title}</span>
+      </div>
+
+      {/* Header */}
+      <div className="flex items-start gap-4">
+        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${cat.bgColor}`}>
+          <Icon className={`h-6 w-6 ${cat.color}`} />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-[var(--crm-neutral-900)] dark:text-white leading-snug">
+            {article.title}
+          </h1>
+          <div className="flex items-center gap-3 mt-1.5">
+            <span className="flex items-center gap-1 text-xs text-[var(--crm-neutral-400)]">
+              <Clock className="h-3 w-3" /> {article.readTime} min di lettura
+            </span>
+            {article.popular && (
+              <span className="flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 text-xs font-medium text-amber-600">
+                <Star className="h-2.5 w-2.5" /> Popolare
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      {article.blocks ? (
+        <div className="rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 bg-white dark:bg-[#1a1a2e] p-6 space-y-5">
+          {article.blocks.map((block, i) => {
+            if (block.type === "heading") return (
+              <h2 key={i} className="text-base font-semibold text-[var(--crm-neutral-900)] dark:text-white pt-2 first:pt-0">
+                {block.text}
+              </h2>
+            );
+            if (block.type === "para") return (
+              <p key={i} className="text-sm text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)] leading-relaxed">
+                {block.text}
+              </p>
+            );
+            if (block.type === "list") return (
+              <ul key={i} className="space-y-1.5 pl-1">
+                {block.items.map((item, j) => (
+                  <li key={j} className="flex items-start gap-2 text-sm text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)]">
+                    <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-[var(--crm-primary)] shrink-0" />
+                    <span className="leading-relaxed">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            );
+            if (block.type === "steps") return (
+              <ol key={i} className="space-y-2 pl-1">
+                {block.items.map((item, j) => (
+                  <li key={j} className="flex items-start gap-3 text-sm text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)]">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--crm-primary)]/10 text-[10px] font-bold text-[var(--crm-primary)] mt-0.5">
+                      {j + 1}
+                    </span>
+                    <span className="leading-relaxed">{item}</span>
+                  </li>
+                ))}
+              </ol>
+            );
+            if (block.type === "tip") return (
+              <div key={i} className="flex items-start gap-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 px-4 py-3">
+                <Lightbulb className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">{block.text}</p>
+              </div>
+            );
+            if (block.type === "warning") return (
+              <div key={i} className="flex items-start gap-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/40 px-4 py-3">
+                <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">{block.text}</p>
+              </div>
+            );
+            if (block.type === "link") return (
+              <a key={i} href={block.href} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-[var(--crm-primary)] hover:underline">
+                {block.text} <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            );
+            return null;
+          })}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed border-[var(--crm-neutral-200)] dark:border-white/10 p-10 text-center">
+          <ListChecks className="h-8 w-8 text-[var(--crm-neutral-300)] mx-auto mb-3" />
+          <p className="text-sm font-medium text-[var(--crm-neutral-500)]">Articolo in fase di redazione</p>
+          <p className="text-xs text-[var(--crm-neutral-400)] mt-1">Questo contenuto sarà disponibile a breve.</p>
+        </div>
+      )}
+
+      {/* Footer nav */}
+      <div className="flex items-center justify-between pt-2">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-sm text-[var(--crm-neutral-500)] hover:text-[var(--crm-primary)] transition-colors"
+        >
+          <ChevronLeft className="h-4 w-4" /> Torna a {cat.label}
+        </button>
+        <div className="flex items-center gap-2 rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 bg-white dark:bg-[#1a1a2e] px-4 py-2 text-xs text-[var(--crm-neutral-500)]">
+          Questo articolo ti è stato utile?
+          <button className="ml-2 text-lg hover:scale-125 transition-transform" title="Sì">👍</button>
+          <button className="text-lg hover:scale-125 transition-transform" title="No">👎</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ArticleRow({ article, compact = false, onClick }: { article: Article; compact?: boolean; onClick?: () => void }) {
+  return (
+    <div
+      onClick={onClick}
+      className="flex items-start gap-3 py-3 border-b border-[var(--crm-neutral-100)] dark:border-white/10 last:border-0 group cursor-pointer hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/5 -mx-4 px-4 rounded-lg transition-colors"
+    >
       <BookOpen className="h-4 w-4 text-[var(--crm-primary)] mt-0.5 shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-[var(--crm-neutral-900)] dark:text-white group-hover:text-[var(--crm-primary)] transition-colors">
@@ -355,12 +747,13 @@ function ArticleRow({ article, compact = false }: { article: Article; compact?: 
             <Star className="h-2.5 w-2.5" /> Popolare
           </span>
         )}
+        <ChevronRight className="h-3.5 w-3.5 text-[var(--crm-neutral-300)] group-hover:text-[var(--crm-primary)] transition-colors" />
       </div>
     </div>
   );
 }
 
-function CategoryDetail({ cat, onBack }: { cat: Category; onBack: () => void }) {
+function CategoryDetail({ cat, onBack, onArticleClick }: { cat: Category; onBack: () => void; onArticleClick: (a: Article) => void }) {
   const Icon = cat.icon;
   return (
     <div className="space-y-6">
@@ -391,7 +784,7 @@ function CategoryDetail({ cat, onBack }: { cat: Category; onBack: () => void }) 
         <p className="text-xs text-[var(--crm-neutral-500)] mb-4">Clicca su un articolo per leggere la guida completa.</p>
         <div>
           {cat.articles.map((a) => (
-            <ArticleRow key={a.id} article={a} />
+            <ArticleRow key={a.id} article={a} onClick={() => onArticleClick(a)} />
           ))}
         </div>
       </div>
@@ -419,6 +812,7 @@ function CategoryDetail({ cat, onBack }: { cat: Category; onBack: () => void }) 
 export default function GuidaPage() {
   const [search, setSearch] = useState("");
   const [selectedCat, setSelectedCat] = useState<Category | null>(null);
+  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
 
   const searchResults = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -430,10 +824,26 @@ export default function GuidaPage() {
     );
   }, [search]);
 
+  if (selectedCat && selectedArticle && !search) {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <ArticleView
+          article={selectedArticle}
+          cat={selectedCat}
+          onBack={() => setSelectedArticle(null)}
+        />
+      </div>
+    );
+  }
+
   if (selectedCat && !search) {
     return (
       <div className="max-w-3xl mx-auto space-y-0">
-        <CategoryDetail cat={selectedCat} onBack={() => setSelectedCat(null)} />
+        <CategoryDetail
+          cat={selectedCat}
+          onBack={() => setSelectedCat(null)}
+          onArticleClick={(a) => setSelectedArticle(a)}
+        />
       </div>
     );
   }
@@ -508,7 +918,11 @@ export default function GuidaPage() {
                     className="flex items-start gap-4 px-5 py-4 hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/5 cursor-pointer transition-colors"
                     onClick={() => {
                       const cat = CATEGORIES.find((c) => c.id === a.categoryId);
-                      if (cat) { setSearch(""); setSelectedCat(cat); }
+                      if (cat) {
+                        const art = cat.articles.find((x) => x.id === a.id);
+                        setSearch(""); setSelectedCat(cat);
+                        if (art) setSelectedArticle(art);
+                      }
                     }}
                   >
                     <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${a.bgColor}`}>
@@ -592,7 +1006,11 @@ export default function GuidaPage() {
                     className="group rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 bg-white dark:bg-[#1a1a2e] p-4 cursor-pointer hover:border-[var(--crm-primary)]/40 hover:shadow-sm transition-all"
                     onClick={() => {
                       const cat = CATEGORIES.find((c) => c.id === a.categoryId);
-                      if (cat) setSelectedCat(cat);
+                      if (cat) {
+                        const art = cat.articles.find((x) => x.id === a.id);
+                        setSelectedCat(cat);
+                        if (art) setSelectedArticle(art);
+                      }
                     }}
                   >
                     <div className="flex items-start gap-3">
