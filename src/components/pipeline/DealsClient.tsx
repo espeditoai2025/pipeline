@@ -73,7 +73,7 @@ export function DealsClient({ pipeline, owners }: DealsClientProps) {
             Affari
           </h1>
           <p className="text-sm text-[var(--crm-neutral-500)] mt-0.5">
-            {allDeals.length} affare{allDeals.length !== 1 ? "i" : ""} —{" "}
+            {allDeals.length} {allDeals.length === 1 ? "affare" : "affari"} —{" "}
             <span className="font-medium">{pipeline.name}</span>
           </p>
         </div>
