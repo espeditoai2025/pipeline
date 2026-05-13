@@ -37,7 +37,46 @@ export async function getPipeline(): Promise<Pipeline | null> {
     },
   });
 
-  if (!pipeline) return null;
+  if (!pipeline) {
+    // First login: create a default pipeline with 5 stages
+    const created = await db.pipeline.create({
+      data: {
+        name: "Pipeline Principale",
+        organizationId: orgId,
+        isDefault: true,
+        position: 0,
+        stages: {
+          create: [
+            { name: "Qualificazione", position: 0, probability: 20, rotting: 14 },
+            { name: "Contatto",       position: 1, probability: 40, rotting: 10 },
+            { name: "Proposta",       position: 2, probability: 60, rotting:  7 },
+            { name: "Negoziazione",   position: 3, probability: 80, rotting:  5 },
+            { name: "Chiusura",       position: 4, probability: 95, rotting:  3 },
+          ],
+        },
+      },
+      include: {
+        stages: {
+          orderBy: { position: "asc" },
+          include: { deals: false },
+        },
+      },
+    });
+    return {
+      id: created.id,
+      name: created.name,
+      isDefault: created.isDefault,
+      stages: created.stages.map((s) => ({
+        id: s.id,
+        name: s.name,
+        position: s.position,
+        probability: s.probability,
+        rotting: s.rotting,
+        deals: [],
+        totalValue: 0,
+      })),
+    };
+  }
 
   const now = new Date();
 

@@ -5,7 +5,7 @@ import { getPipeline, getPipelineOwners } from "@/server/actions/pipeline";
 export default async function DealsPage() {
   const [pipeline, owners] = await Promise.all([getPipeline(), getPipelineOwners()]);
 
-  if (!pipeline) redirect("/login");
+  if (!pipeline) redirect("/login"); // session missing (not logged in)
 
   return (
     <DealsClient
