@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import {
-  Search, Rocket, GitBranch, Users, Zap, Calendar, Mail,
+  Search, Rocket, GitBranch, Users, Zap, Calendar, Mail, Megaphone,
   BarChart3, Workflow, Package, Settings, ShieldCheck,
   Plug, Smartphone, CreditCard, HelpCircle, PlayCircle,
   ChevronRight, ChevronLeft, ArrowUpRight, BookOpen, Star,
@@ -41,8 +41,8 @@ const CATEGORIES: Category[] = [
       { id: "i1", title: "Come creare il tuo account Pipely", excerpt: "Guida passo-passo alla registrazione e configurazione iniziale del tuo CRM.", readTime: 3, popular: true },
       { id: "i2", title: "Configurare la tua organizzazione", excerpt: "Imposta il nome, il logo e le informazioni della tua azienda in Pipely.", readTime: 4 },
       { id: "i3", title: "Invitare i membri del team", excerpt: "Come aggiungere collaboratori e assegnare ruoli e permessi.", readTime: 5, popular: true },
-      { id: "i4", title: "Importare contatti da CSV o Excel", excerpt: "Trasferisci i tuoi dati esistenti in Pipely con la funzione di importazione massiva.", readTime: 6 },
-      { id: "i5", title: "Panoramica della dashboard", excerpt: "Scopri i KPI principali, la pipeline overview e i widget della dashboard.", readTime: 3 },
+      { id: "i4", title: "Importare contatti da CSV o Excel", excerpt: "Trasferisci i tuoi dati esistenti in Pipely: carica file CSV, XLS o XLSX oppure scarica il template Excel precompilato.", readTime: 6 },
+      { id: "i5", title: "Panoramica della dashboard", excerpt: "Scopri i KPI principali, la pipeline overview, i widget e la guida wizard per i primi passi.", readTime: 3 },
       { id: "i6", title: "Personalizzare le impostazioni iniziali", excerpt: "Lingua, fuso orario, valuta e altre preferenze dell'account.", readTime: 4 },
     ],
   },
@@ -118,12 +118,28 @@ const CATEGORIES: Category[] = [
     color: "text-sky-600",
     bgColor: "bg-sky-50 dark:bg-sky-900/20",
     articles: [
-      { id: "em1", title: "Collegare il tuo account email a Pipely", excerpt: "Come integrare Gmail, Outlook o altri provider IMAP/SMTP con il tuo CRM.", readTime: 5 },
-      { id: "em2", title: "Inviare email direttamente da Pipely", excerpt: "Scrivi e invia email ai contatti senza uscire dal CRM, con storico completo.", readTime: 4 },
-      { id: "em3", title: "Creare template email riutilizzabili", excerpt: "Risparmia tempo con modelli predefiniti per i messaggi più frequenti.", readTime: 5 },
-      { id: "em4", title: "Tracciamento aperture e click", excerpt: "Scopri quando i tuoi contatti aprono le email e cliccano sui link.", readTime: 4 },
-      { id: "em5", title: "Sincronizzazione email con gli affari", excerpt: "Come collegare automaticamente le email agli affari e ai contatti correlati.", readTime: 5 },
-      { id: "em6", title: "Gestione casella email integrata", excerpt: "Usa la inbox di Pipely per rispondere alle email senza perdere il contesto CRM.", readTime: 4 },
+      { id: "em1", title: "Configurare il tuo account email (SMTP wizard)", excerpt: "Usa il wizard in Impostazioni → Email per collegare Gmail, Aruba, Libero o un provider SMTP custom in pochi clic.", readTime: 5, popular: true },
+      { id: "em2", title: "Configurare Gmail con App Password", excerpt: "Gmail richiede una App Password dedicata (non la password principale). Guida passo-passo con link alla pagina Google.", readTime: 4 },
+      { id: "em3", title: "Configurare Aruba o Libero come provider SMTP", excerpt: "Impostazioni host, porta e crittografia per i provider italiani più diffusi.", readTime: 3 },
+      { id: "em4", title: "Creare template email riutilizzabili", excerpt: "Risparmia tempo con modelli predefiniti per i messaggi più frequenti.", readTime: 5 },
+      { id: "em5", title: "Inviare email direttamente da Pipely", excerpt: "Scrivi e invia email ai contatti senza uscire dal CRM, con storico completo.", readTime: 4 },
+      { id: "em6", title: "Sicurezza: come vengono protette le credenziali SMTP", excerpt: "Le password SMTP sono cifrate con AES-256 e non vengono mai salvate in chiaro nel database.", readTime: 3 },
+    ],
+  },
+  {
+    id: "campagne",
+    label: "Campagne Email",
+    description: "Liste contatti, campagne di email marketing e monitoraggio risultati",
+    icon: Megaphone,
+    color: "text-rose-600",
+    bgColor: "bg-rose-50 dark:bg-rose-900/20",
+    articles: [
+      { id: "ca1", title: "Creare una lista email", excerpt: "Crea una lista, assegna un nome e una descrizione, poi aggiungi contatti manualmente o via import.", readTime: 3, popular: true },
+      { id: "ca2", title: "Aggiungere contatti a una lista: inserimento manuale", excerpt: "Incolla una o più email nel campo testo per aggiungerle rapidamente alla lista.", readTime: 2 },
+      { id: "ca3", title: "Importare contatti in una lista da CSV o Excel", excerpt: "Carica un file CSV, XLS o XLSX con le email dei destinatari. I duplicati vengono gestiti automaticamente.", readTime: 4 },
+      { id: "ca4", title: "Creare e inviare una campagna email", excerpt: "Scegli la lista, imposta oggetto, mittente e corpo del messaggio, poi invia subito o pianifica.", readTime: 5, popular: true },
+      { id: "ca5", title: "Personalizzare il messaggio con variabili dinamiche", excerpt: "Usa {{nome}}, {{cognome}} e {{email}} per personalizzare ogni email con i dati del destinatario.", readTime: 3 },
+      { id: "ca6", title: "Monitorare aperture, click e disiscrizioni", excerpt: "Leggi le statistiche della campagna: tasso di apertura, click e quanti contatti si sono disiscritti.", readTime: 4 },
     ],
   },
   {
@@ -166,10 +182,10 @@ const CATEGORIES: Category[] = [
     color: "text-teal-600",
     bgColor: "bg-teal-50 dark:bg-teal-900/20",
     articles: [
-      { id: "pr1", title: "Aggiungere prodotti al catalogo", excerpt: "Come creare schede prodotto con nome, codice, prezzo e IVA.", readTime: 3, popular: true },
+      { id: "pr1", title: "Aggiungere prodotti al catalogo", excerpt: "Come creare schede prodotto con nome, codice, prezzo, IVA e attivare la fatturazione ricorrente mensile o annuale.", readTime: 3, popular: true },
       { id: "pr2", title: "Associare prodotti agli affari", excerpt: "Aggiungi prodotti o servizi a un affare per calcolare il valore totale.", readTime: 4 },
       { id: "pr3", title: "Gestire quantità, sconti e IVA", excerpt: "Imposta quantità, percentuale di sconto e aliquota IVA per ogni riga prodotto.", readTime: 4 },
-      { id: "pr4", title: "Categorie e unità di misura", excerpt: "Organizza il catalogo per categorie (software, hardware, servizi) e unità.", readTime: 3 },
+      { id: "pr4", title: "Categorie e unità di misura", excerpt: "Organizza il catalogo per categorie: Software, SaaS, Sito Web, Agente AI, Hardware, Servizi, Consulenza, Formazione, Altro.", readTime: 3 },
       { id: "pr5", title: "Prezzi in valute diverse", excerpt: "Supporto multi-valuta: come impostare prezzi in EUR, USD e altre valute.", readTime: 4 },
       { id: "pr6", title: "Esportare il catalogo prodotti", excerpt: "Come scaricare l'elenco prodotti in formato CSV per la gestione esterna.", readTime: 2 },
     ],
@@ -456,7 +472,7 @@ export default function GuidaPage() {
 
           {/* Quick links */}
           <div className="flex flex-wrap gap-2 mt-4">
-            {["Pipeline", "Contatti", "Automazioni", "Report", "Importazione CSV"].map((tag) => (
+            {["Pipeline", "Contatti", "Campagne Email", "Automazioni", "SMTP"].map((tag) => (
               <button
                 key={tag}
                 onClick={() => setSearch(tag.toLowerCase())}
