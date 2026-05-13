@@ -540,6 +540,7 @@ export default function LandingPage() {
               {
                 name: "Pro",
                 price: "29€",
+                originalPrice: "99€",
                 period: "/ mese",
                 description: "Per team di vendita in crescita",
                 features: [
@@ -593,7 +594,15 @@ export default function LandingPage() {
                   <div className={`text-sm font-medium ${plan.highlight ? "text-blue-200" : "text-slate-500"}`}>
                     {plan.name}
                   </div>
-                  <div className="mt-2 flex items-baseline gap-1">
+                  {"originalPrice" in plan && plan.originalPrice && (
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="text-sm line-through text-blue-300/70">{plan.originalPrice}</span>
+                      <span className="rounded-full bg-teal-400/20 border border-teal-400/40 px-2 py-0.5 text-xs font-semibold text-teal-300">
+                        In offerta
+                      </span>
+                    </div>
+                  )}
+                  <div className="mt-1 flex items-baseline gap-1">
                     <span className={`text-4xl font-bold ${plan.highlight ? "text-white" : "text-slate-900"}`}>
                       {plan.price}
                     </span>
