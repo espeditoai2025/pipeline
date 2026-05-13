@@ -17,6 +17,7 @@ import {
   Users,
   Workflow,
   Zap,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui";
@@ -37,7 +38,10 @@ const navItems = [
   { key: "products", href: "/products", icon: Package },
 ] as const;
 
-const bottomItems = [{ key: "settings", href: "/settings", icon: Cog }] as const;
+const bottomItems = [
+  { key: "guida", href: "/guida", icon: BookOpen },
+  { key: "settings", href: "/settings", icon: Cog },
+] as const;
 
 export function Sidebar() {
   const t = useTranslations("nav");

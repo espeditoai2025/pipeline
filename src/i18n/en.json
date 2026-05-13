@@ -10,7 +10,8 @@
     "reports": "Reports",
     "automations": "Automations",
     "products": "Products",
-    "settings": "Settings"
+    "settings": "Settings",
+    "guida": "Help"
   },
   "dashboard": {
     "title": "Dashboard",
