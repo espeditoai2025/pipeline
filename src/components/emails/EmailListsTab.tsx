@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useRef } from "react";
-import { Plus, Trash2, Users, ChevronRight, Upload, X, UserPlus, ArrowLeft, FileSpreadsheet } from "lucide-react";
+import { Plus, Trash2, Users, ChevronRight, Upload, X, UserPlus, ArrowLeft, FileSpreadsheet, Download } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
@@ -72,6 +72,18 @@ async function readFile(file: File): Promise<ParsedContact[]> {
       reader.readAsText(file);
     }
   });
+}
+
+function downloadSampleFile() {
+  const ws = XLSX.utils.aoa_to_sheet([
+    ["Email", "Nome", "Cognome"],
+    ["mario.rossi@esempio.it", "Mario", "Rossi"],
+    ["sara.bianchi@azienda.it", "Sara", "Bianchi"],
+  ]);
+  ws["!cols"] = [{ wch: 30 }, { wch: 15 }, { wch: 15 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Contatti");
+  XLSX.writeFile(wb, "esempio-lista-email.xlsx");
 }
 
 // Reusable file upload button
@@ -267,11 +279,18 @@ export function EmailListsTab({ lists, onChange }: Props) {
             <UserPlus className="h-4 w-4 mr-1.5" /> Aggiungi contatto
           </Button>
           <FileImportButton label="Importa CSV / Excel" onContacts={handleImportFileInDetail} />
+          <button
+            type="button"
+            onClick={downloadSampleFile}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--crm-neutral-200)] px-3 py-1.5 text-sm font-medium text-[var(--crm-neutral-700)] hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/5 transition-colors"
+          >
+            <Download className="h-4 w-4" /> File di esempio
+          </button>
         </div>
 
         <p className="text-xs text-[var(--crm-neutral-400)]">
           Formati supportati: <strong>.csv</strong> (email, nome, cognome — senza intestazione) ·{" "}
-          <strong>.xls / .xlsx</strong> (colonne: Email, Nome/FirstName, Cognome/LastName)
+          <strong>.xls / .xlsx</strong> (colonne: Email, Nome, Cognome)
         </p>
 
         {showAddContact && (
@@ -372,8 +391,15 @@ export function EmailListsTab({ lists, onChange }: Props) {
             />
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <FileImportButton label="Carica CSV / Excel" onContacts={handleFileImportInCreate} />
+            <button
+              type="button"
+              onClick={downloadSampleFile}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--crm-neutral-200)] px-3 py-1.5 text-sm font-medium text-[var(--crm-neutral-700)] hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/5 transition-colors"
+            >
+              <Download className="h-4 w-4" /> File di esempio
+            </button>
             {pendingContacts.length > 0 && (
               <span className="text-xs text-[var(--crm-neutral-500)]">
                 <strong>{pendingContacts.length}</strong> contatti dal file
