@@ -18,7 +18,7 @@ const SUGGESTIONS = [
   "Quali affari sono a rischio?",
   "Dammi la panoramica pipeline",
   "Cosa mi consigli di fare oggi?",
-  "Come aggiungo tipi di fatturazione?",
+  "Come cambio il setup CRM?",
 ];
 
 export function AIAssistant() {

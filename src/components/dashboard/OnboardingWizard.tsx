@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Building2, Users, Package, Briefcase, Calendar,
   CheckCircle2, ChevronRight, X, Sparkles, Rocket, GitMerge,
-  Mail, Zap, ListChecks, Megaphone, Filter,
+  Mail, Zap, ListChecks, Megaphone, Filter, Layers,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import type { OnboardingStatus } from "@/server/actions/dashboard";
@@ -24,6 +24,16 @@ type Step = {
 };
 
 const STEPS: Step[] = [
+  {
+    id: "hasCrmMode",
+    icon: Layers,
+    iconBg: "bg-indigo-100 dark:bg-indigo-900/30",
+    iconColor: "text-indigo-600",
+    title: "Scegli il setup CRM",
+    description: "Scegli la modalità adatta al tuo settore: Classic (B2B generico), Immobiliare, Assicurazioni o E-commerce.",
+    cta: "Scegli setup",
+    href: "/dashboard",
+  },
   {
     id: "hasPipeline",
     icon: GitMerge,

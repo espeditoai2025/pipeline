@@ -1246,6 +1246,27 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         ]},
         { type: "tip", text: "I campi personalizzati sono visibili a tutti i membri del team e si applicano a tutti i record dell'entità scelta. Usali per informazioni strutturate specifiche del tuo processo di vendita." },
       ]},
+      { id: "im7", title: "Setup CRM: scegli la modalità per il tuo settore", excerpt: "Adatta Pipely al tuo settore scegliendo tra Classic, Immobiliare, Assicurazioni ed E-commerce.", readTime: 3, popular: true, blocks: [
+        { type: "heading", text: "Cos'è il Setup CRM" },
+        { type: "para", text: "Pipely si adatta al tuo settore attraverso quattro modalità: Classic (generico B2B), Immobiliare, Assicurazioni ed E-commerce. Ogni modalità personalizza la terminologia dell'app (es. 'Affare' diventa 'Polizza' in modalità Assicurazioni) e, nelle versioni verticali, abiliterà funzionalità specifiche del settore." },
+        { type: "heading", text: "Come cambiare il setup" },
+        { type: "steps", items: [
+          "Vai alla Dashboard principale",
+          "Individua il banner colorato 'Setup CRM' (sotto il wizard di onboarding)",
+          "Clicca su 'Cambia setup'",
+          "Scegli la modalità desiderata dalla griglia di card",
+          "Clicca 'Applica setup' per confermare",
+        ]},
+        { type: "heading", text: "Le 4 modalità disponibili" },
+        { type: "list", items: [
+          "Classic — CRM generico B2B, adatto a PMI, agenzie, consulenti, startup e reti commerciali",
+          "Immobiliare — per agenti e agenzie immobiliari (funzionalità settore in arrivo)",
+          "Assicurazioni — per agenti e broker assicurativi (funzionalità settore in arrivo)",
+          "E-commerce & Retail — per negozi online e retail (funzionalità settore in arrivo)",
+        ]},
+        { type: "tip", text: "Il setup può essere cambiato in qualsiasi momento senza perdere dati. Cambiarlo aggiorna solo la terminologia e le funzionalità suggerite." },
+        { type: "warning", text: "Le funzionalità settore-specifiche dei 3 verticali (Immobiliare, Assicurazioni, E-commerce) sono in sviluppo e saranno disponibili prossimamente." },
+      ]},
       { id: "im6", title: "Cambiare piano o aggiornare i dati di fatturazione", excerpt: "Come upgradare il piano, aggiornare la carta e scaricare le fatture.", readTime: 4, blocks: [
         { type: "heading", text: "Dove gestire il piano" },
         { type: "steps", items: [

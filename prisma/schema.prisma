@@ -32,6 +32,9 @@ model Organization {
   customBillingTypes      Json?
   customProductCategories Json?
 
+  // CRM vertical mode (CLASSIC | PMI | AGENZIE | COMMERCIALE | CONSULENTI | STARTUP | IMMOBILIARE | ASSICURAZIONI | ECOMMERCE)
+  crmMode String?
+
   users          User[]
   invitations    Invitation[]
   pipelines      Pipeline[]

@@ -122,6 +122,7 @@ export type OnboardingStatus = {
   hasWorkflow:  boolean;
   hasEmailList: boolean;
   hasCampaign:  boolean;
+  hasCrmMode:   boolean;
 };
 
 export async function getOnboardingStatus(): Promise<OnboardingStatus | null> {
@@ -129,7 +130,7 @@ export async function getOnboardingStatus(): Promise<OnboardingStatus | null> {
   const orgId = getOrgId(session);
   if (!orgId) return null;
 
-  const [companies, contacts, leads, products, deals, activities, pipelines, smtp, workflows, emailLists, campaigns] = await Promise.all([
+  const [companies, contacts, leads, products, deals, activities, pipelines, smtp, workflows, emailLists, campaigns, org] = await Promise.all([
     db.company.count({ where: { organizationId: orgId } }),
     db.contact.count({ where: { organizationId: orgId } }),
     db.lead.count({ where: { organizationId: orgId } }),
@@ -141,6 +142,7 @@ export async function getOnboardingStatus(): Promise<OnboardingStatus | null> {
     db.workflow.count({ where: { organizationId: orgId } }),
     db.emailList.count({ where: { organizationId: orgId } }),
     db.emailCampaign.count({ where: { organizationId: orgId } }),
+    db.organization.findUnique({ where: { id: orgId }, select: { crmMode: true } }),
   ]);
 
   return {
@@ -155,6 +157,7 @@ export async function getOnboardingStatus(): Promise<OnboardingStatus | null> {
     hasWorkflow:  workflows  > 0,
     hasEmailList: emailLists > 0,
     hasCampaign:  campaigns  > 0,
+    hasCrmMode:   !!org?.crmMode,
   };
 }
 

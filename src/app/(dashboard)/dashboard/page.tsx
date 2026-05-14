@@ -3,8 +3,10 @@ import { ArrowUpRight, ArrowDownRight, Briefcase, CheckCircle, Euro, TrendingUp,
 import type { Metadata } from "next";
 import { PipelineOverviewChart } from "@/components/charts/PipelineOverviewChart";
 import { getDashboardData, getOnboardingStatus } from "@/server/actions/dashboard";
+import { getCrmMode } from "@/server/actions/crm-mode";
 import { AIInsightsStrip } from "@/components/ai/AIInsightsStrip";
 import { OnboardingWizard } from "@/components/dashboard/OnboardingWizard";
+import { VerticalModePicker } from "@/components/dashboard/VerticalModePicker";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("dashboard");
@@ -53,7 +55,7 @@ function KpiCard({ title, value, sub, change, positive, icon: Icon, iconColor, i
 
 export default async function DashboardPage() {
   const t = await getTranslations("dashboard");
-  const [data, onboarding] = await Promise.all([getDashboardData(), getOnboardingStatus()]);
+  const [data, onboarding, crmMode] = await Promise.all([getDashboardData(), getOnboardingStatus(), getCrmMode()]);
 
   const kpis = data?.kpis ?? {
     openDeals: 0, totalValue: 0, wonDeals: 0, wonValue: 0,
@@ -105,6 +107,8 @@ export default async function DashboardPage() {
       </div>
 
       {onboarding && <OnboardingWizard status={onboarding} />}
+
+      <VerticalModePicker currentMode={crmMode} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {kpiCards.map((kpi) => <KpiCard key={kpi.title} {...kpi} />)}

@@ -7,6 +7,7 @@ import { chatCompletion } from "@/lib/openrouter";
 import type { AIInsight, AIEmailDraft } from "@/types/ai";
 import { getOrgPlan, checkFeature } from "@/lib/plan";
 import { getGuideContext } from "@/lib/guide-data";
+import { CRM_MODES, DEFAULT_MODE, type CrmModeId } from "@/types/crm-modes";
 
 type ActionResult<T> = { data?: T; error?: string };
 
@@ -15,6 +16,11 @@ function getOrgId(s: Session | null) {
 }
 
 // ─── CRM context builder ───────────────────────────────────────────────────
+
+async function getOrgCrmMode(orgId: string): Promise<CrmModeId> {
+  const org = await db.organization.findUnique({ where: { id: orgId }, select: { crmMode: true } });
+  return (org?.crmMode as CrmModeId | null) ?? DEFAULT_MODE;
+}
 
 async function buildCrmContext(orgId: string): Promise<string> {
   const now = new Date();
@@ -96,10 +102,13 @@ export async function askAssistant(message: string): Promise<ActionResult<string
   if (featureError) return { error: featureError };
 
   try {
-    const [crmContext, guideContext] = await Promise.all([
+    const [crmContext, guideContext, crmMode] = await Promise.all([
       buildCrmContext(orgId),
       Promise.resolve(getGuideContext(message)),
+      getOrgCrmMode(orgId),
     ]);
+    const mode = CRM_MODES[crmMode];
+    const modeContext = `Setup CRM attivo: ${mode.name} (${mode.category}) — terminologia: "${mode.dealLabel}" per gli affari, "${mode.leadLabel}" per i lead.`;
 
     const isGuideContent = guideContext.startsWith("=== DOCUMENTAZIONE");
 
@@ -114,12 +123,15 @@ Se non hai abbastanza dati per rispondere, dillo chiaramente.
 Non inventare dati o numeri non presenti nel contesto.
 
 Funzionalità chiave di Pipely (per domande su come si usa):
+- Setup CRM (verticali): nella Dashboard c'è un banner "Setup CRM" con 4 modalità — Classic (generico B2B), Immobiliare, Assicurazioni, Ecommerce. Ogni modalità adatta la terminologia (es. "Affare" diventa "Polizza" per Assicurazioni). I 3 verticali hanno funzionalità settore-specifiche in arrivo. Si cambia in qualsiasi momento dal banner in dashboard.
 - Campi personalizzati: in Impostazioni → Campi puoi aggiungere campi extra (testo, numero, data, select, multiselect, booleano) per Affari, Contatti e Aziende.
 - Tipi di fatturazione: in Impostazioni → Prezzi puoi gestire tipi di pagamento personalizzati oltre ai 7 predefiniti (una tantum, mensile, annuale, noleggio mensile/annuale, affitto mensile/annuale). I tipi appaiono nel form prodotto.
 - Categorie prodotto: in Impostazioni → Prezzi puoi aggiungere categorie personalizzate (es. Formazione, Energia) oltre alle 9 predefinite (Software, Hardware, Servizio, Supporto, Licenza, SaaS, Sito Web, Agenti AI, Altro).
 - Vista dettaglio: ogni affare e contatto ha una pagina dedicata con timeline attività e campi personalizzati.
 - Notifiche in-app: attività scadute, affari in scadenza, lead nuovi — aggiornate ogni 60 secondi.
 - Importazione contatti: CSV/XLS/XLSX, crea automaticamente le aziende collegate.
+
+${modeContext}
 
 ${crmContext}${isGuideContent ? `\n\n${guideContext}` : ""}`,
       },
