@@ -24,7 +24,12 @@ export async function getReportData(period: string) {
 
   const since = periodStart(period);
 
-  const [allDeals, stages, activities, users] = await Promise.all([
+  const trendSince = new Date();
+  trendSince.setMonth(trendSince.getMonth() - 6);
+  trendSince.setDate(1);
+  trendSince.setHours(0, 0, 0, 0);
+
+  const [allDeals, trendDeals, stages, activities, users] = await Promise.all([
     db.deal.findMany({
       where: { organizationId: orgId, createdAt: { gte: since } },
       select: {
@@ -32,6 +37,10 @@ export async function getReportData(period: string) {
         closedAt: true, createdAt: true, ownerId: true,
         owner: { select: { id: true, name: true } },
       },
+    }),
+    db.deal.findMany({
+      where: { organizationId: orgId, closedAt: { gte: trendSince } },
+      select: { value: true, status: true, closedAt: true, createdAt: true },
     }),
     db.stage.findMany({
       where: { pipeline: { organizationId: orgId } },
@@ -67,17 +76,17 @@ export async function getReportData(period: string) {
     };
   });
 
-  // Trend (last 6 months)
+  // Trend (last 6 months) — uses dedicated trendDeals query with closedAt
   const trend: { label: string; vinti: number; persi: number; valore: number; pipeline: number }[] = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date();
     d.setMonth(d.getMonth() - i);
     const label = d.toLocaleString("it-IT", { month: "short" });
     const mStart = new Date(d.getFullYear(), d.getMonth(), 1);
-    const mEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-    const mDeals = allDeals.filter((x) => {
-      const at = new Date(x.createdAt);
-      return at >= mStart && at <= mEnd;
+    const mEnd = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    const mDeals = trendDeals.filter((x) => {
+      const at = x.closedAt ? new Date(x.closedAt) : new Date(x.createdAt);
+      return at >= mStart && at < mEnd;
     });
     trend.push({
       label,
