@@ -5,7 +5,8 @@ import { CheckCircle2, Circle, Pencil, Trash2, Plus, Clock, Briefcase, User, Cal
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { completeActivity, deleteActivity } from "@/server/actions/activities";
-import { syncActivityToGoogleCalendar, toGoogleCalendarUrl } from "@/server/actions/google-calendar";
+import { syncActivityToGoogleCalendar } from "@/server/actions/google-calendar";
+import { toGoogleCalendarUrl } from "@/lib/google-calendar-utils";
 import { ActivityForm } from "./ActivityForm";
 import { ActivityTypeIcon, ACTIVITY_CONFIG } from "./ActivityTypeIcon";
 import type { Activity, ActivityType } from "@/types/activities";
