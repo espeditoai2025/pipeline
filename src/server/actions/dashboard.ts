@@ -113,6 +113,7 @@ export async function getDashboardData() {
 export type OnboardingStatus = {
   hasCompany:   boolean;
   hasContact:   boolean;
+  hasLead:      boolean;
   hasProduct:   boolean;
   hasDeal:      boolean;
   hasActivity:  boolean;
@@ -128,9 +129,10 @@ export async function getOnboardingStatus(): Promise<OnboardingStatus | null> {
   const orgId = getOrgId(session);
   if (!orgId) return null;
 
-  const [companies, contacts, products, deals, activities, pipelines, smtp, workflows, emailLists, campaigns] = await Promise.all([
+  const [companies, contacts, leads, products, deals, activities, pipelines, smtp, workflows, emailLists, campaigns] = await Promise.all([
     db.company.count({ where: { organizationId: orgId } }),
     db.contact.count({ where: { organizationId: orgId } }),
+    db.lead.count({ where: { organizationId: orgId } }),
     db.product.count({ where: { organizationId: orgId } }),
     db.deal.count({ where: { organizationId: orgId } }),
     db.activity.count({ where: { organizationId: orgId } }),
@@ -144,6 +146,7 @@ export async function getOnboardingStatus(): Promise<OnboardingStatus | null> {
   return {
     hasCompany:   companies  > 0,
     hasContact:   contacts   > 0,
+    hasLead:      leads      > 0,
     hasProduct:   products   > 0,
     hasDeal:      deals      > 0,
     hasActivity:  activities > 0,

@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Building2, Users, Package, Briefcase, Calendar,
   CheckCircle2, ChevronRight, X, Sparkles, Rocket, GitMerge,
-  Mail, Zap, ListChecks, Megaphone,
+  Mail, Zap, ListChecks, Megaphone, Filter,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import type { OnboardingStatus } from "@/server/actions/dashboard";
@@ -53,6 +53,16 @@ const STEPS: Step[] = [
     description: "Aggiungi le persone con cui lavori: nome, email, ruolo e azienda collegata.",
     cta: "Aggiungi contatto",
     href: "/contacts",
+  },
+  {
+    id: "hasLead",
+    icon: Filter,
+    iconBg: "bg-amber-100 dark:bg-amber-900/30",
+    iconColor: "text-amber-600",
+    title: "Aggiungi un lead",
+    description: "Registra i potenziali clienti con email, telefono, fonte e score. Convertili in affari con un click.",
+    cta: "Aggiungi lead",
+    href: "/leads",
   },
   {
     id: "hasProduct",
