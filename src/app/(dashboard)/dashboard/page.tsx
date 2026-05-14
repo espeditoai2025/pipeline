@@ -136,14 +136,6 @@ export default async function DashboardPage() {
       <div className="rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 bg-white dark:bg-[#1a1a2e] p-5 shadow-sm">
         <h2 className="text-sm font-semibold text-[var(--crm-neutral-900)] dark:text-white mb-4">{t("pipelineOverview")}</h2>
         <PipelineOverviewChart data={pipelineChartData} />
-        <div className="mt-3 flex items-center gap-4 text-xs text-[var(--crm-neutral-500)]">
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm bg-[var(--crm-primary)]" /> Numero affari
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm bg-[#e0efff]" /> Valore (€)
-          </span>
-        </div>
       </div>
     </div>
   );
