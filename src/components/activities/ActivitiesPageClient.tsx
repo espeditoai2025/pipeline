@@ -58,33 +58,28 @@ export function ActivitiesPageClient({ initialActivities, gcalConnected: initial
 
         {/* Google Calendar connect */}
         <div className="flex items-center gap-2">
-          {gcalConnected ? (
-            <div className="flex items-center gap-2 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 px-3 py-1.5">
-              <CalendarDays className="h-4 w-4 text-green-600 dark:text-green-400" />
-              <span className="text-xs font-medium text-green-700 dark:text-green-400">Google Calendar connesso</span>
-              <button
-                onClick={handleDisconnect}
-                className="ml-1 text-[var(--crm-neutral-400)] hover:text-[var(--crm-danger)] transition-colors"
-                title="Disconnetti"
+          {gcalConfigured && (
+            gcalConnected ? (
+              <div className="flex items-center gap-2 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 px-3 py-1.5">
+                <CalendarDays className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <span className="text-xs font-medium text-green-700 dark:text-green-400">Google Calendar connesso</span>
+                <button
+                  onClick={handleDisconnect}
+                  className="ml-1 text-[var(--crm-neutral-400)] hover:text-[var(--crm-danger)] transition-colors"
+                  title="Disconnetti"
+                >
+                  <Unlink className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <a
+                href="/api/google-calendar/connect"
+                className="flex items-center gap-2 rounded-lg border border-[var(--crm-neutral-200)] dark:border-white/10 bg-white dark:bg-white/5 px-3 py-1.5 text-xs font-medium text-[var(--crm-neutral-700)] dark:text-white/70 hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/10 transition-colors"
               >
-                <Unlink className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ) : gcalConfigured ? (
-            <a
-              href="/api/google-calendar/connect"
-              className="flex items-center gap-2 rounded-lg border border-[var(--crm-neutral-200)] dark:border-white/10 bg-white dark:bg-white/5 px-3 py-1.5 text-xs font-medium text-[var(--crm-neutral-700)] dark:text-white/70 hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/10 transition-colors"
-            >
-              <CalendarDays className="h-4 w-4" />
-              Connetti Google Calendar
-            </a>
-          ) : (
-            <div className="flex items-center gap-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5">
-              <CalendarDays className="h-4 w-4 text-amber-600" />
-              <span className="text-xs text-amber-700 dark:text-amber-400">
-                Aggiungi <code className="font-mono">GOOGLE_CLIENT_ID</code> e <code className="font-mono">GOOGLE_CLIENT_SECRET</code> a <code className="font-mono">.env.local</code> per abilitare Google Calendar
-              </span>
-            </div>
+                <CalendarDays className="h-4 w-4" />
+                Connetti Google Calendar
+              </a>
+            )
           )}
         </div>
       </div>
