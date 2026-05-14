@@ -62,6 +62,7 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -120,6 +121,12 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
     setLostReason("");
   }, [open, deal, reset, defaultStageId, stages]);
 
+  function syncValueFromProducts(list: SelectedProduct[]) {
+    if (list.length === 0) return;
+    const total = list.reduce((sum, p) => sum + p.unitPrice * p.quantity, 0);
+    setValue("value", total);
+  }
+
   function handleAddProduct() {
     const prod = products.find((p) => p.id === pickedProductId);
     if (!prod) return;
@@ -127,20 +134,26 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
       toast.error("Prodotto già aggiunto");
       return;
     }
-    setSelectedProducts((prev) => [
-      ...prev,
+    const next = [
+      ...selectedProducts,
       { productId: prod.id, name: prod.name, unitPrice: prod.unitPrice, currency: prod.currency, quantity: 1, discount: 0, taxRate: prod.taxRate },
-    ]);
+    ];
+    setSelectedProducts(next);
+    syncValueFromProducts(next);
     setPickedProductId("");
     setAddingProduct(false);
   }
 
   function removeProduct(productId: string) {
-    setSelectedProducts((prev) => prev.filter((p) => p.productId !== productId));
+    const next = selectedProducts.filter((p) => p.productId !== productId);
+    setSelectedProducts(next);
+    syncValueFromProducts(next);
   }
 
   function updateProductQty(productId: string, qty: number) {
-    setSelectedProducts((prev) => prev.map((p) => p.productId === productId ? { ...p, quantity: Math.max(1, qty) } : p));
+    const next = selectedProducts.map((p) => p.productId === productId ? { ...p, quantity: Math.max(1, qty) } : p);
+    setSelectedProducts(next);
+    syncValueFromProducts(next);
   }
 
   async function handleCloseDeal(status: "WON" | "LOST") {
@@ -417,13 +430,16 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
                         <span className="text-xs text-[var(--crm-neutral-500)] shrink-0">
                           {sp.unitPrice.toLocaleString("it-IT", { style: "currency", currency: sp.currency })}
                         </span>
-                        <input
-                          type="number"
-                          min={1}
-                          value={sp.quantity}
-                          onChange={(e) => updateProductQty(sp.productId, parseInt(e.target.value) || 1)}
-                          className="w-14 rounded border border-[var(--crm-neutral-200)] px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-[var(--crm-primary)]"
-                        />
+                        <div className="flex flex-col items-center">
+                          <input
+                            type="number"
+                            min={1}
+                            value={sp.quantity}
+                            onChange={(e) => updateProductQty(sp.productId, parseInt(e.target.value) || 1)}
+                            className="w-14 rounded border border-[var(--crm-neutral-200)] px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-[var(--crm-primary)]"
+                          />
+                          <span className="text-[10px] text-[var(--crm-neutral-400)] mt-0.5">q.tà / mesi</span>
+                        </div>
                         <button type="button" onClick={() => removeProduct(sp.productId)} className="text-[var(--crm-neutral-400)] hover:text-[var(--crm-danger)]">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
