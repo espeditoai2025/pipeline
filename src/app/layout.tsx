@@ -45,13 +45,13 @@ export const metadata: Metadata = {
     siteName: "Pipely",
     title: "Pipely — CRM italiano con AI e automazioni",
     description: "Pipely è il CRM pensato per team italiani. Pipeline Kanban, contatti, campagne email, automazioni workflow e AI Assistant. Gratis per sempre nel piano Starter.",
-    images: [{ url: "https://www.pipely.it/og-image.png", width: 1200, height: 630, alt: "Pipely CRM" }],
+    images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Chiudi più affari. Lavora meno." }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Pipely — CRM italiano con AI e automazioni",
     description: "Pipeline Kanban, contatti, campagne email, automazioni e AI Assistant. Gratis nel piano Starter.",
-    images: ["https://www.pipely.it/og-image.png"],
+    images: ["https://www.pipely.it/opengraph-image"],
   },
   alternates: {
     canonical: BASE_URL,
