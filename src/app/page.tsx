@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     title: "Pipely — CRM italiano con AI, pipeline e automazioni",
     description: "CRM italiano con AI Assistant, pipeline Kanban, automazioni reali e campagne email. Gratis per sempre nel piano Starter.",
     url: "https://www.pipely.it",
-    images: [{ url: "https://www.pipely.it/og-image.png", width: 1200, height: 630, alt: "Pipely CRM — dashboard" }],
+    images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Chiudi più affari. Lavora meno." }],
   },
 };
 import {
