@@ -33,6 +33,7 @@ import {
   FileSpreadsheet,
   Megaphone,
   XCircle,
+  ChevronDown,
 } from "lucide-react";
 import { PipelyAppIcon, PipelyWordmark } from "@/components/shared/PipelyLogo";
 
@@ -137,6 +138,41 @@ const benefits = [
   "Supporto in italiano",
 ];
 
+const faqs = [
+  {
+    q: "Cos'è un CRM?",
+    a: "Un CRM (Customer Relationship Management) è un software che centralizza la gestione dei rapporti con i clienti: contatti, trattative, attività e comunicazioni in un unico posto. Invece di usare fogli Excel e email separate, tutto il team ha accesso alle stesse informazioni in tempo reale.",
+  },
+  {
+    q: "Perché le PMI hanno bisogno di un CRM?",
+    a: "Le PMI perdono mediamente il 20–30% delle opportunità per mancanza di follow-up. Un CRM come Pipely automatizza i promemoria, traccia ogni interazione e mostra in tempo reale lo stato di ogni trattativa. Il risultato: più affari chiusi, meno lavoro manuale e nessun cliente dimenticato.",
+  },
+  {
+    q: "CRM vs Excel: qual è la differenza?",
+    a: "Excel è statico: ogni aggiornamento è manuale, non c'è cronologia automatica, non puoi collaborare in tempo reale e non invia promemoria. Un CRM è dinamico: storico completo di ogni cliente, notifiche automatiche, automazioni workflow, report in tempo reale e accesso da qualsiasi dispositivo.",
+  },
+  {
+    q: "Quanto costa un CRM?",
+    a: "Pipely è gratuito per sempre nel piano Starter (1 pipeline, fino a 500 contatti). Il piano Pro costa 29€/mese e include pipeline illimitate, AI Assistant, automazioni avanzate e campagne email con tracking. Nessun costo nascosto, nessun contratto annuale obbligatorio.",
+  },
+  {
+    q: "Come si automatizzano i follow-up con un CRM?",
+    a: "Con Pipely crei workflow trigger-action: ad esempio «quando un affare non ha attività da 7 giorni → crea task di follow-up e notifica il responsabile». Si configura una volta e funziona in automatico, senza dover ricordare manualmente ogni cliente.",
+  },
+  {
+    q: "Pipely è gratuito?",
+    a: "Sì. Il piano Starter è gratuito per sempre e non richiede la carta di credito. Include 1 pipeline, fino a 500 contatti, calendario attività, catalogo prodotti e import XLS/CSV. Puoi passare al piano Pro in qualsiasi momento se hai bisogno di più funzionalità.",
+  },
+  {
+    q: "Posso importare i miei contatti da Excel?",
+    a: "Assolutamente. Pipely supporta l'import da file XLS e CSV con rilevamento automatico delle colonne. Puoi verificare un'anteprima dei dati e gestire i duplicati prima di confermare. Il processo richiede meno di 2 minuti.",
+  },
+  {
+    q: "Il CRM funziona completamente in italiano?",
+    a: "Sì, Pipely è 100% in italiano: interfaccia, notifiche, supporto e documentazione. È stato sviluppato specificamente per i team italiani, con attenzione alle esigenze delle PMI del mercato italiano.",
+  },
+];
+
 const automationSteps = [
   { trigger: "Affare spostato in «Proposta»", actions: ["Crea attività follow-up +3gg", "Invia notifica al responsabile"] },
   { trigger: "Nuovo contatto creato", actions: ["Invia email di benvenuto", "Crea task di verifica"] },
@@ -194,6 +230,14 @@ const jsonLd = {
       publisher: { "@id": "https://www.pipely.it/#organization" },
       inLanguage: "it-IT",
     },
+    {
+      "@type": "FAQPage",
+      mainEntity: faqs.map((f) => ({
+        "@type": "Question",
+        name: f.q,
+        acceptedAnswer: { "@type": "Answer", text: f.a },
+      })),
+    },
   ],
 };
 
@@ -242,12 +286,16 @@ export default function LandingPage() {
             CRM italiano con AI + automazioni reali
           </div>
 
-          <h1 className="mb-6 text-5xl font-semibold leading-tight tracking-tight text-white md:text-6xl lg:text-7xl">
-            Chiudi più affari.{" "}
+          <h1 className="mb-3 text-5xl font-semibold leading-tight tracking-tight text-white md:text-6xl lg:text-7xl">
+            CRM Italiano con AI{" "}
             <span className="bg-gradient-to-r from-blue-400 to-teal-400 bg-clip-text text-transparent">
-              Lavora meno.
+              e Automazioni per PMI
             </span>
           </h1>
+
+          <p className="mb-4 text-2xl font-medium text-white/70 tracking-tight">
+            Chiudi più affari. Lavora meno.
+          </p>
 
           <p className="mx-auto mb-10 max-w-2xl text-lg leading-relaxed text-slate-300">
             Pipely è la piattaforma di sales management pensata per team italiani. Pipeline, contatti,
@@ -748,6 +796,34 @@ export default function LandingPage() {
                   <div className="mt-1 text-sm text-slate-500">{item.desc}</div>
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FAQ ── */}
+      <section className="py-24 px-6 bg-slate-50">
+        <div className="mx-auto max-w-3xl">
+          <div className="mb-12 text-center">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-medium text-blue-600">
+              <Zap className="h-3.5 w-3.5" />
+              Domande frequenti
+            </div>
+            <h2 className="text-4xl font-semibold tracking-tight text-slate-900">Tutto quello che vuoi sapere</h2>
+            <p className="mt-3 text-slate-500">Risposte rapide su Pipely, i CRM e come funzionano per le PMI italiane.</p>
+          </div>
+          <div className="space-y-3">
+            {faqs.map((faq) => (
+              <details
+                key={faq.q}
+                className="group rounded-xl border border-slate-200 bg-white px-6 py-4 cursor-pointer open:shadow-sm transition-shadow"
+              >
+                <summary className="flex items-center justify-between font-medium text-slate-900 list-none">
+                  {faq.q}
+                  <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180 ml-4" />
+                </summary>
+                <p className="mt-3 text-sm leading-relaxed text-slate-600">{faq.a}</p>
+              </details>
             ))}
           </div>
         </div>
