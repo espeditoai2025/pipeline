@@ -70,7 +70,7 @@ const STEPS: Step[] = [
     iconBg: "bg-orange-100 dark:bg-orange-900/30",
     iconColor: "text-orange-600",
     title: "Inserisci un prodotto",
-    description: "Carica il tuo catalogo con prezzi, IVA e categoria. Poi collegalo agli affari.",
+    description: "Carica il tuo catalogo con prezzi, IVA e tipo di fatturazione (una tantum, abbonamento, noleggio, affitto). Poi collegalo agli affari.",
     cta: "Aggiungi prodotto",
     href: "/products",
   },

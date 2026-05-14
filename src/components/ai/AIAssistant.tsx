@@ -17,8 +17,8 @@ function parseMarkdown(text: string): string {
 const SUGGESTIONS = [
   "Quali affari sono a rischio?",
   "Dammi la panoramica pipeline",
-  "Quali lead sono più caldi?",
   "Cosa mi consigli di fare oggi?",
+  "Come aggiungo tipi di fatturazione?",
 ];
 
 export function AIAssistant() {
