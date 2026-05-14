@@ -1,15 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, Building2, Globe, User, FileText } from "lucide-react";
+import { Loader2, Building2, Globe, User, FileText, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { createCompany, updateCompany } from "@/server/actions/contacts";
+import { getCustomFields, getCustomFieldValues, saveCustomFieldValues } from "@/server/actions/custom-fields";
+import { CustomFieldsSection } from "@/components/shared/CustomFieldsSection";
 import type { Company } from "@/types/contacts";
+import type { CustomField } from "@/types/custom-fields";
 
 const schema = z.object({
   name: z.string().min(1, "Nome obbligatorio"),
@@ -46,17 +49,20 @@ const INDUSTRIES = ["Tecnologia", "Consulenza", "Manifatturiero", "Finanza", "Me
 const SIZES = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
 const COUNTRIES = ["Italia", "Francia", "Germania", "Spagna", "UK", "USA", "Svizzera", "Altro"];
 
-type Tab = "generale" | "referente" | "note";
+type Tab = "generale" | "referente" | "note" | "campi";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "generale", label: "Generale", icon: Building2 },
   { id: "referente", label: "Referente", icon: User },
   { id: "note", label: "Note", icon: FileText },
+  { id: "campi", label: "Campi", icon: SlidersHorizontal },
 ];
 
 export function CompanyForm({ open, onClose, company, onSaved }: Props) {
   const isEditing = !!company;
   const [activeTab, setActiveTab] = useState<Tab>("generale");
+  const [customFields, setCustomFields] = useState<CustomField[]>([]);
+  const [customValues, setCustomValues] = useState<Record<string, string>>({});
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -85,6 +91,19 @@ export function CompanyForm({ open, onClose, company, onSaved }: Props) {
     },
   });
 
+  useEffect(() => {
+    if (!open) return;
+    setCustomValues({});
+    getCustomFields("company").then(setCustomFields);
+    if (company?.id) {
+      getCustomFieldValues(company.id, "company").then((vals) => {
+        const map: Record<string, string> = {};
+        for (const v of vals) map[v.fieldId] = v.value;
+        setCustomValues(map);
+      });
+    }
+  }, [open, company]);
+
   async function onSubmit(data: FormValues) {
     const result = isEditing
       ? await updateCompany({ id: company!.id, ...data })
@@ -92,13 +111,20 @@ export function CompanyForm({ open, onClose, company, onSaved }: Props) {
 
     if (result.error) {
       toast.error(result.error);
-    } else {
-      toast.success(isEditing ? "Azienda aggiornata" : "Azienda creata");
-      onSaved(result.data!);
-      reset();
-      setActiveTab("generale");
-      onClose();
+      return;
     }
+
+    const savedId = result.data!.id;
+    const cfValues = Object.entries(customValues).map(([fieldId, value]) => ({ fieldId, value }));
+    if (cfValues.length > 0) {
+      await saveCustomFieldValues(savedId, "company", cfValues);
+    }
+
+    toast.success(isEditing ? "Azienda aggiornata" : "Azienda creata");
+    onSaved(result.data!);
+    reset();
+    setActiveTab("generale");
+    onClose();
   }
 
   return (
@@ -248,6 +274,24 @@ export function CompanyForm({ open, onClose, company, onSaved }: Props) {
                     placeholder="Inserisci note, contesto, informazioni utili sull'azienda..."
                   />
                 </div>
+              </div>
+            )}
+
+            {/* ── CAMPI ────────────────────────────────────────── */}
+            {activeTab === "campi" && (
+              <div className="py-2">
+                {customFields.length === 0 ? (
+                  <p className="text-sm text-[var(--crm-neutral-400)] text-center py-6">
+                    Nessun campo personalizzato per le aziende.<br />
+                    <span className="text-xs">Aggiungili da Impostazioni → Campi.</span>
+                  </p>
+                ) : (
+                  <CustomFieldsSection
+                    fields={customFields}
+                    values={customValues}
+                    onChange={(fieldId, value) => setCustomValues((prev) => ({ ...prev, [fieldId]: value }))}
+                  />
+                )}
               </div>
             )}
           </form>
