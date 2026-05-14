@@ -18,8 +18,11 @@ import { createDeal, updateDeal } from "@/server/actions/deals";
 import { addProductToDeal } from "@/server/actions/products";
 import { getContacts } from "@/server/actions/contacts";
 import { getProducts } from "@/server/actions/products";
+import { getCustomFields, getCustomFieldValues, saveCustomFieldValues } from "@/server/actions/custom-fields";
+import { CustomFieldsSection } from "@/components/shared/CustomFieldsSection";
 import type { Deal, Stage } from "@/types/deals";
 import type { Product } from "@/types/products";
+import type { CustomField } from "@/types/custom-fields";
 
 const schema = z.object({
   title: z.string().min(1, "Titolo obbligatorio"),
@@ -57,6 +60,8 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
   const [closingAs, setClosingAs] = useState<"WON" | "LOST" | null>(null);
   const [lostReason, setLostReason] = useState("");
   const [isClosing, setIsClosing] = useState(false);
+  const [customFields, setCustomFields] = useState<CustomField[]>([]);
+  const [customValues, setCustomValues] = useState<Record<string, string>>({});
 
   const {
     register,
@@ -97,6 +102,15 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
       })))
     );
     getProducts().then((ps) => setProducts(ps.filter((p) => p.isActive)));
+    getCustomFields("deal").then(setCustomFields);
+    setCustomValues({});
+    if (deal?.id) {
+      getCustomFieldValues(deal.id, "deal").then((vals) => {
+        const map: Record<string, string> = {};
+        for (const v of vals) map[v.fieldId] = v.value;
+        setCustomValues(map);
+      });
+    }
     if (deal) {
       reset({
         title: deal.title,
@@ -214,6 +228,14 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
           })
         )
       );
+    }
+
+    const savedDealId = isEditing ? deal!.id : newDealId;
+    if (savedDealId) {
+      const cfValues = Object.entries(customValues).map(([fieldId, value]) => ({ fieldId, value }));
+      if (cfValues.length > 0) {
+        await saveCustomFieldValues(savedDealId, "deal", cfValues);
+      }
     }
 
     toast.success(isEditing ? "Affare aggiornato" : "Affare creato");
@@ -456,6 +478,12 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
                 )}
               </div>
             )}
+
+            <CustomFieldsSection
+              fields={customFields}
+              values={customValues}
+              onChange={(fieldId, value) => setCustomValues((prev) => ({ ...prev, [fieldId]: value }))}
+            />
 
             {/* Azioni */}
             <div className="flex gap-3 pt-2">

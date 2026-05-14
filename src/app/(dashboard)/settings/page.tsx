@@ -7,7 +7,7 @@ import {
   Save, Loader2, Eye, EyeOff, Plus, Trash2,
   CheckCircle2, Clock, Key, Users, LogOut,
   Monitor, Package, Briefcase, Activity,
-  Zap, BarChart3, Send, X, ChevronDown,
+  Zap, BarChart3, Send, X, ChevronDown, SlidersHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -17,10 +17,11 @@ import {
 } from "@/server/actions/settings";
 import { getSmtpConfig } from "@/server/actions/smtp";
 import { SmtpWizard } from "@/components/settings/SmtpWizard";
+import { CustomFieldsManager } from "@/components/settings/CustomFieldsManager";
 import type { SmtpConfigPublic } from "@/server/actions/smtp";
 type Role = "OWNER" | "ADMIN" | "MANAGER" | "SALES" | "VIEWER";
 
-type Tab = "profile" | "security" | "billing" | "preferences" | "organization" | "email";
+type Tab = "profile" | "security" | "billing" | "preferences" | "organization" | "email" | "fields";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "profile",      label: "Profilo",        icon: User },
@@ -29,6 +30,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "preferences",  label: "Preferenze",     icon: Sliders },
   { id: "organization", label: "Organizzazione", icon: Building2 },
   { id: "email",        label: "Email",          icon: Mail },
+  { id: "fields",       label: "Campi",          icon: SlidersHorizontal },
 ];
 
 const PLANS = [
@@ -755,6 +757,18 @@ export default function SettingsPage() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {tab === "fields" && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-base font-semibold">Campi personalizzati</h2>
+                <p className="text-sm text-[var(--crm-neutral-500)] mt-0.5">
+                  Aggiungi campi extra a Affari, Contatti e Aziende per raccogliere le informazioni specifiche del tuo settore.
+                </p>
+              </div>
+              <CustomFieldsManager />
             </div>
           )}
 

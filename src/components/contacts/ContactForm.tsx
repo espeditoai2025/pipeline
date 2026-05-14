@@ -3,12 +3,16 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { createContact, updateContact } from "@/server/actions/contacts";
+import { getCustomFields, getCustomFieldValues, saveCustomFieldValues } from "@/server/actions/custom-fields";
+import { CustomFieldsSection } from "@/components/shared/CustomFieldsSection";
 import type { Contact, Company } from "@/types/contacts";
+import type { CustomField } from "@/types/custom-fields";
 
 const schema = z.object({
   firstName: z.string().min(1, "Nome obbligatorio"),
@@ -41,6 +45,26 @@ export function ContactForm({ open, onClose, contact, companies, onSaved }: Prop
       : { firstName: "", lastName: "", email: "", phone: "", jobTitle: "", companyId: "" },
   });
 
+  const [customFields, setCustomFields] = useState<CustomField[]>([]);
+  const [customValues, setCustomValues] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!open) return;
+    reset(contact
+      ? { firstName: contact.firstName, lastName: contact.lastName ?? "", email: contact.email ?? "", phone: contact.phone ?? "", jobTitle: contact.jobTitle ?? "", companyId: contact.companyId ?? "" }
+      : { firstName: "", lastName: "", email: "", phone: "", jobTitle: "", companyId: "" }
+    );
+    setCustomValues({});
+    getCustomFields("contact").then(setCustomFields);
+    if (contact?.id) {
+      getCustomFieldValues(contact.id, "contact").then((vals) => {
+        const map: Record<string, string> = {};
+        for (const v of vals) map[v.fieldId] = v.value;
+        setCustomValues(map);
+      });
+    }
+  }, [open, contact, reset]);
+
   async function onSubmit(data: FormValues) {
     const result = isEditing
       ? await updateContact({ id: contact!.id, ...data })
@@ -48,12 +72,19 @@ export function ContactForm({ open, onClose, contact, companies, onSaved }: Prop
 
     if (result.error) {
       toast.error(result.error);
-    } else {
-      toast.success(isEditing ? "Contatto aggiornato" : "Contatto creato");
-      onSaved(result.data!);
-      reset();
-      onClose();
+      return;
     }
+
+    const savedId = result.data!.id;
+    const cfValues = Object.entries(customValues).map(([fieldId, value]) => ({ fieldId, value }));
+    if (cfValues.length > 0) {
+      await saveCustomFieldValues(savedId, "contact", cfValues);
+    }
+
+    toast.success(isEditing ? "Contatto aggiornato" : "Contatto creato");
+    onSaved(result.data!);
+    reset();
+    onClose();
   }
 
   return (
@@ -102,6 +133,12 @@ export function ContactForm({ open, onClose, contact, companies, onSaved }: Prop
               ))}
             </select>
           </div>
+
+          <CustomFieldsSection
+            fields={customFields}
+            values={customValues}
+            onChange={(fieldId, value) => setCustomValues((prev) => ({ ...prev, [fieldId]: value }))}
+          />
 
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Annulla</Button>
