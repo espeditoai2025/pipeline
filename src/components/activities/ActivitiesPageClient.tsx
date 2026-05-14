@@ -111,6 +111,7 @@ export function ActivitiesPageClient({ initialActivities, gcalConnected: initial
         <ActivitiesTable
           initialActivities={activities}
           filterDay={selectedDay}
+          onClearDay={() => setSelectedDay(null)}
           gcalConnected={gcalConnected}
         />
 

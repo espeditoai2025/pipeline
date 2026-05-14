@@ -14,6 +14,7 @@ import type { Activity, ActivityType } from "@/types/activities";
 type Props = {
   initialActivities: Activity[];
   filterDay?: Date | null;
+  onClearDay?: () => void;
   gcalConnected?: boolean;
 };
 
@@ -96,7 +97,7 @@ function sameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-export function ActivitiesTable({ initialActivities, filterDay, gcalConnected }: Props) {
+export function ActivitiesTable({ initialActivities, filterDay, onClearDay, gcalConnected }: Props) {
   const [activities, setActivities] = useState(initialActivities);
   const [filter, setFilter] = useState<Filter>({ type: "", completed: "all", search: "" });
   const [formOpen, setFormOpen] = useState(false);
@@ -172,10 +173,14 @@ export function ActivitiesTable({ initialActivities, filterDay, gcalConnected }:
             <option value="done">Completate</option>
           </select>
           {filterDay && (
-            <span className="flex items-center gap-1 rounded-lg bg-[var(--crm-primary)]/10 px-3 py-2 text-xs font-medium text-[var(--crm-primary)]">
+            <button
+              onClick={onClearDay}
+              className="flex items-center gap-1.5 rounded-lg bg-[var(--crm-primary)]/10 hover:bg-[var(--crm-primary)]/20 px-3 py-2 text-xs font-medium text-[var(--crm-primary)] transition-colors"
+            >
               <CalendarDays className="h-3.5 w-3.5" />
               {filterDay.toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}
-            </span>
+              <span className="ml-0.5 text-[var(--crm-primary)]/60 hover:text-[var(--crm-primary)]">×</span>
+            </button>
           )}
         </div>
         <Button
