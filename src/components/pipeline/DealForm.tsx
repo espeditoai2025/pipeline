@@ -335,7 +335,7 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
               <div>
                 <label className="block text-sm font-medium mb-1">Valore</label>
                 <input
-                  type="number" min={0} step={100}
+                  type="number" min={0} step="any"
                   {...register("value", { valueAsNumber: true })}
                   className={inputCls}
                 />
