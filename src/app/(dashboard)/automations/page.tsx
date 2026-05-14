@@ -7,8 +7,10 @@ import { WorkflowBuilder } from "@/components/automations/WorkflowBuilder";
 import { AutomationLogView } from "@/components/automations/AutomationLogView";
 import { Button } from "@/components/ui/button";
 import { getWorkflows, getWorkflowLogs } from "@/server/actions/workflows";
+import { getTemplates } from "@/server/actions/emails";
 import type { Workflow } from "@/types/workflows";
 import type { WorkflowLog } from "@/types/workflows";
+import type { EmailTemplate } from "@/types/emails";
 
 type Tab = "workflows" | "logs";
 
@@ -16,15 +18,17 @@ export default function AutomationsPage() {
   const [tab, setTab] = useState<Tab>("workflows");
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [logs, setLogs] = useState<WorkflowLog[]>([]);
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [builderOpen, setBuilderOpen] = useState(false);
   const [editing, setEditing] = useState<Workflow | null>(null);
   const [, startTransition] = useTransition();
 
   useEffect(() => {
     startTransition(async () => {
-      const [wfs, wlogs] = await Promise.all([getWorkflows(), getWorkflowLogs()]);
+      const [wfs, wlogs, tpls] = await Promise.all([getWorkflows(), getWorkflowLogs(), getTemplates()]);
       setWorkflows(wfs);
       setLogs(wlogs);
+      setTemplates(tpls);
     });
   }, []);
 
@@ -132,6 +136,7 @@ export default function AutomationsPage() {
               <WorkflowCard
                 key={w.id}
                 workflow={w}
+                templates={templates}
                 onEdit={handleEdit}
                 onDeleted={handleDeleted}
                 onToggled={handleToggled}

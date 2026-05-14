@@ -6,9 +6,11 @@ import { toast } from "sonner";
 import { toggleWorkflow, deleteWorkflow, testWorkflow } from "@/server/actions/workflows";
 import { TRIGGER_CONFIG, ACTION_CONFIG } from "./WorkflowConfig";
 import type { Workflow } from "@/types/workflows";
+import type { EmailTemplate } from "@/types/emails";
 
 type Props = {
   workflow: Workflow;
+  templates?: EmailTemplate[];
   onEdit: (w: Workflow) => void;
   onDeleted: (id: string) => void;
   onToggled: (id: string, isActive: boolean) => void;
@@ -19,7 +21,7 @@ function formatDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
-export function WorkflowCard({ workflow, onEdit, onDeleted, onToggled }: Props) {
+export function WorkflowCard({ workflow, templates = [], onEdit, onDeleted, onToggled }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [testOpen, setTestOpen] = useState(false);
   const [testLog, setTestLog] = useState<string[]>([]);
@@ -157,7 +159,11 @@ export function WorkflowCard({ workflow, onEdit, onDeleted, onToggled }: Props) 
                     </p>
                     <p className="text-xs text-[var(--crm-neutral-500)]">
                       {step.action.type === "CREATE_ACTIVITY" && `"${step.action.subject}" tra ${step.action.dueDays}g`}
-                      {step.action.type === "SEND_EMAIL" && `Template ${step.action.templateId} → ${step.action.to}`}
+                      {step.action.type === "SEND_EMAIL" && (() => {
+                        const tpl = templates.find(t => t.id === step.action.templateId);
+                        const label = tpl ? tpl.name : step.action.templateId || "Nessun template";
+                        return `${label} → ${step.action.to}`;
+                      })()}
                       {step.action.type === "SEND_NOTIFICATION" && `"${step.action.message}"`}
                       {step.action.type === "WAIT" && `${step.action.days} giorni`}
                       {step.action.type === "UPDATE_DEAL_STAGE" && `Stage: ${step.action.stageId}`}

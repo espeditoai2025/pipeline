@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { createWorkflow, updateWorkflow } from "@/server/actions/workflows";
+import { getTemplates } from "@/server/actions/emails";
+import type { EmailTemplate } from "@/types/emails";
 import { TRIGGER_CONFIG, ACTION_CONFIG } from "./WorkflowConfig";
 import { UpgradeModal } from "@/components/shared/UpgradeModal";
 import { isPlanError } from "@/lib/plan-client";
@@ -32,7 +34,7 @@ type Props = {
 const inputCls = "w-full rounded-lg border border-[var(--crm-neutral-200)] bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-[var(--crm-neutral-900)] dark:text-white placeholder:text-[var(--crm-neutral-400)] focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] focus:border-transparent transition-colors";
 
 const DEFAULT_ACTIONS: Record<ActionType, object> = {
-  SEND_EMAIL:         { type: "SEND_EMAIL",        templateId: "tpl-1", to: "contact" },
+  SEND_EMAIL:         { type: "SEND_EMAIL",        templateId: "", to: "contact" },
   CREATE_ACTIVITY:    { type: "CREATE_ACTIVITY",   activityType: "CALL", subject: "Follow-up", dueDays: 1 },
   UPDATE_DEAL_STAGE:  { type: "UPDATE_DEAL_STAGE", stageId: "" },
   ASSIGN_OWNER:       { type: "ASSIGN_OWNER",      userId: "" },
@@ -44,13 +46,26 @@ export function WorkflowBuilder({ open, onClose, workflow, onSaved }: Props) {
   const isEditing = !!workflow;
   const [steps, setSteps] = useState<WorkflowStep[]>(workflow?.steps ?? []);
   const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormValues>({
+  useEffect(() => {
+    if (open) getTemplates().then(setTemplates);
+  }, [open]);
+
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: workflow
-      ? { name: workflow.name, description: workflow.description, triggerType: workflow.trigger.type }
-      : { name: "", description: "", triggerType: "DEAL_STAGE_CHANGED" },
+    defaultValues: { name: "", description: "", triggerType: "DEAL_STAGE_CHANGED" },
   });
+
+  useEffect(() => {
+    if (open) {
+      setSteps(workflow?.steps ?? []);
+      reset(workflow
+        ? { name: workflow.name, description: workflow.description ?? "", triggerType: workflow.trigger.type }
+        : { name: "", description: "", triggerType: "DEAL_STAGE_CHANGED" }
+      );
+    }
+  }, [open, workflow, reset]);
 
   function addStep(type: ActionType) {
     const step: WorkflowStep = {
@@ -73,6 +88,11 @@ export function WorkflowBuilder({ open, onClose, workflow, onSaved }: Props) {
   async function onSubmit(data: FormValues) {
     if (steps.length === 0) {
       toast.error("Aggiungi almeno un'azione");
+      return;
+    }
+    const missingTemplate = steps.find(s => s.action.type === "SEND_EMAIL" && !s.action.templateId);
+    if (missingTemplate) {
+      toast.error("Seleziona un template email per l'azione SEND_EMAIL");
       return;
     }
 
@@ -199,11 +219,21 @@ export function WorkflowBuilder({ open, onClose, workflow, onSaved }: Props) {
                         </div>
                       )}
                       {step.action.type === "SEND_EMAIL" && (
-                        <input
-                          value={step.action.templateId}
-                          onChange={(e) => updateStepField(step.id, "templateId", e.target.value)}
-                          className={inputCls} placeholder="ID template (es. tpl-1)"
-                        />
+                        <div className="space-y-2">
+                          <select
+                            value={step.action.templateId}
+                            onChange={(e) => updateStepField(step.id, "templateId", e.target.value)}
+                            className={inputCls}
+                          >
+                            <option value="">— Seleziona template email —</option>
+                            {templates.map(t => (
+                              <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                          </select>
+                          {templates.length === 0 && (
+                            <p className="text-xs text-[var(--crm-neutral-400)]">Nessun template disponibile — creane uno in Comunicazioni → Template</p>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
