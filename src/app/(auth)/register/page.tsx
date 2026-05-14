@@ -5,6 +5,7 @@ import { PipelyAppIcon } from "@/components/shared/PipelyLogo";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { registerSchema, type RegisterInput } from "@/lib/validators/auth";
@@ -32,7 +33,16 @@ export default function RegisterPage() {
       setServerError(json.error ?? "Errore durante la registrazione");
       return;
     }
-    router.push("/login?registered=1");
+    const result = await signIn("credentials", {
+      email: data.email,
+      password: data.password,
+      redirect: false,
+    });
+    if (result?.error) {
+      router.push("/login?registered=1");
+      return;
+    }
+    router.push("/dashboard");
   }
 
   return (
