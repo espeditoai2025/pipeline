@@ -168,3 +168,23 @@ export async function deleteDeal(dealId: string) {
     return { error: "Errore durante l'eliminazione" };
   }
 }
+
+export async function getDealsForSelect(): Promise<{ id: string; title: string; value: number; currency: string }[]> {
+  const session = await auth();
+  if (!session) return [];
+
+  const orgId = getOrgId(session);
+  if (!orgId) return [];
+
+  try {
+    const deals = await db.deal.findMany({
+      where: { organizationId: orgId, status: "OPEN" },
+      select: { id: true, title: true, value: true, currency: true },
+      orderBy: { updatedAt: "desc" },
+      take: 100,
+    });
+    return deals.map((d) => ({ ...d, value: Number(d.value) }));
+  } catch {
+    return [];
+  }
+}
