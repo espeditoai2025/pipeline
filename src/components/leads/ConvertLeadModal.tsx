@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowRightCircle, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowRightCircle, Loader2, UserPlus, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { convertLead } from "@/server/actions/leads";
-import type { Lead } from "@/types/contacts";
+import type { Lead, LeadStatus } from "@/types/contacts";
 
 type Props = {
   open: boolean;
@@ -15,21 +15,57 @@ type Props = {
   onConverted: (leadId: string, dealId: string) => void;
 };
 
+const inputCls = "w-full rounded-lg border border-[var(--crm-neutral-200)] bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-[var(--crm-neutral-900)] dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] focus:border-transparent transition-colors";
+
 export function ConvertLeadModal({ open, onClose, lead, onConverted }: Props) {
-  const [dealTitle, setDealTitle] = useState(lead?.title ?? "");
+  const [dealTitle, setDealTitle] = useState("");
+  const [dealValue, setDealValue] = useState(0);
+  const [createContact, setCreateContact] = useState(false);
+  const [contactFirstName, setContactFirstName] = useState("");
+  const [contactLastName, setContactLastName] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!lead) return;
+    setDealTitle(lead.title);
+    setDealValue(0);
+    setCreateContact(!lead.contactId);
+    // Pre-fill contact from lead data
+    const nameParts = lead.title.split(" ");
+    setContactFirstName(nameParts[0] ?? "");
+    setContactLastName(nameParts.slice(1).join(" "));
+    setContactEmail(lead.email ?? "");
+    setContactPhone(lead.phone ?? "");
+  }, [lead]);
 
   if (!lead) return null;
 
+  const scoreColor = lead.score >= 70 ? "var(--crm-success)" : lead.score >= 40 ? "var(--crm-warning)" : "var(--crm-danger)";
+
   async function handleConvert() {
-    if (!lead) return;
+    if (!lead || !dealTitle.trim()) return;
     setLoading(true);
-    const res = await convertLead(lead.id, dealTitle || lead.title);
+    const res = await convertLead(lead.id, {
+      dealTitle: dealTitle.trim(),
+      dealValue,
+      currency: "EUR",
+      createContact: createContact && !lead.contactId,
+      contactFirstName: contactFirstName.trim(),
+      contactLastName: contactLastName.trim(),
+      contactEmail: contactEmail.trim(),
+      contactPhone: contactPhone.trim(),
+    });
     setLoading(false);
     if (res.error) {
       toast.error(res.error);
     } else {
-      toast.success("Lead convertito in affare");
+      toast.success(
+        res.contactId
+          ? "Lead convertito: contatto e affare creati!"
+          : "Lead convertito in affare"
+      );
       onConverted(lead.id, res.dealId!);
       onClose();
     }
@@ -37,54 +73,112 @@ export function ConvertLeadModal({ open, onClose, lead, onConverted }: Props) {
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="w-full sm:max-w-md">
+      <SheetContent className="w-full sm:max-w-md overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>Converti lead in affare</SheetTitle>
+          <SheetTitle>Converti lead</SheetTitle>
         </SheetHeader>
 
         <SheetBody>
-        <div className="space-y-5">
-          <div className="rounded-xl border border-[var(--crm-neutral-100)] p-4 bg-[var(--crm-neutral-50)] dark:bg-white/5">
-            <p className="text-sm font-medium">{lead.title}</p>
-            {lead.source && <p className="text-xs text-[var(--crm-neutral-500)] mt-1">Sorgente: {lead.source}</p>}
-            <div className="mt-2 flex items-center gap-2">
-              <div className="h-1.5 flex-1 rounded-full bg-[var(--crm-neutral-200)] overflow-hidden">
-                <div className="h-full rounded-full bg-[var(--crm-primary)]" style={{ width: `${lead.score}%` }} />
+          <div className="space-y-5">
+
+            {/* Lead preview */}
+            <div className="rounded-xl border border-[var(--crm-neutral-100)] p-4 bg-[var(--crm-neutral-50)] dark:bg-white/5 space-y-2">
+              <p className="text-sm font-semibold">{lead.title}</p>
+              <div className="flex items-center gap-3 text-xs text-[var(--crm-neutral-500)]">
+                {lead.source && <span>📍 {lead.source}</span>}
+                {lead.email && <span>✉ {lead.email}</span>}
               </div>
-              <span className="text-xs font-semibold text-[var(--crm-primary)]">{lead.score}</span>
+              <div className="flex items-center gap-2">
+                <div className="h-1.5 flex-1 rounded-full bg-[var(--crm-neutral-200)] overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${lead.score}%`, backgroundColor: scoreColor }} />
+                </div>
+                <span className="text-xs font-bold" style={{ color: scoreColor }}>{lead.score}</span>
+              </div>
+            </div>
+
+            {/* Deal */}
+            <div className="space-y-3">
+              <p className="text-sm font-semibold">Affare da creare</p>
+              <div>
+                <label className="block text-xs font-medium mb-1 text-[var(--crm-neutral-600)]">Titolo affare *</label>
+                <input value={dealTitle} onChange={(e) => setDealTitle(e.target.value)} className={inputCls} placeholder={lead.title} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1 text-[var(--crm-neutral-600)]">Valore (€)</label>
+                <input
+                  type="number" min={0} step={100}
+                  value={dealValue}
+                  onChange={(e) => setDealValue(parseFloat(e.target.value) || 0)}
+                  className={inputCls}
+                />
+              </div>
+            </div>
+
+            {/* Create contact toggle */}
+            {!lead.contactId && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setCreateContact((v) => !v)}
+                  className="flex items-center gap-2 text-sm font-medium text-[var(--crm-primary)] hover:underline"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  {createContact ? "Non creare contatto" : "Crea anche un contatto"}
+                  <ChevronDown className={`h-3.5 w-3.5 transition-transform ${createContact ? "rotate-180" : ""}`} />
+                </button>
+
+                {createContact && (
+                  <div className="mt-3 space-y-3 rounded-xl border border-[var(--crm-neutral-100)] p-4 bg-[var(--crm-neutral-50)] dark:bg-white/5">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium mb-1 text-[var(--crm-neutral-600)]">Nome *</label>
+                        <input value={contactFirstName} onChange={(e) => setContactFirstName(e.target.value)} className={inputCls} placeholder="Mario" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1 text-[var(--crm-neutral-600)]">Cognome</label>
+                        <input value={contactLastName} onChange={(e) => setContactLastName(e.target.value)} className={inputCls} placeholder="Rossi" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1 text-[var(--crm-neutral-600)]">Email</label>
+                      <input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} className={inputCls} placeholder="mario@acme.it" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1 text-[var(--crm-neutral-600)]">Telefono</label>
+                      <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} className={inputCls} placeholder="+39 02 1234567" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {lead.contactId && (
+              <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/20 px-3 py-2 text-xs text-green-700">
+                ✓ Già collegato a un contatto — l'affare verrà associato automaticamente.
+              </div>
+            )}
+
+            {/* What happens */}
+            <div className="rounded-lg border border-[var(--crm-neutral-100)] p-3 text-xs text-[var(--crm-neutral-500)] space-y-1">
+              <p className="font-semibold text-[var(--crm-neutral-700)]">Operazioni:</p>
+              <p>• Crea un affare nel primo stage della pipeline predefinita</p>
+              {createContact && !lead.contactId && <p>• Crea un nuovo contatto e lo collega all'affare</p>}
+              <p>• Segna il lead come "Convertito"</p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Annulla</Button>
+              <Button
+                type="button"
+                disabled={loading || !dealTitle.trim()}
+                className="flex-1 bg-[var(--crm-success)] hover:bg-[var(--crm-success)]/90 text-white"
+                onClick={handleConvert}
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ArrowRightCircle className="h-4 w-4 mr-2" />}
+                Converti
+              </Button>
             </div>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Titolo dell&apos;affare</label>
-            <input
-              value={dealTitle}
-              onChange={(e) => setDealTitle(e.target.value)}
-              className="w-full rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)]"
-              placeholder={lead.title}
-            />
-          </div>
-
-          <div className="rounded-lg border border-[var(--crm-neutral-100)] p-3 text-xs text-[var(--crm-neutral-500)] space-y-1">
-            <p className="font-medium text-[var(--crm-neutral-700)]">Operazioni eseguite:</p>
-            <p>• Crea un nuovo affare nel primo stage della pipeline predefinita</p>
-            <p>• Segna il lead come &quot;Convertito&quot;</p>
-            <p>• Collega il lead all&apos;affare creato</p>
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Annulla</Button>
-            <Button
-              type="button"
-              disabled={loading}
-              className="flex-1 bg-[var(--crm-success)] hover:bg-[var(--crm-success)]/90 text-white"
-              onClick={handleConvert}
-            >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ArrowRightCircle className="h-4 w-4 mr-2" />}
-              Converti
-            </Button>
-          </div>
-        </div>
         </SheetBody>
       </SheetContent>
     </Sheet>

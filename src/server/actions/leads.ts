@@ -8,8 +8,9 @@ import { db } from "@/lib/db";
 import type { Lead, LeadStatus } from "@/types/contacts";
 import { runWorkflows } from "@/lib/workflow-engine";
 
-function getOrgId(s: Session | null) {
-  return (s?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
+function getIds(s: Session | null) {
+  const user = s?.user as { id?: string; organizationId?: string } | undefined;
+  return { orgId: user?.organizationId ?? null, userId: user?.id ?? null };
 }
 
 // DB enum → app type mapping
@@ -28,28 +29,56 @@ const APP_TO_DB: Record<string, string> = {
   DISQUALIFIED: "DISQUALIFIED",
 };
 
+const LEAD_SELECT = {
+  id: true, title: true, source: true, score: true, status: true,
+  data: true, email: true, phone: true, notes: true,
+  organizationId: true, ownerId: true, contactId: true, convertedDealId: true,
+  createdAt: true, updatedAt: true,
+  owner: { select: { id: true, name: true, email: true } },
+  contact: { select: { id: true, firstName: true, lastName: true } },
+} as const;
+
+function mapLead(l: {
+  id: string; title: string; source: string | null; score: number; status: string;
+  data: unknown; email: string | null; phone: string | null; notes: string | null;
+  organizationId: string; ownerId: string | null; contactId: string | null;
+  convertedDealId: string | null; createdAt: Date; updatedAt: Date;
+  owner: { id: string; name: string | null; email: string } | null;
+  contact: { id: string; firstName: string; lastName: string | null } | null;
+}): Lead {
+  return {
+    id: l.id,
+    title: l.title,
+    source: l.source,
+    score: l.score,
+    status: (DB_TO_APP[l.status] ?? l.status) as LeadStatus,
+    data: (l.data ?? {}) as Record<string, unknown>,
+    email: l.email,
+    phone: l.phone,
+    notes: l.notes,
+    organizationId: l.organizationId,
+    ownerId: l.ownerId,
+    owner: l.owner,
+    contactId: l.contactId,
+    contact: l.contact,
+    convertedDealId: l.convertedDealId,
+    createdAt: l.createdAt.toISOString(),
+    updatedAt: l.updatedAt.toISOString(),
+  };
+}
+
 export async function getLeads(): Promise<Lead[]> {
   const session = await auth();
-  const orgId = getOrgId(session);
+  const { orgId } = getIds(session);
   if (!orgId) return [];
 
   const rows = await db.lead.findMany({
     where: { organizationId: orgId },
     orderBy: { createdAt: "desc" },
+    select: LEAD_SELECT,
   });
 
-  return rows.map((l) => ({
-    id: l.id,
-    title: l.title,
-    source: l.source ?? null,
-    score: l.score,
-    status: (DB_TO_APP[l.status] ?? l.status) as LeadStatus,
-    data: (l.data ?? {}) as Record<string, unknown>,
-    organizationId: l.organizationId,
-    convertedDealId: l.convertedDealId ?? null,
-    createdAt: l.createdAt.toISOString(),
-    updatedAt: l.createdAt.toISOString(),
-  }));
+  return rows.map(mapLead);
 }
 
 const leadSchema = z.object({
@@ -57,12 +86,17 @@ const leadSchema = z.object({
   source: z.string().optional(),
   score: z.number().min(0).max(100),
   status: z.enum(["NEW", "WORKING", "NURTURING", "CONVERTED", "DISQUALIFIED"]),
+  email: z.string().email("Email non valida").optional().or(z.literal("")),
+  phone: z.string().optional(),
+  notes: z.string().optional(),
+  ownerId: z.string().optional(),
+  contactId: z.string().optional(),
   data: z.record(z.string(), z.unknown()).optional(),
 });
 
 export async function createLead(input: z.infer<typeof leadSchema>): Promise<{ data: Lead | null; error: string | null }> {
   const session = await auth();
-  const orgId = getOrgId(session);
+  const { orgId } = getIds(session);
   if (!session || !orgId) return { data: null, error: "Non autorizzato" };
 
   const parsed = leadSchema.safeParse(input);
@@ -76,27 +110,19 @@ export async function createLead(input: z.infer<typeof leadSchema>): Promise<{ d
         score: parsed.data.score,
         status: APP_TO_DB[parsed.data.status] as "NEW" | "CONTACTED" | "QUALIFIED" | "CONVERTED" | "DISQUALIFIED",
         data: (parsed.data.data ?? {}) as Record<string, string>,
+        email: parsed.data.email || null,
+        phone: parsed.data.phone || null,
+        notes: parsed.data.notes || null,
         organizationId: orgId,
+        ownerId: parsed.data.ownerId || null,
+        contactId: parsed.data.contactId || null,
       },
+      select: LEAD_SELECT,
     });
 
     revalidatePath("/leads");
     runWorkflows({ trigger: "LEAD_CREATED", orgId, leadId: row.id, leadTitle: row.title }).catch(console.error);
-    return {
-      data: {
-        id: row.id,
-        title: row.title,
-        source: row.source ?? null,
-        score: row.score,
-        status: (DB_TO_APP[row.status] ?? row.status) as LeadStatus,
-        data: (row.data ?? {}) as Record<string, unknown>,
-        organizationId: row.organizationId,
-        convertedDealId: row.convertedDealId ?? null,
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.createdAt.toISOString(),
-      },
-      error: null,
-    };
+    return { data: mapLead(row), error: null };
   } catch (e) {
     return { data: null, error: e instanceof Error ? e.message : "Errore durante la creazione" };
   }
@@ -104,7 +130,7 @@ export async function createLead(input: z.infer<typeof leadSchema>): Promise<{ d
 
 export async function updateLead(input: z.infer<typeof leadSchema> & { id: string }): Promise<{ data: Lead | null; error: string | null }> {
   const session = await auth();
-  const orgId = getOrgId(session);
+  const { orgId } = getIds(session);
   if (!session || !orgId) return { data: null, error: "Non autorizzato" };
 
   const parsed = leadSchema.safeParse(input);
@@ -119,33 +145,42 @@ export async function updateLead(input: z.infer<typeof leadSchema> & { id: strin
         score: parsed.data.score,
         status: APP_TO_DB[parsed.data.status] as "NEW" | "CONTACTED" | "QUALIFIED" | "CONVERTED" | "DISQUALIFIED",
         data: (parsed.data.data ?? {}) as Record<string, string>,
+        email: parsed.data.email || null,
+        phone: parsed.data.phone || null,
+        notes: parsed.data.notes || null,
+        ownerId: parsed.data.ownerId || null,
+        contactId: parsed.data.contactId || null,
       },
+      select: LEAD_SELECT,
     });
 
     revalidatePath("/leads");
-    return {
-      data: {
-        id: row.id,
-        title: row.title,
-        source: row.source ?? null,
-        score: row.score,
-        status: (DB_TO_APP[row.status] ?? row.status) as LeadStatus,
-        data: (row.data ?? {}) as Record<string, unknown>,
-        organizationId: row.organizationId,
-        convertedDealId: row.convertedDealId ?? null,
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.createdAt.toISOString(),
-      },
-      error: null,
-    };
+    return { data: mapLead(row), error: null };
   } catch (e) {
     return { data: null, error: e instanceof Error ? e.message : "Errore durante l'aggiornamento" };
   }
 }
 
+export async function updateLeadStatus(id: string, status: LeadStatus): Promise<{ error: string | null }> {
+  const session = await auth();
+  const { orgId } = getIds(session);
+  if (!orgId) return { error: "Non autorizzato" };
+
+  try {
+    await db.lead.update({
+      where: { id, organizationId: orgId },
+      data: { status: APP_TO_DB[status] as "NEW" | "CONTACTED" | "QUALIFIED" | "CONVERTED" | "DISQUALIFIED" },
+    });
+    revalidatePath("/leads");
+    return { error: null };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Errore" };
+  }
+}
+
 export async function deleteLead(id: string): Promise<{ error: string | null }> {
   const session = await auth();
-  const orgId = getOrgId(session);
+  const { orgId } = getIds(session);
   if (!orgId) return { error: "Non autorizzato" };
 
   try {
@@ -157,44 +192,79 @@ export async function deleteLead(id: string): Promise<{ error: string | null }> 
   }
 }
 
-export async function convertLead(id: string, dealTitle: string): Promise<{ dealId: string | null; error: string | null }> {
+const convertSchema = z.object({
+  dealTitle: z.string().min(1),
+  dealValue: z.number().min(0).default(0),
+  currency: z.string().default("EUR"),
+  createContact: z.boolean().default(false),
+  contactFirstName: z.string().optional(),
+  contactLastName: z.string().optional(),
+  contactEmail: z.string().optional(),
+  contactPhone: z.string().optional(),
+});
+
+export async function convertLead(
+  id: string,
+  input: z.infer<typeof convertSchema>
+): Promise<{ dealId: string | null; contactId: string | null; error: string | null }> {
   const session = await auth();
-  const orgId = getOrgId(session);
-  if (!session || !orgId) return { dealId: null, error: "Non autorizzato" };
+  const { orgId, userId } = getIds(session);
+  if (!session || !orgId || !userId) return { dealId: null, contactId: null, error: "Non autorizzato" };
+
+  const parsed = convertSchema.safeParse(input);
+  if (!parsed.success) return { dealId: null, contactId: null, error: "Dati non validi" };
 
   try {
     const lead = await db.lead.findUnique({ where: { id, organizationId: orgId } });
-    if (!lead) return { dealId: null, error: "Lead non trovato" };
-    if (lead.status === "CONVERTED") return { dealId: null, error: "Lead già convertito" };
+    if (!lead) return { dealId: null, contactId: null, error: "Lead non trovato" };
+    if (lead.status === "CONVERTED") return { dealId: null, contactId: null, error: "Lead già convertito" };
 
     const pipeline = await db.pipeline.findFirst({
       where: { organizationId: orgId },
       include: { stages: { orderBy: { position: "asc" }, take: 1 } },
     });
-    if (!pipeline?.stages[0]) return { dealId: null, error: "Nessuna pipeline configurata" };
+    if (!pipeline?.stages[0]) return { dealId: null, contactId: null, error: "Nessuna pipeline configurata" };
+
+    // Optionally create a Contact
+    let contactId: string | null = lead.contactId ?? null;
+    if (parsed.data.createContact && parsed.data.contactFirstName) {
+      const contact = await db.contact.create({
+        data: {
+          firstName: parsed.data.contactFirstName,
+          lastName: parsed.data.contactLastName || null,
+          email: parsed.data.contactEmail || lead.email || null,
+          phone: parsed.data.contactPhone || lead.phone || null,
+          organizationId: orgId,
+          ownerId: userId,
+        },
+      });
+      contactId = contact.id;
+    }
 
     const deal = await db.deal.create({
       data: {
-        title: dealTitle,
-        value: 0,
-        currency: "EUR",
+        title: parsed.data.dealTitle,
+        value: parsed.data.dealValue,
+        currency: parsed.data.currency,
         status: "OPEN",
         pipelineId: pipeline.id,
         stageId: pipeline.stages[0].id,
         organizationId: orgId,
-        ownerId: session.user!.id!,
+        ownerId: userId,
+        contactId: contactId ?? undefined,
       },
     });
 
     await db.lead.update({
       where: { id },
-      data: { status: "CONVERTED", convertedDealId: deal.id },
+      data: { status: "CONVERTED", convertedDealId: deal.id, contactId: contactId ?? undefined },
     });
 
     revalidatePath("/leads");
     revalidatePath("/deals");
-    return { dealId: deal.id, error: null };
+    revalidatePath("/contacts");
+    return { dealId: deal.id, contactId, error: null };
   } catch (e) {
-    return { dealId: null, error: e instanceof Error ? e.message : "Errore durante la conversione" };
+    return { dealId: null, contactId: null, error: e instanceof Error ? e.message : "Errore durante la conversione" };
   }
 }

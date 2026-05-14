@@ -80,6 +80,7 @@ model User {
 
   ownedDeals     Deal[]         @relation("DealOwner")
   ownedContacts  Contact[]      @relation("ContactOwner")
+  ownedLeads     Lead[]         @relation("LeadOwner")
   activities     Activity[]
   emailAccounts  EmailAccount[]
   notifications  Notification[]
@@ -182,6 +183,7 @@ model Contact {
   company        Company?     @relation(fields: [companyId], references: [id])
 
   deals        Deal[]
+  leads        Lead[]             @relation("LeadContact")
   activities   Activity[]
   emails       Email[]
   customValues CustomFieldValue[]
@@ -268,17 +270,25 @@ enum ActivityType {
 // ============ LEADS ============
 
 model Lead {
-  id             String       @id @default(cuid())
-  title          String
-  source         String?
-  score          Int          @default(0)
-  status         LeadStatus   @default(NEW)
-  data           Json         // form payload
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id              String       @id @default(cuid())
+  title           String
+  source          String?
+  score           Int          @default(0)
+  status          LeadStatus   @default(NEW)
+  data            Json         // form payload
+  email           String?
+  phone           String?
+  notes           String?      @db.Text
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ownerId         String?
+  owner           User?        @relation("LeadOwner", fields: [ownerId], references: [id])
+  contactId       String?
+  contact         Contact?     @relation("LeadContact", fields: [contactId], references: [id])
   convertedDealId String?
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum LeadStatus {

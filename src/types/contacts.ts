@@ -48,7 +48,14 @@ export type Lead = {
   score: number;
   status: LeadStatus;
   data: Record<string, unknown>;
+  email: string | null;
+  phone: string | null;
+  notes: string | null;
   organizationId: string;
+  ownerId: string | null;
+  owner: { id: string; name: string | null; email: string } | null;
+  contactId: string | null;
+  contact: { id: string; firstName: string; lastName: string | null } | null;
   convertedDealId: string | null;
   createdAt: string;
   updatedAt: string;
