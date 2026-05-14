@@ -66,7 +66,7 @@ export function DealsClient({ pipeline, owners }: DealsClientProps) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 min-w-0 overflow-x-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-[var(--crm-neutral-900)] dark:text-white">

@@ -20,7 +20,7 @@ export function StageColumn({ stage, onDealClick }: Props) {
 
   return (
     <div
-      className="flex w-64 shrink-0 flex-col rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 bg-[var(--crm-neutral-50)] dark:bg-[#161b2d]"
+      className="flex w-56 shrink-0 flex-col rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 bg-[var(--crm-neutral-50)] dark:bg-[#161b2d]"
       data-testid={`stage-column-${stage.id}`}
     >
       {/* Column header */}

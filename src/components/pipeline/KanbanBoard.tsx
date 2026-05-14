@@ -97,7 +97,7 @@ export function KanbanBoard({ pipeline, onDealClick }: Props) {
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="flex gap-4 overflow-x-auto pb-4" data-testid="kanban-board">
+      <div className="w-full flex gap-4 overflow-x-auto pb-4" data-testid="kanban-board">
         {stages.map((stage) => (
           <StageColumn key={stage.id} stage={stage} onDealClick={onDealClick} />
         ))}
