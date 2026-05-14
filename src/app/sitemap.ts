@@ -22,7 +22,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       url: `${BASE}/register`,
       lastModified: now,
       changeFrequency: "yearly",
-      priority: 0.5,
+      priority: 0.7,
     },
     {
       url: `${BASE}/privacy`,
@@ -46,7 +46,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       url: `${BASE}/contatti`,
       lastModified: now,
       changeFrequency: "monthly",
-      priority: 0.5,
+      priority: 0.6,
     },
   ];
 }

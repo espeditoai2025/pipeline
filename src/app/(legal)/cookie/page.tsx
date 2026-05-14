@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Cookie Policy",
-  description: "Informativa sull'uso dei cookie di Pipely ai sensi dell'art. 122 del Codice Privacy",
+  title: "Cookie Policy — Pipely CRM",
+  description: "Informativa sull'uso dei cookie di Pipely ai sensi dell'art. 122 del Codice Privacy e del GDPR. Quali cookie usiamo e come gestirli.",
+  alternates: { canonical: "https://www.pipely.it/cookie" },
+  openGraph: { title: "Cookie Policy — Pipely CRM", url: "https://www.pipely.it/cookie" },
 };
 
 const LAST_UPDATED = "13 maggio 2025";

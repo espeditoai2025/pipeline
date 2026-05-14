@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Termini di Servizio",
-  description: "Condizioni generali di utilizzo di Pipely CRM",
+  title: "Termini di Servizio — Pipely CRM",
+  description: "Condizioni generali di utilizzo di Pipely CRM. Leggi i termini che regolano l'accesso e l'utilizzo della piattaforma.",
+  alternates: { canonical: "https://www.pipely.it/termini" },
+  openGraph: { title: "Termini di Servizio — Pipely CRM", url: "https://www.pipely.it/termini" },
 };
 
 const LAST_UPDATED = "13 maggio 2025";

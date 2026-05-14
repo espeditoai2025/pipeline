@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy",
-  description: "Informativa sul trattamento dei dati personali ai sensi del GDPR (Reg. UE 2016/679)",
+  title: "Privacy Policy — Pipely CRM",
+  description: "Informativa sul trattamento dei dati personali di Pipely ai sensi del GDPR (Reg. UE 2016/679). Come raccogliamo, usiamo e proteggiamo i tuoi dati.",
+  alternates: { canonical: "https://www.pipely.it/privacy" },
+  openGraph: { title: "Privacy Policy — Pipely CRM", url: "https://www.pipely.it/privacy" },
 };
 
 const LAST_UPDATED = "13 maggio 2025";

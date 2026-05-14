@@ -3,8 +3,14 @@ import { Mail, Clock, MessageSquare, Headphones } from "lucide-react";
 import { ContactForm } from "./ContactForm";
 
 export const metadata: Metadata = {
-  title: "Contatti",
-  description: "Hai domande su Pipely? Scrivici — ti risponderemo entro 1 giorno lavorativo.",
+  title: "Contattaci — Supporto Pipely CRM",
+  description: "Hai domande su Pipely? Scrivici a support@pipely.it — ti risponderemo entro 1 giorno lavorativo. Siamo disponibili dal lunedì al venerdì, 9:00–18:00 CET.",
+  alternates: { canonical: "https://www.pipely.it/contatti" },
+  openGraph: {
+    title: "Contattaci — Supporto Pipely CRM",
+    description: "Hai domande su Pipely? Scrivici — rispondiamo entro 1 giorno lavorativo.",
+    url: "https://www.pipely.it/contatti",
+  },
 };
 
 const contacts = [

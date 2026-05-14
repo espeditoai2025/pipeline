@@ -61,6 +61,8 @@ export const metadata: Metadata = {
     follow: true,
     googleBot: { index: true, follow: true, "max-snippet": -1, "max-image-preview": "large" },
   },
+  // Add Google Search Console verification key here when available:
+  // verification: { google: "YOUR_VERIFICATION_CODE" },
 };
 
 export const viewport: Viewport = {

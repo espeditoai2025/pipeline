@@ -228,6 +228,7 @@ export default function LandingPage() {
         </div>
       </header>
 
+      <main id="main-content">
       {/* ── Hero ── */}
       <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-6 py-28 text-center">
         <div className="pointer-events-none absolute inset-0">
@@ -352,16 +353,16 @@ export default function LandingPage() {
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {features.map((f) => (
-              <div
+              <article
                 key={f.title}
                 className="group rounded-2xl border border-slate-100 bg-white p-6 shadow-sm hover:shadow-md hover:border-slate-200 transition-all"
               >
-                <div className={`mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl ${f.color} text-white`}>
+                <div className={`mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl ${f.color} text-white`} aria-hidden="true">
                   <f.icon className="h-5 w-5" />
                 </div>
                 <h3 className="mb-2 font-semibold text-slate-900">{f.title}</h3>
                 <p className="text-sm leading-relaxed text-slate-500">{f.description}</p>
-              </div>
+              </article>
             ))}
           </div>
         </div>
@@ -648,7 +649,7 @@ export default function LandingPage() {
                 highlight: false,
               },
             ].map((plan) => (
-              <div
+              <article
                 key={plan.name}
                 className={`relative flex flex-col rounded-2xl p-8 ${
                   plan.highlight
@@ -711,7 +712,7 @@ export default function LandingPage() {
                 >
                   {plan.cta}
                 </Link>
-              </div>
+              </article>
             ))}
           </div>
         </div>
@@ -801,6 +802,7 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+      </main>
     </div>
   );
 }
