@@ -160,9 +160,10 @@ export function WorkflowCard({ workflow, templates = [], onEdit, onDeleted, onTo
                     <p className="text-xs text-[var(--crm-neutral-500)]">
                       {step.action.type === "CREATE_ACTIVITY" && `"${step.action.subject}" tra ${step.action.dueDays}g`}
                       {step.action.type === "SEND_EMAIL" && (() => {
-                        const tpl = templates.find(t => t.id === step.action.templateId);
-                        const label = tpl ? tpl.name : step.action.templateId || "Nessun template";
-                        return `${label} → ${step.action.to}`;
+                        const a = step.action as { type: "SEND_EMAIL"; templateId: string; to: string };
+                        const tpl = templates.find(t => t.id === a.templateId);
+                        const label = tpl ? tpl.name : a.templateId || "Nessun template";
+                        return `${label} → ${a.to}`;
                       })()}
                       {step.action.type === "SEND_NOTIFICATION" && `"${step.action.message}"`}
                       {step.action.type === "WAIT" && `${step.action.days} giorni`}
