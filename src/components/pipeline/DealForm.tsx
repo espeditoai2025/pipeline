@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, Plus, Trash2, Package } from "lucide-react";
+import { Loader2, Plus, Trash2, Package, Trophy, X, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import {
   Sheet,
@@ -54,6 +54,9 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
   const [addingProduct, setAddingProduct] = useState(false);
   const [pickedProductId, setPickedProductId] = useState("");
+  const [closingAs, setClosingAs] = useState<"WON" | "LOST" | null>(null);
+  const [lostReason, setLostReason] = useState("");
+  const [isClosing, setIsClosing] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -119,6 +122,32 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
     setSelectedProducts((prev) => prev.map((p) => p.productId === productId ? { ...p, quantity: Math.max(1, qty) } : p));
   }
 
+  async function handleCloseDeal(status: "WON" | "LOST") {
+    if (!deal) return;
+    setIsClosing(true);
+    const result = await updateDeal({
+      id: deal.id,
+      status,
+      lostReason: status === "LOST" ? (lostReason.trim() || null) : null,
+    });
+    setIsClosing(false);
+    if (result.error) { toast.error(result.error); return; }
+    toast.success(status === "WON" ? "Affare chiuso come vinto 🎉" : "Affare chiuso come perso");
+    setClosingAs(null);
+    setLostReason("");
+    onClose();
+  }
+
+  async function handleReopenDeal() {
+    if (!deal) return;
+    setIsClosing(true);
+    const result = await updateDeal({ id: deal.id, status: "OPEN", lostReason: null });
+    setIsClosing(false);
+    if (result.error) { toast.error(result.error); return; }
+    toast.success("Affare riaperto");
+    onClose();
+  }
+
   async function onSubmit(data: FormValues) {
     const payload = {
       ...data,
@@ -167,6 +196,97 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
         </SheetHeader>
 
         <SheetBody>
+          {/* Status badge + close actions — solo in modifica */}
+          {isEditing && deal && (
+            <div className="mb-5">
+              {deal.status === "OPEN" && (
+                <>
+                  {closingAs === null ? (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setClosingAs("WON")}
+                        className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-2.5 transition-colors"
+                      >
+                        <Trophy className="h-4 w-4" /> Vinto
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setClosingAs("LOST")}
+                        className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold py-2.5 transition-colors"
+                      >
+                        <X className="h-4 w-4" /> Perso
+                      </button>
+                    </div>
+                  ) : closingAs === "WON" ? (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20 p-4 space-y-3">
+                      <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">Confermi di aver vinto questo affare?</p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={isClosing}
+                          onClick={() => handleCloseDeal("WON")}
+                          className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-2.5 transition-colors disabled:opacity-60"
+                        >
+                          {isClosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trophy className="h-4 w-4" />} Sì, Vinto!
+                        </button>
+                        <button type="button" onClick={() => setClosingAs(null)} className="px-4 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
+                          Annulla
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 dark:bg-rose-900/20 p-4 space-y-3">
+                      <p className="text-sm font-medium text-rose-800 dark:text-rose-300">Motivo della perdita (opzionale)</p>
+                      <input
+                        type="text"
+                        value={lostReason}
+                        onChange={(e) => setLostReason(e.target.value)}
+                        placeholder="es. Prezzo, Concorrente, No budget..."
+                        className={inputCls}
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={isClosing}
+                          onClick={() => handleCloseDeal("LOST")}
+                          className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold py-2.5 transition-colors disabled:opacity-60"
+                        >
+                          {isClosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />} Conferma Perso
+                        </button>
+                        <button type="button" onClick={() => { setClosingAs(null); setLostReason(""); }} className="px-4 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
+                          Annulla
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {(deal.status === "WON" || deal.status === "LOST") && (
+                <div className={`rounded-xl border p-4 flex items-center justify-between ${deal.status === "WON" ? "border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20" : "border-rose-200 bg-rose-50 dark:bg-rose-900/20"}`}>
+                  <div>
+                    <span className={`inline-flex items-center gap-1.5 text-sm font-semibold ${deal.status === "WON" ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"}`}>
+                      {deal.status === "WON" ? <><Trophy className="h-4 w-4" /> Affare vinto</> : <><X className="h-4 w-4" /> Affare perso</>}
+                    </span>
+                    {deal.status === "LOST" && deal.lostReason && (
+                      <p className="text-xs text-rose-600 dark:text-rose-400 mt-0.5">Motivo: {deal.lostReason}</p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isClosing}
+                    onClick={handleReopenDeal}
+                    className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 border border-slate-200 rounded-lg px-3 py-1.5 bg-white transition-colors disabled:opacity-60"
+                  >
+                    {isClosing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />} Riapri
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
 
             {/* Titolo */}
