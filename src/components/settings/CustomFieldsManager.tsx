@@ -61,10 +61,12 @@ export function CustomFieldsManager() {
       getCustomFields("deal"),
       getCustomFields("contact"),
       getCustomFields("company"),
-    ]).then(([deals, contacts, companies]) => {
-      setFields({ deal: deals, contact: contacts, company: companies });
-      setLoading(false);
-    });
+    ])
+      .then(([deals, contacts, companies]) => {
+        setFields({ deal: deals, contact: contacts, company: companies });
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   async function handleCreate() {

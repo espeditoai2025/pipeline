@@ -23,10 +23,10 @@ export function AIInsightsStrip({ compact = false }: Props) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    fetchAIInsights().then((r) => {
-      if (r.data) setInsights(r.data);
-      setLoading(false);
-    });
+    fetchAIInsights()
+      .then((r) => { if (r.data) setInsights(r.data); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   const visible = insights.filter((i) => !dismissed.has(i.id));
