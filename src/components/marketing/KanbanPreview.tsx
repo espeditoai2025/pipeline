@@ -27,7 +27,7 @@ export function KanbanPreview() {
     return () => clearInterval(id);
   }, []);
 
-  const highlighted = HIGHLIGHT_SEQUENCE[step];
+  const highlighted = HIGHLIGHT_SEQUENCE[step] ?? HIGHLIGHT_SEQUENCE[0]!;
 
   return (
     <div
