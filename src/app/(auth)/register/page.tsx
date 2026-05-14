@@ -131,6 +131,29 @@ export default function RegisterPage() {
           )}
         </div>
 
+        <div>
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              {...register("acceptTerms")}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-[var(--crm-neutral-100)] text-[var(--crm-primary)] focus:ring-[var(--crm-primary)]"
+            />
+            <span className="text-sm text-[var(--crm-neutral-600)]">
+              Ho letto e accetto i{" "}
+              <a href="/termini" target="_blank" className="text-[var(--crm-primary)] font-medium hover:underline">
+                Termini di Servizio
+              </a>{" "}
+              e la{" "}
+              <a href="/privacy" target="_blank" className="text-[var(--crm-primary)] font-medium hover:underline">
+                Privacy Policy
+              </a>
+            </span>
+          </label>
+          {errors.acceptTerms && (
+            <p className="mt-1 text-xs text-[var(--crm-danger)]">{errors.acceptTerms.message}</p>
+          )}
+        </div>
+
         {serverError && (
           <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-[var(--crm-danger)]">
             {serverError}

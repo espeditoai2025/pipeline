@@ -12,6 +12,7 @@ export const registerSchema = z
     organizationName: z.string().min(2, "Nome azienda deve avere almeno 2 caratteri"),
     password: z.string().min(8, "Password deve avere almeno 8 caratteri"),
     confirmPassword: z.string(),
+    acceptTerms: z.literal(true, { message: "Devi accettare i Termini di Servizio per continuare" }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Le password non coincidono",
