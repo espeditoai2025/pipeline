@@ -7,7 +7,7 @@ import {
   Save, Loader2, Eye, EyeOff, Plus, Trash2,
   CheckCircle2, Clock, Key, Users, LogOut,
   Monitor, Package, Briefcase, Activity,
-  Zap, BarChart3, Send, X, ChevronDown, SlidersHorizontal,
+  Zap, BarChart3, Send, X, ChevronDown, SlidersHorizontal, DollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -18,10 +18,11 @@ import {
 import { getSmtpConfig } from "@/server/actions/smtp";
 import { SmtpWizard } from "@/components/settings/SmtpWizard";
 import { CustomFieldsManager } from "@/components/settings/CustomFieldsManager";
+import { BillingTypesManager } from "@/components/settings/BillingTypesManager";
 import type { SmtpConfigPublic } from "@/server/actions/smtp";
 type Role = "OWNER" | "ADMIN" | "MANAGER" | "SALES" | "VIEWER";
 
-type Tab = "profile" | "security" | "billing" | "preferences" | "organization" | "email" | "fields";
+type Tab = "profile" | "security" | "billing" | "preferences" | "organization" | "email" | "fields" | "pricing";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "profile",      label: "Profilo",        icon: User },
@@ -31,6 +32,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "organization", label: "Organizzazione", icon: Building2 },
   { id: "email",        label: "Email",          icon: Mail },
   { id: "fields",       label: "Campi",          icon: SlidersHorizontal },
+  { id: "pricing",      label: "Prezzi",         icon: DollarSign },
 ];
 
 const PLANS = [
@@ -769,6 +771,18 @@ export default function SettingsPage() {
                 </p>
               </div>
               <CustomFieldsManager />
+            </div>
+          )}
+
+          {tab === "pricing" && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-base font-semibold">Tipi di fatturazione</h2>
+                <p className="text-sm text-[var(--crm-neutral-500)] mt-0.5">
+                  Gestisci i tipi di pagamento disponibili per i tuoi prodotti: abbonamenti, noleggi, affitti e tipi personalizzati.
+                </p>
+              </div>
+              <BillingTypesManager />
             </div>
           )}
 

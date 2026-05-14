@@ -5,6 +5,7 @@ import { createColumnHelper, useReactTable, getCoreRowModel, getSortedRowModel, 
 import { ArrowUpDown, Pencil, Trash2, ToggleLeft, ToggleRight, Package } from "lucide-react";
 import { toast } from "sonner";
 import { deleteProduct, toggleProductActive } from "@/server/actions/products";
+import { PREDEFINED_BILLING_TYPES } from "@/server/actions/billing-types";
 import type { Product, ProductCategory } from "@/types/products";
 
 const CATEGORY_LABELS: Record<ProductCategory, string> = {
@@ -25,6 +26,13 @@ const CATEGORY_COLORS: Record<ProductCategory, string> = {
   AI_AGENT:  "bg-pink-100 text-pink-700",
   OTHER:     "bg-gray-100 text-gray-600",
 };
+
+function getBillingLabel(product: Product): string {
+  if (!product.isSubscription) return "Una tantum";
+  const found = PREDEFINED_BILLING_TYPES.find((t) => t.id === product.billingPeriod);
+  if (found) return found.name;
+  return product.billingPeriod ?? "Ricorrente";
+}
 
 function formatPrice(price: number, currency: string) {
   return new Intl.NumberFormat("it-IT", { style: "currency", currency }).format(price);
@@ -81,6 +89,15 @@ export function ProductsTable({ products, onEdit, onDeleted, onToggled }: Props)
     helper.accessor("taxRate", {
       header: "IVA",
       cell: ({ getValue }) => <span className="text-sm">{getValue()}%</span>,
+    }),
+    helper.display({
+      id: "billingType",
+      header: "Fatturazione",
+      cell: ({ row }) => (
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${row.original.isSubscription ? "bg-indigo-100 text-indigo-700" : "bg-gray-100 text-gray-600"}`}>
+          {getBillingLabel(row.original)}
+        </span>
+      ),
     }),
     helper.accessor("isActive", {
       header: "Stato",

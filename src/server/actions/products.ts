@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import type { Product, ProductCategory, BillingPeriod, DealProduct, CreateProductInput, AddDealProductInput } from "@/types/products";
+import type { Product, ProductCategory, DealProduct, CreateProductInput, AddDealProductInput } from "@/types/products";
 
 function getOrgId(s: Session | null) {
   return (s?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
@@ -33,7 +33,7 @@ function mapProduct(p: {
     unit: p.unit,
     isActive: p.isActive,
     isSubscription: p.isSubscription,
-    billingPeriod: (p.billingPeriod as BillingPeriod | null) ?? null,
+    billingPeriod: p.billingPeriod ?? null,
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
   };
@@ -62,7 +62,7 @@ const productSchema = z.object({
   taxRate: z.number().min(0).max(100),
   unit: z.string().min(1, "Unità obbligatoria"),
   isSubscription: z.boolean().default(false),
-  billingPeriod: z.enum(["monthly", "annual"]).nullable().optional(),
+  billingPeriod: z.string().nullable().optional(),
 });
 
 type ActionResult<T> = { data?: T; error?: string };
@@ -115,6 +115,8 @@ export async function updateProduct(id: string, input: Partial<CreateProductInpu
         ...(input.currency && { currency: input.currency }),
         ...(input.taxRate !== undefined && { taxRate: input.taxRate }),
         ...(input.unit && { unit: input.unit }),
+        ...(input.isSubscription !== undefined && { isSubscription: input.isSubscription }),
+        ...(input.billingPeriod !== undefined && { billingPeriod: input.isSubscription ? (input.billingPeriod ?? null) : null }),
       },
     });
     revalidatePath("/products");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { createProduct, updateProduct } from "@/server/actions/products";
+import { getCustomBillingTypes, PREDEFINED_BILLING_TYPES, type CustomBillingType } from "@/server/actions/billing-types";
 import type { Product, ProductCategory } from "@/types/products";
 
 const schema = z.object({
@@ -20,8 +21,6 @@ const schema = z.object({
   currency: z.string().min(1),
   taxRate: z.number().min(0).max(100),
   unit: z.string().min(1, "Unità obbligatoria"),
-  isSubscription: z.boolean(),
-  billingPeriod: z.enum(["monthly", "annual"]).nullable().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -50,16 +49,22 @@ type Props = {
   onSaved: (p: Product) => void;
 };
 
+function getBillingTypeFromProduct(p: Product | null | undefined): string {
+  if (!p || !p.isSubscription) return "one_time";
+  return p.billingPeriod ?? "monthly";
+}
+
 const defaultValues: FormValues = {
   name: "", code: "", description: "", category: "SERVICE",
   unitPrice: 0, currency: "EUR", taxRate: 22, unit: "pezzo",
-  isSubscription: false, billingPeriod: null,
 };
 
 export function ProductForm({ open, onClose, product, onSaved }: Props) {
   const isEditing = !!product;
+  const [billingType, setBillingType] = useState<string>("one_time");
+  const [customTypes, setCustomTypes] = useState<CustomBillingType[]>([]);
 
-  const { register, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm<FormValues>({
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: product
       ? {
@@ -71,14 +76,9 @@ export function ProductForm({ open, onClose, product, onSaved }: Props) {
           currency: product.currency,
           taxRate: product.taxRate,
           unit: product.unit,
-          isSubscription: product.isSubscription,
-          billingPeriod: product.billingPeriod ?? null,
         }
       : defaultValues,
   });
-
-  const isSubscription = watch("isSubscription");
-  const billingPeriod = watch("billingPeriod");
 
   useEffect(() => {
     if (open) {
@@ -92,18 +92,27 @@ export function ProductForm({ open, onClose, product, onSaved }: Props) {
             currency: product.currency,
             taxRate: product.taxRate,
             unit: product.unit,
-            isSubscription: product.isSubscription,
-            billingPeriod: product.billingPeriod ?? null,
           }
         : defaultValues
       );
+      setBillingType(getBillingTypeFromProduct(product));
+      getCustomBillingTypes().then(setCustomTypes);
     }
   }, [open, product, reset]);
 
+  const allBillingTypes = [
+    ...PREDEFINED_BILLING_TYPES,
+    ...customTypes.map((ct) => ({ id: ct.id, name: ct.name, description: ct.period ?? "Personalizzato", isRecurring: true })),
+  ];
+
   async function onSubmit(data: FormValues) {
+    const selectedType = allBillingTypes.find((t) => t.id === billingType);
+    const isSubscription = selectedType?.isRecurring ?? false;
+    const billingPeriod = isSubscription ? billingType : null;
+
     const result = isEditing
-      ? await updateProduct(product!.id, data)
-      : await createProduct(data);
+      ? await updateProduct(product!.id, { ...data, isSubscription, billingPeriod })
+      : await createProduct({ ...data, isSubscription, billingPeriod });
 
     if (result.error) {
       toast.error(result.error);
@@ -162,54 +171,26 @@ export function ProductForm({ open, onClose, product, onSaved }: Props) {
               </div>
             </div>
 
-            {/* Subscription toggle */}
-            <div className="rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 p-4 space-y-3">
-              <label className="flex items-center justify-between cursor-pointer">
-                <div>
-                  <p className="text-sm font-medium">Abbonamento ricorrente</p>
-                  <p className="text-xs text-[var(--crm-neutral-500)] mt-0.5">Il prodotto viene fatturato periodicamente</p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={isSubscription}
-                  onClick={() => {
-                    setValue("isSubscription", !isSubscription, { shouldValidate: true });
-                    if (isSubscription) setValue("billingPeriod", null);
-                  }}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] focus:ring-offset-2 ${
-                    isSubscription ? "bg-[var(--crm-primary)]" : "bg-[var(--crm-neutral-200)]"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      isSubscription ? "translate-x-6" : "translate-x-1"
+            {/* Billing type selector */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Tipo di fatturazione</label>
+              <div className="grid grid-cols-2 gap-2">
+                {allBillingTypes.map((bt) => (
+                  <button
+                    key={bt.id}
+                    type="button"
+                    onClick={() => setBillingType(bt.id)}
+                    className={`rounded-lg border-2 px-3 py-2.5 text-left transition-colors ${
+                      billingType === bt.id
+                        ? "border-[var(--crm-primary)] bg-[var(--crm-primary)]/5"
+                        : "border-[var(--crm-neutral-100)] hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/5"
                     }`}
-                  />
-                </button>
-              </label>
-
-              {isSubscription && (
-                <div>
-                  <label className="block text-xs font-medium text-[var(--crm-neutral-500)] uppercase tracking-wide mb-2">Cadenza di fatturazione</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(["monthly", "annual"] as const).map((period) => (
-                      <button
-                        key={period}
-                        type="button"
-                        onClick={() => setValue("billingPeriod", period, { shouldValidate: true })}
-                        className={`rounded-lg border-2 py-2.5 text-sm font-medium transition-colors ${
-                          billingPeriod === period
-                            ? "border-[var(--crm-primary)] bg-[var(--crm-primary)]/5 text-[var(--crm-primary)]"
-                            : "border-[var(--crm-neutral-100)] hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/5"
-                        }`}
-                      >
-                        {period === "monthly" ? "Mensile" : "Annuale"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+                  >
+                    <p className={`text-sm font-medium ${billingType === bt.id ? "text-[var(--crm-primary)]" : ""}`}>{bt.name}</p>
+                    <p className="text-xs text-[var(--crm-neutral-400)] mt-0.5">{bt.description}</p>
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="grid grid-cols-3 gap-3">
