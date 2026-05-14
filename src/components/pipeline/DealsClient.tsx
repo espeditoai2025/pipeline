@@ -39,9 +39,19 @@ export function DealsClient({ pipeline, owners }: DealsClientProps) {
         ...stage,
         deals: stage.deals.filter((d: Deal) => {
           if (filters.ownerId && d.ownerId !== filters.ownerId) return false;
-          if (filters.search && !d.title.toLowerCase().includes(filters.search.toLowerCase())) return false;
+          if (filters.stageId && d.stageId !== filters.stageId) return false;
+          if (filters.search) {
+            const q = filters.search.toLowerCase();
+            const inTitle = d.title.toLowerCase().includes(q);
+            const inContact = d.contact
+              ? `${d.contact.firstName} ${d.contact.lastName ?? ""}`.toLowerCase().includes(q)
+              : false;
+            const inCompany = d.company?.name.toLowerCase().includes(q) ?? false;
+            if (!inTitle && !inContact && !inCompany) return false;
+          }
           if (filters.minValue !== undefined && d.value < filters.minValue) return false;
           if (filters.maxValue !== undefined && d.value > filters.maxValue) return false;
+          if (filters.dueAfter && d.expectedClose && d.expectedClose < filters.dueAfter) return false;
           if (filters.dueBefore && d.expectedClose && d.expectedClose > filters.dueBefore) return false;
           return true;
         }),
@@ -105,7 +115,7 @@ export function DealsClient({ pipeline, owners }: DealsClientProps) {
         </div>
       </div>
 
-      <FilterBar filters={filters} owners={owners} onChange={setFilters} />
+      <FilterBar filters={filters} owners={owners} stages={pipeline.stages} onChange={setFilters} />
 
       {view === "kanban" ? (
         <KanbanBoard pipeline={filteredPipeline} onDealClick={openEditDeal} />

@@ -57,6 +57,7 @@ export type Pipeline = {
 
 export type DealFilters = {
   ownerId?: string;
+  stageId?: string;
   minValue?: number;
   maxValue?: number;
   dueBefore?: string;
