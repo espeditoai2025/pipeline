@@ -10,11 +10,12 @@ function getOrgId(s: Session | null) {
 
 export type AppNotification = {
   id: string;
-  type: "overdue_activity" | "deal_won" | "deal_lost" | "new_lead";
+  type: "overdue_activity" | "due_today" | "deal_won" | "deal_lost" | "new_lead" | "deal_expiring";
   title: string;
   body: string;
   createdAt: string;
   read: boolean;
+  href?: string;
 };
 
 export async function getNotifications(): Promise<AppNotification[]> {
@@ -23,16 +24,23 @@ export async function getNotifications(): Promise<AppNotification[]> {
   if (!orgId) return [];
 
   const now = new Date();
+  const todayEnd = new Date(now);
+  todayEnd.setHours(23, 59, 59, 999);
+  const tomorrowEnd = new Date(now.getTime() + 86400_000);
+  tomorrowEnd.setHours(23, 59, 59, 999);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 86400_000);
+  const sevenDaysFromNow = new Date(now.getTime() + 7 * 86400_000);
 
-  const [overdueActivities, recentWon, recentLost, recentLeads] = await Promise.all([
+  const [overdueActivities, dueTodayActivities, recentWon, recentLost, recentLeads, expiringDeals] = await Promise.all([
     db.activity.findMany({
-      where: {
-        organizationId: orgId,
-        completedAt: null,
-        dueDate: { lt: now },
-      },
-      select: { id: true, subject: true, dueDate: true, type: true },
+      where: { organizationId: orgId, completedAt: null, dueDate: { lt: now } },
+      select: { id: true, subject: true, dueDate: true, dealId: true, contactId: true },
+      orderBy: { dueDate: "asc" },
+      take: 5,
+    }),
+    db.activity.findMany({
+      where: { organizationId: orgId, completedAt: null, dueDate: { gte: now, lte: todayEnd } },
+      select: { id: true, subject: true, dueDate: true, dealId: true, contactId: true },
       orderBy: { dueDate: "asc" },
       take: 5,
     }),
@@ -54,12 +62,19 @@ export async function getNotifications(): Promise<AppNotification[]> {
       orderBy: { createdAt: "desc" },
       take: 3,
     }),
+    db.deal.findMany({
+      where: { organizationId: orgId, status: "OPEN", expectedClose: { gte: now, lte: sevenDaysFromNow } },
+      select: { id: true, title: true, expectedClose: true },
+      orderBy: { expectedClose: "asc" },
+      take: 3,
+    }),
   ]);
 
   const notifications: AppNotification[] = [];
 
   for (const a of overdueActivities) {
     const daysLate = Math.floor((now.getTime() - new Date(a.dueDate!).getTime()) / 86400_000);
+    const href = a.dealId ? `/deals/${a.dealId}` : a.contactId ? `/contacts/${a.contactId}` : "/activities";
     notifications.push({
       id: `act-${a.id}`,
       type: "overdue_activity",
@@ -67,6 +82,34 @@ export async function getNotifications(): Promise<AppNotification[]> {
       body: `"${a.subject}" — ${daysLate === 0 ? "scaduta oggi" : `scaduta ${daysLate} giorn${daysLate === 1 ? "o" : "i"} fa`}`,
       createdAt: a.dueDate!.toISOString(),
       read: false,
+      href,
+    });
+  }
+
+  for (const a of dueTodayActivities) {
+    const href = a.dealId ? `/deals/${a.dealId}` : a.contactId ? `/contacts/${a.contactId}` : "/activities";
+    const time = new Date(a.dueDate!).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+    notifications.push({
+      id: `today-${a.id}`,
+      type: "due_today",
+      title: "In scadenza oggi",
+      body: `"${a.subject}" — ore ${time}`,
+      createdAt: a.dueDate!.toISOString(),
+      read: false,
+      href,
+    });
+  }
+
+  for (const d of expiringDeals) {
+    const daysLeft = Math.ceil((new Date(d.expectedClose!).getTime() - now.getTime()) / 86400_000);
+    notifications.push({
+      id: `exp-${d.id}`,
+      type: "deal_expiring",
+      title: "Affare in scadenza",
+      body: `"${d.title}" — chiusura ${daysLeft <= 1 ? "domani" : `tra ${daysLeft} giorni`}`,
+      createdAt: d.expectedClose!.toISOString(),
+      read: false,
+      href: `/deals/${d.id}`,
     });
   }
 
@@ -74,10 +117,11 @@ export async function getNotifications(): Promise<AppNotification[]> {
     notifications.push({
       id: `won-${d.id}`,
       type: "deal_won",
-      title: "Affare vinto",
+      title: "Affare vinto 🎉",
       body: `"${d.title}" è stato chiuso come vinto`,
       createdAt: d.closedAt!.toISOString(),
       read: true,
+      href: `/deals/${d.id}`,
     });
   }
 
@@ -89,6 +133,7 @@ export async function getNotifications(): Promise<AppNotification[]> {
       body: `"${d.title}" è stato chiuso come perso`,
       createdAt: d.closedAt!.toISOString(),
       read: true,
+      href: `/deals/${d.id}`,
     });
   }
 
@@ -100,6 +145,7 @@ export async function getNotifications(): Promise<AppNotification[]> {
       body: `"${l.title}" è entrato nella pipeline lead`,
       createdAt: l.createdAt.toISOString(),
       read: true,
+      href: "/leads",
     });
   }
 

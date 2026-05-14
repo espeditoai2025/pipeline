@@ -2,8 +2,9 @@
 
 import { useTranslations } from "next-intl";
 import { signOut, useSession } from "next-auth/react";
-import { Bell, Moon, Search, Sun, Clock, Trophy, XCircle, Zap, CheckCircle2, Inbox } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { Bell, Moon, Search, Sun, Clock, Trophy, XCircle, Zap, CheckCircle2, Inbox, CalendarClock, TrendingDown } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,19 +28,24 @@ function timeAgo(iso: string) {
 
 const NOTIF_ICONS: Record<AppNotification["type"], React.ElementType> = {
   overdue_activity: Clock,
+  due_today: CalendarClock,
   deal_won: Trophy,
   deal_lost: XCircle,
+  deal_expiring: TrendingDown,
   new_lead: Zap,
 };
 
 const NOTIF_COLORS: Record<AppNotification["type"], string> = {
   overdue_activity: "text-red-500 bg-red-50 dark:bg-red-900/20",
+  due_today: "text-amber-600 bg-amber-50 dark:bg-amber-900/20",
   deal_won: "text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20",
   deal_lost: "text-slate-500 bg-slate-100 dark:bg-white/10",
+  deal_expiring: "text-orange-500 bg-orange-50 dark:bg-orange-900/20",
   new_lead: "text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20",
 };
 
 function NotificationPanel({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [read, setRead] = useState<Set<string>>(new Set());
@@ -56,6 +62,14 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
 
   function markAllRead() {
     setRead(new Set(notifications.map((n) => n.id)));
+  }
+
+  function handleClick(n: AppNotification) {
+    setRead((r) => new Set([...r, n.id]));
+    if (n.href) {
+      onClose();
+      router.push(n.href);
+    }
   }
 
   return (
@@ -100,8 +114,8 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
             return (
               <div
                 key={n.id}
-                onClick={() => setRead((r) => new Set([...r, n.id]))}
-                className={`flex items-start gap-3 px-4 py-3 border-b border-[var(--crm-neutral-100)] dark:border-white/5 last:border-0 cursor-pointer transition-colors hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/5 ${isUnread ? "bg-[var(--crm-primary)]/[0.03]" : ""}`}
+                onClick={() => handleClick(n)}
+                className={`flex items-start gap-3 px-4 py-3 border-b border-[var(--crm-neutral-100)] dark:border-white/5 last:border-0 cursor-pointer transition-colors hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/5 ${isUnread ? "bg-[var(--crm-primary)]/[0.03]" : ""} ${n.href ? "hover:bg-[var(--crm-primary)]/5" : ""}`}
               >
                 <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${NOTIF_COLORS[n.type]}`}>
                   <Icon className="h-3.5 w-3.5" />
@@ -138,12 +152,18 @@ export function Topbar() {
     ? session.user.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
     : "U";
 
-  // Load unread count on mount
-  useEffect(() => {
+  const refreshCount = useCallback(() => {
     getNotifications().then((n) => {
       setUnreadCount(n.filter((x) => !x.read).length);
     });
   }, []);
+
+  // Load on mount + refresh every 60s
+  useEffect(() => {
+    refreshCount();
+    const interval = setInterval(refreshCount, 60_000);
+    return () => clearInterval(interval);
+  }, [refreshCount]);
 
   // Close on outside click
   useEffect(() => {
