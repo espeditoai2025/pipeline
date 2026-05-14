@@ -324,13 +324,40 @@ export async function importContacts(rows: Array<{ firstName: string; lastName?:
   const limitError = checkContactLimit(plan, currentCount, rows.length);
   if (limitError) return { imported: 0, duplicates: 0, error: limitError };
 
+  // Existing emails for duplicate detection
   const existingEmails = new Set(
     (await db.contact.findMany({ where: { organizationId: orgId }, select: { email: true } }))
       .map((c) => c.email?.toLowerCase())
       .filter(Boolean) as string[]
   );
 
-  let imported = 0;
+  // Build company name → id cache (find-or-create)
+  const companyCache = new Map<string, string>();
+  const uniqueCompanyNames = [...new Set(rows.map((r) => r.companyName?.trim()).filter(Boolean) as string[])];
+  if (uniqueCompanyNames.length > 0) {
+    const existing = await db.company.findMany({
+      where: { organizationId: orgId, name: { in: uniqueCompanyNames } },
+      select: { id: true, name: true },
+    });
+    for (const c of existing) companyCache.set(c.name, c.id);
+
+    // Create missing companies in batch
+    const missing = uniqueCompanyNames.filter((n) => !companyCache.has(n));
+    if (missing.length > 0) {
+      await db.company.createMany({
+        data: missing.map((name) => ({ name, organizationId: orgId })),
+        skipDuplicates: true,
+      });
+      const created = await db.company.findMany({
+        where: { organizationId: orgId, name: { in: missing } },
+        select: { id: true, name: true },
+      });
+      for (const c of created) companyCache.set(c.name, c.id);
+    }
+  }
+
+  // Separate valid rows from duplicates
+  const toCreate: typeof rows = [];
   let duplicates = 0;
 
   for (const row of rows) {
@@ -338,24 +365,32 @@ export async function importContacts(rows: Array<{ firstName: string; lastName?:
     if (emailLower && existingEmails.has(emailLower)) {
       duplicates++;
     } else {
-      await db.contact.create({
-        data: {
+      toCreate.push(row);
+      if (emailLower) existingEmails.add(emailLower);
+    }
+  }
+
+  // Batch insert
+  if (toCreate.length > 0) {
+    await db.contact.createMany({
+      data: toCreate.map((row) => {
+        const companyId = row.companyName?.trim() ? (companyCache.get(row.companyName.trim()) ?? null) : null;
+        return {
           firstName: row.firstName,
           lastName: row.lastName || null,
           email: row.email || null,
           phone: row.phone || null,
           jobTitle: row.jobTitle || null,
+          companyId,
           organizationId: orgId,
           ownerId: session.user!.id!,
-        },
-      });
-      if (emailLower) existingEmails.add(emailLower);
-      imported++;
-    }
+        };
+      }),
+    });
   }
 
   revalidatePath("/contacts");
-  return { imported, duplicates, error: null };
+  return { imported: toCreate.length, duplicates, error: null };
 }
 
 // ── COMPANIES CRUD ───────────────────────────────────────────────────────────

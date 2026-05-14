@@ -26,7 +26,11 @@ const ALIASES: Record<string, string[]> = {
 };
 
 const TEMPLATE_HEADERS = ["firstName", "lastName", "email", "phone", "jobTitle", "companyName"];
-const TEMPLATE_SAMPLE  = ["Mario", "Rossi", "mario.rossi@esempio.it", "+39 02 1234567", "CEO", "Acme S.r.l."];
+const TEMPLATE_ROWS = [
+  ["Mario", "Rossi", "mario.rossi@esempio.it", "+39 02 1234567", "CEO", "Acme S.r.l."],
+  ["Giulia", "Bianchi", "giulia.bianchi@esempio.it", "+39 335 9876543", "Direttore Commerciale", "Beta S.p.A."],
+  ["Luca", "Verdi", "luca.verdi@esempio.it", "", "Account Manager", "Acme S.r.l."],
+];
 
 function resolveHeader(raw: string): string {
   const norm = raw.trim().toLowerCase().replace(/[\s_-]+/g, "");
@@ -75,11 +79,8 @@ function normalizeRow(row: ImportRow) {
 
 function downloadTemplate() {
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet([TEMPLATE_HEADERS, TEMPLATE_SAMPLE]);
-
-  // Column widths
-  ws["!cols"] = TEMPLATE_HEADERS.map(() => ({ wch: 22 }));
-
+  const ws = XLSX.utils.aoa_to_sheet([TEMPLATE_HEADERS, ...TEMPLATE_ROWS]);
+  ws["!cols"] = TEMPLATE_HEADERS.map(() => ({ wch: 26 }));
   XLSX.utils.book_append_sheet(wb, ws, "Contatti");
   XLSX.writeFile(wb, "template_contatti.xlsx");
 }
@@ -90,7 +91,7 @@ export function ImportCSVModal({ open, onClose, onImported }: Props) {
   const [fileName, setFileName] = useState("");
   const [rowCount, setRowCount] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{ imported: number; duplicates: number } | null>(null);
+  const [result, setResult] = useState<{ imported: number; duplicates: number; companies?: number } | null>(null);
   const parsedRowsRef = useRef<ImportRow[]>([]);
 
   async function handleFile(file: File) {
@@ -121,12 +122,13 @@ export function ImportCSVModal({ open, onClose, onImported }: Props) {
     if (!rows.length) return;
     setLoading(true);
     const normalized = rows.map(normalizeRow).filter((r): r is NonNullable<typeof r> => r !== null);
+    const uniqueCompanies = new Set(normalized.map((r) => r.companyName?.trim()).filter(Boolean)).size;
     const res = await importContacts(normalized);
     setLoading(false);
     if (res.error) {
       toast.error(res.error);
     } else {
-      setResult({ imported: res.imported, duplicates: res.duplicates });
+      setResult({ imported: res.imported, duplicates: res.duplicates, companies: uniqueCompanies });
       toast.success(`Importati ${res.imported} contatti`);
       onImported();
     }
@@ -247,10 +249,16 @@ export function ImportCSVModal({ open, onClose, onImported }: Props) {
                   <CheckCircle2 className="h-5 w-5" />
                   <span className="font-semibold">{result.imported} contatti importati</span>
                 </div>
+                {(result.companies ?? 0) > 0 && (
+                  <div className="flex items-center gap-2 text-blue-600">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span className="text-sm">{result.companies} aziende create/collegate automaticamente</span>
+                  </div>
+                )}
                 {result.duplicates > 0 && (
                   <div className="flex items-center gap-2 text-yellow-600">
                     <AlertCircle className="h-5 w-5" />
-                    <span>{result.duplicates} duplicati saltati</span>
+                    <span>{result.duplicates} duplicati saltati (email già presente)</span>
                   </div>
                 )}
               </div>
