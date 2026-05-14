@@ -5,7 +5,7 @@ import { createColumnHelper, useReactTable, getCoreRowModel, getSortedRowModel, 
 import { ArrowUpDown, Pencil, Trash2, ToggleLeft, ToggleRight, Package } from "lucide-react";
 import { toast } from "sonner";
 import { deleteProduct, toggleProductActive } from "@/server/actions/products";
-import { PREDEFINED_BILLING_TYPES } from "@/server/actions/billing-types";
+import { PREDEFINED_BILLING_TYPES } from "@/types/billing-types";
 import type { Product, ProductCategory } from "@/types/products";
 
 const CATEGORY_LABELS: Record<ProductCategory, string> = {

@@ -4,12 +4,8 @@ import { useEffect, useState } from "react";
 import { Plus, Trash2, Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  getCustomBillingTypes,
-  saveCustomBillingTypes,
-  PREDEFINED_BILLING_TYPES,
-  type CustomBillingType,
-} from "@/server/actions/billing-types";
+import { getCustomBillingTypes, saveCustomBillingTypes } from "@/server/actions/billing-types";
+import { PREDEFINED_BILLING_TYPES, type CustomBillingType } from "@/types/billing-types";
 
 const inputCls = "w-full rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] bg-transparent";
 
@@ -21,10 +17,10 @@ export function BillingTypesManager() {
   const [newPeriod, setNewPeriod] = useState("");
 
   useEffect(() => {
-    getCustomBillingTypes().then((types) => {
-      setCustomTypes(types);
-      setLoading(false);
-    });
+    getCustomBillingTypes()
+      .then((types) => setCustomTypes(types))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   async function handleAdd() {

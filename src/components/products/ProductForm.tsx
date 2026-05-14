@@ -9,7 +9,8 @@ import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { createProduct, updateProduct } from "@/server/actions/products";
-import { getCustomBillingTypes, PREDEFINED_BILLING_TYPES, type CustomBillingType } from "@/server/actions/billing-types";
+import { getCustomBillingTypes } from "@/server/actions/billing-types";
+import { PREDEFINED_BILLING_TYPES, type CustomBillingType } from "@/types/billing-types";
 import type { Product, ProductCategory } from "@/types/products";
 
 const schema = z.object({
