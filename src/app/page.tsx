@@ -36,6 +36,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { PipelyAppIcon, PipelyWordmark } from "@/components/shared/PipelyLogo";
+import { KanbanPreview } from "@/components/marketing/KanbanPreview";
 
 const features = [
   {
@@ -328,45 +329,9 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Dashboard mockup */}
+        {/* Dashboard mockup animato */}
         <div className="relative mx-auto mt-20 max-w-5xl">
-          <div className="rounded-2xl border border-white/10 bg-slate-800/60 p-1 shadow-2xl shadow-black/40 backdrop-blur-sm">
-            <div className="rounded-xl bg-slate-900 p-4">
-              <div className="mb-4 flex items-center gap-3">
-                <div className="flex gap-1.5">
-                  <div className="h-3 w-3 rounded-full bg-red-500/60" />
-                  <div className="h-3 w-3 rounded-full bg-yellow-500/60" />
-                  <div className="h-3 w-3 rounded-full bg-green-500/60" />
-                </div>
-                <div className="h-6 flex-1 rounded-md bg-slate-700/50" />
-              </div>
-              <div className="grid grid-cols-4 gap-3">
-                {[
-                  { label: "Lead", color: "bg-slate-600", deals: [85, 60, 75] },
-                  { label: "Qualificato", color: "bg-blue-600", deals: [90, 50] },
-                  { label: "Proposta", color: "bg-violet-600", deals: [70, 80, 55] },
-                  { label: "Chiuso ✓", color: "bg-teal-600", deals: [65, 95] },
-                ].map((col) => (
-                  <div key={col.label} className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className={`h-2 w-2 rounded-full ${col.color}`} />
-                      <span className="text-xs font-medium text-slate-400">{col.label}</span>
-                    </div>
-                    {col.deals.map((w, i) => (
-                      <div key={i} className="rounded-lg bg-slate-700/60 p-2.5 border border-slate-600/30">
-                        <div className="mb-1.5 h-2 rounded bg-slate-500/60" style={{ width: `${w}%` }} />
-                        <div className="h-1.5 w-1/2 rounded bg-slate-600/60" />
-                        <div className="mt-2 flex items-center justify-between">
-                          <div className="h-4 w-4 rounded-full bg-blue-500/50" />
-                          <div className="h-1.5 w-8 rounded bg-teal-500/50" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <KanbanPreview />
           <div className="absolute -bottom-10 left-1/2 h-32 w-3/4 -translate-x-1/2 rounded-full bg-blue-600/20 blur-3xl" />
         </div>
       </section>
