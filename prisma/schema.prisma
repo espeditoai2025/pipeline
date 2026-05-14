@@ -19,7 +19,17 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Business details
+  website   String?
+  phone     String?
+  vatNumber String?
+  address   String?
+  city      String?
+  country   String?
+  sector    String?
+
   users          User[]
+  invitations    Invitation[]
   pipelines      Pipeline[]
   deals          Deal[]
   contacts       Contact[]
@@ -33,6 +43,18 @@ model Organization {
   emailLists     EmailList[]
   emailCampaigns EmailCampaign[]
   smtpConfig     SmtpConfig?
+}
+
+model Invitation {
+  id             String       @id @default(cuid())
+  email          String
+  role           Role         @default(SALES)
+  token          String       @unique
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  expiresAt      DateTime
+  createdAt      DateTime     @default(now())
+  acceptedAt     DateTime?
 }
 
 enum Plan {

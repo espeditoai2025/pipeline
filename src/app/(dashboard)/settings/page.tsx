@@ -6,15 +6,19 @@ import {
   User, Shield, CreditCard, Sliders, Building2, Mail,
   Save, Loader2, Eye, EyeOff, Plus, Trash2,
   CheckCircle2, Clock, Key, Users, LogOut,
-  Smartphone, Monitor, Package, Briefcase, Activity,
-  Zap, BarChart3,
+  Monitor, Package, Briefcase, Activity,
+  Zap, BarChart3, Send, X, ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { getOrgData, updateOrgName, getTeamMembers, getUsageStats } from "@/server/actions/settings";
+import {
+  getOrgData, updateOrgDetails, getTeamMembers, getUsageStats,
+  inviteTeamMember, getInvitations, revokeInvitation, removeMember, updateMemberRole,
+} from "@/server/actions/settings";
 import { getSmtpConfig } from "@/server/actions/smtp";
 import { SmtpWizard } from "@/components/settings/SmtpWizard";
 import type { SmtpConfigPublic } from "@/server/actions/smtp";
+type Role = "OWNER" | "ADMIN" | "MANAGER" | "SALES" | "VIEWER";
 
 type Tab = "profile" | "security" | "billing" | "preferences" | "organization" | "email";
 
@@ -43,9 +47,11 @@ const PLANS = [
 ];
 
 const ROLE_LABELS: Record<string, string> = {
-  ADMIN: "Admin", MANAGER: "Manager", SALES: "Sales", VIEWER: "Viewer",
+  OWNER: "Owner", ADMIN: "Admin", MANAGER: "Manager", SALES: "Sales", VIEWER: "Viewer",
 };
+const ASSIGNABLE_ROLES: Role[] = ["ADMIN", "MANAGER", "SALES", "VIEWER"];
 const ROLE_COLORS: Record<string, string> = {
+  OWNER: "bg-yellow-100 text-yellow-700",
   ADMIN: "bg-purple-100 text-purple-700",
   MANAGER: "bg-blue-100 text-blue-700",
   SALES: "bg-green-100 text-green-700",
@@ -92,6 +98,7 @@ const inputCls = "w-full rounded-lg border border-[var(--crm-neutral-100)] px-3 
 type OrgData = Awaited<ReturnType<typeof getOrgData>>;
 type Members = Awaited<ReturnType<typeof getTeamMembers>>;
 type Usage = Awaited<ReturnType<typeof getUsageStats>>;
+type Invitations = Awaited<ReturnType<typeof getInvitations>>;
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>("profile");
@@ -120,19 +127,44 @@ export default function SettingsPage() {
 
   // Org — real data
   const [orgData, setOrgData] = useState<OrgData>(null);
-  const [orgName, setOrgName] = useState("");
+  const [orgDetails, setOrgDetails] = useState({
+    name: "", website: "", phone: "", vatNumber: "",
+    address: "", city: "", country: "", sector: "",
+  });
   const [savingOrg, setSavingOrg] = useState(false);
   const [members, setMembers] = useState<Members>([]);
   const [usage, setUsage] = useState<Usage>(null);
+
+  // Invitations
+  const [invitations, setInvitations] = useState<Invitations>([]);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<Role>("SALES");
+  const [sendingInvite, setSendingInvite] = useState(false);
+  const [generatedInviteLink, setGeneratedInviteLink] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
 
   // SMTP
   const [smtpConfig, setSmtpConfig] = useState<SmtpConfigPublic | null>(null);
   const [smtpLoaded, setSmtpLoaded] = useState(false);
 
   useEffect(() => {
-    getOrgData().then((d) => { setOrgData(d); if (d) setOrgName(d.name); });
+    getOrgData().then((d) => {
+      setOrgData(d);
+      if (d) setOrgDetails({
+        name: d.name ?? "",
+        website: d.website ?? "",
+        phone: d.phone ?? "",
+        vatNumber: d.vatNumber ?? "",
+        address: d.address ?? "",
+        city: d.city ?? "",
+        country: d.country ?? "",
+        sector: d.sector ?? "",
+      });
+    });
     getTeamMembers().then(setMembers);
     getUsageStats().then(setUsage);
+    getInvitations().then(setInvitations);
     getSmtpConfig().then((c) => { setSmtpConfig(c); setSmtpLoaded(true); });
   }, []);
 
@@ -145,10 +177,45 @@ export default function SettingsPage() {
 
   async function handleSaveOrg() {
     setSavingOrg(true);
-    const res = await updateOrgName(orgName);
+    const res = await updateOrgDetails(orgDetails);
     setSavingOrg(false);
     if (res.error) toast.error(res.error);
-    else { setOrgData((d) => d ? { ...d, name: orgName } : d); toast.success("Organizzazione aggiornata"); }
+    else { setOrgData((d) => d ? { ...d, ...orgDetails } : d); toast.success("Organizzazione aggiornata"); }
+  }
+
+  async function handleSendInvite() {
+    if (!inviteEmail.trim()) { toast.error("Inserisci un'email"); return; }
+    setSendingInvite(true);
+    const res = await inviteTeamMember(inviteEmail.trim(), inviteRole);
+    setSendingInvite(false);
+    if (res.error) { toast.error(res.error); return; }
+    const link = `${window.location.origin}/register?invite=${res.token}`;
+    setGeneratedInviteLink(link);
+    setInviteEmail("");
+    toast.success("Invito creato!");
+    getInvitations().then(setInvitations);
+  }
+
+  async function handleRevokeInvite(id: string) {
+    const res = await revokeInvitation(id);
+    if (res.error) toast.error(res.error);
+    else { setInvitations((arr) => arr.filter((i) => i.id !== id)); toast.success("Invito revocato"); }
+  }
+
+  async function handleRemoveMember(id: string) {
+    setRemovingId(id);
+    const res = await removeMember(id);
+    setRemovingId(null);
+    if (res.error) toast.error(res.error);
+    else { setMembers((arr) => arr.filter((m) => m.id !== id)); toast.success("Membro rimosso"); }
+  }
+
+  async function handleUpdateRole(id: string, role: Role) {
+    setUpdatingRoleId(id);
+    const res = await updateMemberRole(id, role);
+    setUpdatingRoleId(null);
+    if (res.error) toast.error(res.error);
+    else { setMembers((arr) => arr.map((m) => m.id === id ? { ...m, role } : m)); toast.success("Ruolo aggiornato"); }
   }
 
   function handleGenerateKey() {
@@ -489,12 +556,51 @@ export default function SettingsPage() {
           {/* ── ORGANIZZAZIONE ── */}
           {tab === "organization" && (
             <div className="space-y-4">
+              {/* Dettagli aziendali */}
               <div className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] p-6 space-y-4">
                 <h2 className="text-base font-semibold">Dettagli organizzazione</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium mb-1">Nome organizzazione</label>
-                    <input value={orgName} onChange={(e) => setOrgName(e.target.value)} className={inputCls} />
+                    <label className="block text-sm font-medium mb-1">Nome organizzazione *</label>
+                    <input value={orgDetails.name} onChange={(e) => setOrgDetails(d => ({ ...d, name: e.target.value }))} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Sito web</label>
+                    <input value={orgDetails.website} onChange={(e) => setOrgDetails(d => ({ ...d, website: e.target.value }))} placeholder="https://esempio.it" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Telefono</label>
+                    <input value={orgDetails.phone} onChange={(e) => setOrgDetails(d => ({ ...d, phone: e.target.value }))} placeholder="+39 02 1234567" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Partita IVA</label>
+                    <input value={orgDetails.vatNumber} onChange={(e) => setOrgDetails(d => ({ ...d, vatNumber: e.target.value }))} placeholder="IT12345678901" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Settore</label>
+                    <input value={orgDetails.sector} onChange={(e) => setOrgDetails(d => ({ ...d, sector: e.target.value }))} placeholder="es. SaaS, Manifatturiero, Consulenza" className={inputCls} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium mb-1">Indirizzo</label>
+                    <input value={orgDetails.address} onChange={(e) => setOrgDetails(d => ({ ...d, address: e.target.value }))} placeholder="Via Roma 1" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Città</label>
+                    <input value={orgDetails.city} onChange={(e) => setOrgDetails(d => ({ ...d, city: e.target.value }))} placeholder="Milano" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Paese</label>
+                    <select value={orgDetails.country} onChange={(e) => setOrgDetails(d => ({ ...d, country: e.target.value }))} className={inputCls}>
+                      <option value="">Seleziona...</option>
+                      <option value="IT">Italia</option>
+                      <option value="DE">Germania</option>
+                      <option value="FR">Francia</option>
+                      <option value="ES">Spagna</option>
+                      <option value="GB">Regno Unito</option>
+                      <option value="US">Stati Uniti</option>
+                      <option value="CH">Svizzera</option>
+                      <option value="AT">Austria</option>
+                    </select>
                   </div>
                   {orgData && (
                     <>
@@ -506,19 +612,84 @@ export default function SettingsPage() {
                         <label className="block text-sm font-medium mb-1">Piano</label>
                         <input value={PLAN_LABELS[orgData.plan] ?? orgData.plan} disabled className={`${inputCls} opacity-50 cursor-not-allowed`} />
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Membro dal</label>
-                        <input value={new Date(orgData.createdAt).toLocaleDateString("it-IT")} disabled className={`${inputCls} opacity-50 cursor-not-allowed`} />
-                      </div>
                     </>
                   )}
                 </div>
                 <Button onClick={handleSaveOrg} disabled={savingOrg} className="bg-[var(--crm-primary)] hover:bg-[var(--crm-primary-dark)] text-white">
                   {savingOrg ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                  Salva
+                  Salva modifiche
                 </Button>
               </div>
 
+              {/* Invita collaboratori */}
+              <div className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] p-6 space-y-4">
+                <h2 className="text-base font-semibold flex items-center gap-2">
+                  <Send className="h-4 w-4 text-[var(--crm-primary)]" /> Invita collaboratori
+                </h2>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSendInvite()}
+                    placeholder="email@esempio.it"
+                    type="email"
+                    className={`${inputCls} flex-1`}
+                  />
+                  <select
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value as Role)}
+                    className={`${inputCls} sm:w-36`}
+                  >
+                    {ASSIGNABLE_ROLES.map((r) => (
+                      <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                    ))}
+                  </select>
+                  <Button onClick={handleSendInvite} disabled={sendingInvite} className="bg-[var(--crm-primary)] hover:bg-[var(--crm-primary-dark)] text-white whitespace-nowrap">
+                    {sendingInvite ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                    <span className="ml-1.5">Invia invito</span>
+                  </Button>
+                </div>
+
+                {generatedInviteLink && (
+                  <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/20 px-3 py-2.5 space-y-1.5">
+                    <p className="text-xs font-semibold text-green-700 flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Link di invito generato — condividilo!
+                    </p>
+                    <code className="block text-xs font-mono text-green-800 break-all">{generatedInviteLink}</code>
+                    <div className="flex gap-3">
+                      <button onClick={() => { navigator.clipboard.writeText(generatedInviteLink); toast.success("Link copiato!"); }} className="text-xs text-green-600 hover:underline">Copia link</button>
+                      <button onClick={() => setGeneratedInviteLink(null)} className="text-xs text-green-600 hover:underline">Chiudi</button>
+                    </div>
+                  </div>
+                )}
+
+                {invitations.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-[var(--crm-neutral-500)] mb-2">Inviti in sospeso</p>
+                    <div className="space-y-1.5">
+                      {invitations.map((inv) => (
+                        <div key={inv.id} className="flex items-center gap-3 rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{inv.email}</p>
+                            <p className="text-xs text-[var(--crm-neutral-400)]">
+                              Scade {new Date(inv.expiresAt).toLocaleDateString("it-IT")} · {ROLE_LABELS[inv.role] ?? inv.role}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => handleRevokeInvite(inv.id)}
+                            className="text-[var(--crm-neutral-400)] hover:text-[var(--crm-danger)] transition-colors flex-shrink-0"
+                            title="Revoca invito"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Membri del team */}
               <div className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] p-6 space-y-3">
                 <div className="flex items-center justify-between">
                   <h2 className="text-base font-semibold flex items-center gap-2">
@@ -530,25 +701,57 @@ export default function SettingsPage() {
                   <p className="text-sm text-[var(--crm-neutral-500)] py-2">Caricamento...</p>
                 ) : (
                   <div className="divide-y divide-[var(--crm-neutral-100)]">
-                    {members.map((m) => (
-                      <div key={m.id} className="flex items-center gap-3 py-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--crm-primary)]/10 text-sm font-bold text-[var(--crm-primary)] flex-shrink-0">
-                          {(m.name ?? m.email).split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
+                    {members.map((m) => {
+                      const isMe = m.email === session?.user?.email;
+                      const myRole = members.find(mb => mb.email === session?.user?.email)?.role;
+                      const canManage = (myRole === "OWNER" || myRole === "ADMIN") && !isMe && m.role !== "OWNER";
+                      const canChangeRole = myRole === "OWNER" && !isMe && m.role !== "OWNER";
+                      return (
+                        <div key={m.id} className="flex items-center gap-3 py-3">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--crm-primary)]/10 text-sm font-bold text-[var(--crm-primary)] flex-shrink-0">
+                            {(m.name ?? m.email).split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium">{m.name ?? "—"} {isMe && <span className="text-xs text-[var(--crm-neutral-400)]">(tu)</span>}</p>
+                            <p className="text-xs text-[var(--crm-neutral-500)]">{m.email}</p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {canChangeRole ? (
+                              <div className="relative">
+                                <select
+                                  value={m.role}
+                                  onChange={(e) => handleUpdateRole(m.id, e.target.value as Role)}
+                                  disabled={updatingRoleId === m.id}
+                                  className="rounded-full text-xs font-medium px-2 py-0.5 border border-[var(--crm-neutral-200)] bg-white appearance-none pr-5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-[var(--crm-primary)]"
+                                >
+                                  {ASSIGNABLE_ROLES.map((r) => (
+                                    <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                                  ))}
+                                </select>
+                                <ChevronDown className="h-3 w-3 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--crm-neutral-400)]" />
+                              </div>
+                            ) : (
+                              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_COLORS[m.role] ?? "bg-gray-100 text-gray-600"}`}>
+                                {ROLE_LABELS[m.role] ?? m.role}
+                              </span>
+                            )}
+                            <span className="text-xs text-[var(--crm-neutral-400)] hidden sm:flex items-center gap-1">
+                              <Clock className="h-3 w-3" /> {timeAgo(m.createdAt.toISOString())}
+                            </span>
+                            {canManage && (
+                              <button
+                                onClick={() => handleRemoveMember(m.id)}
+                                disabled={removingId === m.id}
+                                className="text-[var(--crm-neutral-400)] hover:text-[var(--crm-danger)] transition-colors"
+                                title="Rimuovi membro"
+                              >
+                                {removingId === m.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium">{m.name ?? "—"}</p>
-                          <p className="text-xs text-[var(--crm-neutral-500)]">{m.email}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_COLORS[m.role] ?? "bg-gray-100 text-gray-600"}`}>
-                            {ROLE_LABELS[m.role] ?? m.role}
-                          </span>
-                          <span className="text-xs text-[var(--crm-neutral-400)] hidden sm:flex items-center gap-1">
-                            <Clock className="h-3 w-3" /> {timeAgo(m.createdAt.toISOString())}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
