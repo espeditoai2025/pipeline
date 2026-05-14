@@ -58,21 +58,6 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
   const [lostReason, setLostReason] = useState("");
   const [isClosing, setIsClosing] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-    getContacts().then((cs) =>
-      setContacts(cs.map((c) => ({
-        id: c.id,
-        firstName: c.firstName,
-        lastName: c.lastName,
-        email: c.email,
-        companyName: (c as { company?: { name: string } | null }).company?.name ?? null,
-      })))
-    );
-    getProducts().then((ps) => setProducts(ps.filter((p) => p.isActive)));
-    if (!isEditing) setSelectedProducts([]);
-  }, [open, isEditing]);
-
   const {
     register,
     handleSubmit,
@@ -98,6 +83,42 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
           contactId: "",
         },
   });
+
+  useEffect(() => {
+    if (!open) return;
+    getContacts().then((cs) =>
+      setContacts(cs.map((c) => ({
+        id: c.id,
+        firstName: c.firstName,
+        lastName: c.lastName,
+        email: c.email,
+        companyName: (c as { company?: { name: string } | null }).company?.name ?? null,
+      })))
+    );
+    getProducts().then((ps) => setProducts(ps.filter((p) => p.isActive)));
+    if (deal) {
+      reset({
+        title: deal.title,
+        value: deal.value,
+        currency: deal.currency,
+        stageId: deal.stageId,
+        expectedClose: deal.expectedClose?.slice(0, 10) ?? "",
+        contactId: deal.contact?.id ?? "",
+      });
+    } else {
+      reset({
+        title: "",
+        value: 0,
+        currency: "EUR",
+        stageId: defaultStageId ?? stages[0]?.id ?? "",
+        expectedClose: "",
+        contactId: "",
+      });
+      setSelectedProducts([]);
+    }
+    setClosingAs(null);
+    setLostReason("");
+  }, [open, deal, reset, defaultStageId, stages]);
 
   function handleAddProduct() {
     const prod = products.find((p) => p.id === pickedProductId);
