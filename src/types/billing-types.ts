@@ -1,4 +1,5 @@
 export type CustomBillingType = { id: string; name: string; period?: string };
+export type CustomProductCategory = { id: string; name: string; color?: string };
 
 export const PREDEFINED_BILLING_TYPES: {
   id: string;

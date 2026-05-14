@@ -1,4 +1,4 @@
-export type ProductCategory = "SOFTWARE" | "HARDWARE" | "SERVICE" | "SUPPORT" | "LICENSE" | "SAAS" | "WEBSITE" | "AI_AGENT" | "OTHER";
+export type ProductCategory = "SOFTWARE" | "HARDWARE" | "SERVICE" | "SUPPORT" | "LICENSE" | "SAAS" | "WEBSITE" | "AI_AGENT" | "OTHER" | (string & {});
 
 export type Product = {
   id: string;

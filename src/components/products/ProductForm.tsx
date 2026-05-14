@@ -9,15 +9,15 @@ import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { createProduct, updateProduct } from "@/server/actions/products";
-import { getCustomBillingTypes } from "@/server/actions/billing-types";
-import { PREDEFINED_BILLING_TYPES, type CustomBillingType } from "@/types/billing-types";
-import type { Product, ProductCategory } from "@/types/products";
+import { getCustomBillingTypes, getCustomProductCategories } from "@/server/actions/billing-types";
+import { PREDEFINED_BILLING_TYPES, type CustomBillingType, type CustomProductCategory } from "@/types/billing-types";
+import type { Product } from "@/types/products";
 
 const schema = z.object({
   name: z.string().min(1, "Nome obbligatorio"),
   code: z.string().min(1, "Codice obbligatorio"),
   description: z.string().optional(),
-  category: z.enum(["SOFTWARE", "HARDWARE", "SERVICE", "SUPPORT", "LICENSE", "SAAS", "WEBSITE", "AI_AGENT", "OTHER"]),
+  category: z.string().min(1, "Categoria obbligatoria"),
   unitPrice: z.number().min(0),
   currency: z.string().min(1),
   taxRate: z.number().min(0).max(100),
@@ -26,7 +26,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-const CATEGORIES: { value: ProductCategory; label: string }[] = [
+const PREDEFINED_CATEGORIES: { value: string; label: string }[] = [
   { value: "SOFTWARE",  label: "Software" },
   { value: "HARDWARE",  label: "Hardware" },
   { value: "SERVICE",   label: "Servizio" },
@@ -63,9 +63,10 @@ const defaultValues: FormValues = {
 export function ProductForm({ open, onClose, product, onSaved }: Props) {
   const isEditing = !!product;
   const [billingType, setBillingType] = useState<string>("one_time");
-  const [customTypes, setCustomTypes] = useState<CustomBillingType[]>([]);
+  const [customBillingTypes, setCustomBillingTypes] = useState<CustomBillingType[]>([]);
+  const [customCategories, setCustomCategories] = useState<CustomProductCategory[]>([]);
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: product
       ? {
@@ -80,6 +81,8 @@ export function ProductForm({ open, onClose, product, onSaved }: Props) {
         }
       : defaultValues,
   });
+
+  const selectedCategory = watch("category");
 
   useEffect(() => {
     if (open) {
@@ -97,13 +100,23 @@ export function ProductForm({ open, onClose, product, onSaved }: Props) {
         : defaultValues
       );
       setBillingType(getBillingTypeFromProduct(product));
-      getCustomBillingTypes().then(setCustomTypes);
+      Promise.all([getCustomBillingTypes(), getCustomProductCategories()])
+        .then(([bt, cats]) => {
+          setCustomBillingTypes(bt);
+          setCustomCategories(cats);
+        })
+        .catch(() => {});
     }
   }, [open, product, reset]);
 
   const allBillingTypes = [
     ...PREDEFINED_BILLING_TYPES,
-    ...customTypes.map((ct) => ({ id: ct.id, name: ct.name, description: ct.period ?? "Personalizzato", isRecurring: true })),
+    ...customBillingTypes.map((ct) => ({ id: ct.id, name: ct.name, description: ct.period ?? "Personalizzato", isRecurring: true })),
+  ];
+
+  const allCategories = [
+    ...PREDEFINED_CATEGORIES,
+    ...customCategories.map((c) => ({ value: c.id, label: c.name })),
   ];
 
   async function onSubmit(data: FormValues) {
@@ -158,13 +171,24 @@ export function ProductForm({ open, onClose, product, onSaved }: Props) {
               <textarea {...register("description")} rows={2} className={`${inputCls} resize-none`} placeholder="Descrizione opzionale..." />
             </div>
 
+            {/* Categoria */}
             <div>
               <label className="block text-sm font-medium mb-2">Categoria</label>
               <div className="grid grid-cols-3 gap-2">
-                {CATEGORIES.map(({ value, label }) => (
+                {allCategories.map(({ value, label }) => (
                   <label key={value} className="cursor-pointer">
-                    <input {...register("category")} type="radio" value={value} className="sr-only peer" />
-                    <div className="rounded-lg border-2 border-[var(--crm-neutral-100)] p-2 text-xs font-medium text-center transition-colors peer-checked:border-[var(--crm-primary)] peer-checked:bg-[var(--crm-primary)]/5 hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/5">
+                    <input
+                      type="radio"
+                      value={value}
+                      checked={selectedCategory === value}
+                      onChange={() => setValue("category", value, { shouldValidate: true })}
+                      className="sr-only"
+                    />
+                    <div className={`rounded-lg border-2 p-2 text-xs font-medium text-center transition-colors ${
+                      selectedCategory === value
+                        ? "border-[var(--crm-primary)] bg-[var(--crm-primary)]/5 text-[var(--crm-primary)]"
+                        : "border-[var(--crm-neutral-100)] hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/5"
+                    }`}>
                       {label}
                     </div>
                   </label>

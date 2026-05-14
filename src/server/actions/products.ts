@@ -56,7 +56,7 @@ const productSchema = z.object({
   name: z.string().min(1, "Nome obbligatorio"),
   code: z.string().min(1, "Codice obbligatorio"),
   description: z.string().optional(),
-  category: z.enum(["SOFTWARE", "HARDWARE", "SERVICE", "SUPPORT", "LICENSE", "SAAS", "WEBSITE", "AI_AGENT", "OTHER"]),
+  category: z.string().min(1, "Categoria obbligatoria"),
   unitPrice: z.number().min(0, "Prezzo non valido"),
   currency: z.string().min(1),
   taxRate: z.number().min(0).max(100),

@@ -8,14 +8,14 @@ import { deleteProduct, toggleProductActive } from "@/server/actions/products";
 import { PREDEFINED_BILLING_TYPES } from "@/types/billing-types";
 import type { Product, ProductCategory } from "@/types/products";
 
-const CATEGORY_LABELS: Record<ProductCategory, string> = {
+const CATEGORY_LABELS: Record<string, string> = {
   SOFTWARE: "Software", HARDWARE: "Hardware", SERVICE: "Servizio",
   SUPPORT: "Supporto", LICENSE: "Licenza",
   SAAS: "SaaS", WEBSITE: "Sito Web", AI_AGENT: "Agenti AI",
   OTHER: "Altro",
 };
 
-const CATEGORY_COLORS: Record<ProductCategory, string> = {
+const CATEGORY_COLORS: Record<string, string> = {
   SOFTWARE:  "bg-blue-100 text-blue-700",
   HARDWARE:  "bg-orange-100 text-orange-700",
   SERVICE:   "bg-purple-100 text-purple-700",
@@ -26,6 +26,13 @@ const CATEGORY_COLORS: Record<ProductCategory, string> = {
   AI_AGENT:  "bg-pink-100 text-pink-700",
   OTHER:     "bg-gray-100 text-gray-600",
 };
+
+function getCategoryLabel(cat: string): string {
+  return CATEGORY_LABELS[cat] ?? cat;
+}
+function getCategoryColor(cat: string): string {
+  return CATEGORY_COLORS[cat] ?? "bg-violet-100 text-violet-700";
+}
 
 function getBillingLabel(product: Product): string {
   if (!product.isSubscription) return "Una tantum";
@@ -68,8 +75,8 @@ export function ProductsTable({ products, onEdit, onDeleted, onToggled }: Props)
     helper.accessor("category", {
       header: "Categoria",
       cell: ({ getValue }) => (
-        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${CATEGORY_COLORS[getValue()]}`}>
-          {CATEGORY_LABELS[getValue()]}
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getCategoryColor(getValue())}`}>
+          {getCategoryLabel(getValue())}
         </span>
       ),
     }),

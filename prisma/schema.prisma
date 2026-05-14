@@ -29,7 +29,8 @@ model Organization {
   sector    String?
 
   // Custom billing types defined by the org
-  customBillingTypes Json?
+  customBillingTypes      Json?
+  customProductCategories Json?
 
   users          User[]
   invitations    Invitation[]
