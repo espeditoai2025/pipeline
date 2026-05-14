@@ -78,6 +78,10 @@ model User {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt      DateTime     @default(now())
 
+  googleCalendarToken        String?
+  googleCalendarRefreshToken String?
+  googleCalendarTokenExpiry  DateTime?
+
   ownedDeals     Deal[]         @relation("DealOwner")
   ownedContacts  Contact[]      @relation("ContactOwner")
   ownedLeads     Lead[]         @relation("LeadOwner")
