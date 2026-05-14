@@ -1134,6 +1134,22 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         { type: "para", text: "Quando crei o modifichi un prodotto, i tipi personalizzati appaiono in fondo alla griglia dei tipi di fatturazione, esattamente come i tipi predefiniti." },
         { type: "tip", text: "I tipi personalizzati sono ricorrenti per default: il prodotto verrà marcato come abbonamento ricorrente con il periodo che hai specificato." },
       ]},
+      { id: "pr8", title: "Categorie prodotto personalizzate", excerpt: "Aggiungi categorie su misura (es. Formazione, Energia, Consulenza AI) oltre alle 9 predefinite.", readTime: 2, blocks: [
+        { type: "heading", text: "Categorie predefinite (non rimovibili)" },
+        { type: "list", items: [
+          "Software, Hardware, Servizio, Supporto, Licenza, SaaS, Sito Web, Agenti AI, Altro",
+        ]},
+        { type: "heading", text: "Aggiungere una categoria personalizzata" },
+        { type: "steps", items: [
+          "Vai su Impostazioni → Prezzi",
+          "Nella sezione \"Categorie prodotto\" digita il nome della nuova categoria",
+          "Premi Invio o clicca il pulsante +",
+          "La categoria appare subito nel form di creazione prodotto",
+        ]},
+        { type: "heading", text: "Come appaiono nel catalogo" },
+        { type: "para", text: "Le categorie personalizzate sono selezionabili nella griglia categoria del form prodotto, esattamente come le predefinite. Nella tabella prodotti appaiono con un badge colorato." },
+        { type: "tip", text: "Per rimuovere una categoria personalizzata clicca l'icona cestino accanto al chip. Attenzione: i prodotti già associati a quella categoria la mantengono nel database — cambierà solo la visualizzazione del label." },
+      ]},
     ],
   },
   {

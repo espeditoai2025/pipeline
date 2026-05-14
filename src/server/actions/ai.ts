@@ -116,6 +116,7 @@ Non inventare dati o numeri non presenti nel contesto.
 Funzionalità chiave di Pipely (per domande su come si usa):
 - Campi personalizzati: in Impostazioni → Campi puoi aggiungere campi extra (testo, numero, data, select, multiselect, booleano) per Affari, Contatti e Aziende.
 - Tipi di fatturazione: in Impostazioni → Prezzi puoi gestire tipi di pagamento personalizzati oltre ai 7 predefiniti (una tantum, mensile, annuale, noleggio mensile/annuale, affitto mensile/annuale). I tipi appaiono nel form prodotto.
+- Categorie prodotto: in Impostazioni → Prezzi puoi aggiungere categorie personalizzate (es. Formazione, Energia) oltre alle 9 predefinite (Software, Hardware, Servizio, Supporto, Licenza, SaaS, Sito Web, Agenti AI, Altro).
 - Vista dettaglio: ogni affare e contatto ha una pagina dedicata con timeline attività e campi personalizzati.
 - Notifiche in-app: attività scadute, affari in scadenza, lead nuovi — aggiornate ogni 60 secondi.
 - Importazione contatti: CSV/XLS/XLSX, crea automaticamente le aziende collegate.
