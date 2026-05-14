@@ -6,10 +6,10 @@ export const metadata: Metadata = {
   description: "Chiudi più affari con Pipely: CRM per team italiani con pipeline Kanban, contatti, campagne email, workflow automatizzati e AI Assistant integrato. Inizia gratis.",
   alternates: { canonical: "https://www.pipely.it" },
   openGraph: {
-    title: "Pipely — Chiudi più affari, lavora meno",
+    title: "Pipely — CRM italiano con AI, pipeline e automazioni",
     description: "CRM italiano con AI Assistant, pipeline Kanban, automazioni reali e campagne email. Gratis per sempre nel piano Starter.",
     url: "https://www.pipely.it",
-    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Pipely CRM — dashboard" }],
+    images: [{ url: "https://www.pipely.it/og-image.png", width: 1200, height: 630, alt: "Pipely CRM — dashboard" }],
   },
 };
 import {
