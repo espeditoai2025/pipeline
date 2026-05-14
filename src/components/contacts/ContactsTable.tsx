@@ -68,7 +68,9 @@ export function ContactsTable({ initialContacts, companies }: Props) {
             {row.original.firstName[0]}{row.original.lastName?.[0] ?? ""}
           </div>
           <div>
-            <p className="font-medium text-sm">{row.original.firstName} {row.original.lastName}</p>
+            <a href={`/contacts/${row.original.id}`} className="font-medium text-sm hover:text-[var(--crm-primary)] hover:underline">
+              {row.original.firstName} {row.original.lastName}
+            </a>
             {row.original.jobTitle && <p className="text-xs text-[var(--crm-neutral-500)]">{row.original.jobTitle}</p>}
           </div>
         </div>

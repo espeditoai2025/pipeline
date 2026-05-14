@@ -86,6 +86,74 @@ export async function getCompanies(): Promise<Company[]> {
   }));
 }
 
+export async function getContactDetail(id: string) {
+  const session = await auth();
+  const orgId = getOrgId(session);
+  if (!orgId) return null;
+
+  const contact = await db.contact.findFirst({
+    where: { id, organizationId: orgId },
+    include: {
+      owner: { select: { id: true, name: true, email: true } },
+      company: { select: { id: true, name: true, website: true, industry: true } },
+      deals: {
+        orderBy: { createdAt: "desc" },
+        include: { stage: { select: { id: true, name: true } } },
+      },
+      activities: {
+        orderBy: { createdAt: "desc" },
+        include: { user: { select: { id: true, name: true, email: true } } },
+      },
+      customValues: { include: { field: true } },
+    },
+  });
+
+  if (!contact) return null;
+
+  return {
+    id: contact.id,
+    firstName: contact.firstName,
+    lastName: contact.lastName ?? null,
+    email: contact.email ?? null,
+    phone: contact.phone ?? null,
+    jobTitle: contact.jobTitle ?? null,
+    organizationId: contact.organizationId,
+    ownerId: contact.ownerId,
+    owner: contact.owner,
+    companyId: contact.companyId ?? null,
+    company: contact.company ?? null,
+    createdAt: contact.createdAt.toISOString(),
+    updatedAt: contact.updatedAt.toISOString(),
+    deals: contact.deals.map((d) => ({
+      id: d.id,
+      title: d.title,
+      value: Number(d.value),
+      currency: d.currency,
+      status: d.status,
+      stageName: d.stage?.name ?? null,
+      expectedClose: d.expectedClose?.toISOString() ?? null,
+    })),
+    activities: contact.activities.map((a) => ({
+      id: a.id,
+      type: a.type,
+      subject: a.subject,
+      notes: a.notes ?? null,
+      dueDate: a.dueDate?.toISOString() ?? null,
+      completedAt: a.completedAt?.toISOString() ?? null,
+      duration: a.duration ?? null,
+      user: a.user,
+      dealId: a.dealId ?? null,
+      createdAt: a.createdAt.toISOString(),
+    })),
+    customValues: contact.customValues.map((v) => ({
+      fieldId: v.fieldId,
+      fieldName: v.field.name,
+      fieldType: v.field.fieldType,
+      value: v.value,
+    })),
+  };
+}
+
 // ── SCHEMAS ─────────────────────────────────────────────────────────────────
 
 const contactSchema = z.object({

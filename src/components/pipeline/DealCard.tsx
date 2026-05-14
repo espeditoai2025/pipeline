@@ -2,7 +2,8 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CalendarDays, Flame, User } from "lucide-react";
+import { CalendarDays, Flame, ExternalLink } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { Deal } from "@/types/deals";
 
@@ -53,11 +54,21 @@ export function DealCard({ deal, isOverlay = false, onClick }: Props) {
     >
       {/* Rotting indicator */}
       {isRotting && (
-        <span className="absolute top-2 right-2 flex items-center gap-0.5 text-[10px] font-semibold text-[var(--crm-rotting)]">
+        <span className="absolute top-2 right-8 flex items-center gap-0.5 text-[10px] font-semibold text-[var(--crm-rotting)]">
           <Flame className="h-3 w-3" />
           {deal.daysInStage}g
         </span>
       )}
+
+      {/* Detail link */}
+      <Link
+        href={`/deals/${deal.id}`}
+        onClick={(e) => e.stopPropagation()}
+        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[var(--crm-neutral-400)] hover:text-[var(--crm-primary)]"
+        title="Apri dettaglio"
+      >
+        <ExternalLink className="h-3.5 w-3.5" />
+      </Link>
 
       {/* Title */}
       <p className="text-sm font-medium text-[var(--crm-neutral-900)] dark:text-white leading-snug pr-6 line-clamp-2">

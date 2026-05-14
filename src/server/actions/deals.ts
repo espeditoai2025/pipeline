@@ -169,6 +169,70 @@ export async function deleteDeal(dealId: string) {
   }
 }
 
+export async function getDealDetail(id: string) {
+  const session = await auth();
+  const orgId = getOrgId(session);
+  if (!orgId) return null;
+
+  const deal = await db.deal.findFirst({
+    where: { id, organizationId: orgId },
+    include: {
+      owner: { select: { id: true, name: true, email: true } },
+      contact: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
+      company: { select: { id: true, name: true, website: true } },
+      stage: { select: { id: true, name: true, position: true } },
+      activities: {
+        orderBy: { createdAt: "desc" },
+        include: { user: { select: { id: true, name: true, email: true } } },
+      },
+      customValues: { include: { field: true } },
+    },
+  });
+
+  if (!deal) return null;
+
+  return {
+    id: deal.id,
+    title: deal.title,
+    value: Number(deal.value),
+    currency: deal.currency,
+    status: deal.status,
+    expectedClose: deal.expectedClose?.toISOString() ?? null,
+    closedAt: deal.closedAt?.toISOString() ?? null,
+    lostReason: deal.lostReason ?? null,
+    stageId: deal.stageId,
+    pipelineId: deal.pipelineId,
+    organizationId: deal.organizationId,
+    ownerId: deal.ownerId,
+    owner: deal.owner,
+    contact: deal.contact
+      ? { id: deal.contact.id, firstName: deal.contact.firstName, lastName: deal.contact.lastName ?? null, email: deal.contact.email ?? null, phone: deal.contact.phone ?? null }
+      : null,
+    company: deal.company ?? null,
+    stage: deal.stage ? { id: deal.stage.id, name: deal.stage.name, position: deal.stage.position } : null,
+    createdAt: deal.createdAt.toISOString(),
+    updatedAt: deal.updatedAt.toISOString(),
+    activities: deal.activities.map((a) => ({
+      id: a.id,
+      type: a.type,
+      subject: a.subject,
+      notes: a.notes ?? null,
+      dueDate: a.dueDate?.toISOString() ?? null,
+      completedAt: a.completedAt?.toISOString() ?? null,
+      duration: a.duration ?? null,
+      user: a.user,
+      contactId: a.contactId ?? null,
+      createdAt: a.createdAt.toISOString(),
+    })),
+    customValues: deal.customValues.map((v) => ({
+      fieldId: v.fieldId,
+      fieldName: v.field.name,
+      fieldType: v.field.fieldType,
+      value: v.value,
+    })),
+  };
+}
+
 export async function getDealsForSelect(): Promise<{ id: string; title: string; value: number; currency: string }[]> {
   const session = await auth();
   if (!session) return [];
