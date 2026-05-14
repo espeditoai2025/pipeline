@@ -19,12 +19,15 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
+const BASE_URL = "https://www.pipely.it";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(BASE_URL),
   title: {
-    default: "Pipely",
+    default: "Pipely — CRM italiano con AI e automazioni",
     template: "%s | Pipely",
   },
-  description: "Gestisci le tue vendite con efficienza",
+  description: "Pipely è il CRM pensato per team italiani. Pipeline Kanban, contatti, campagne email, automazioni workflow e AI Assistant. Gratis per sempre nel piano Starter.",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: "/pipely-favicon.svg",
@@ -34,6 +37,29 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "default",
     title: "Pipely",
+  },
+  openGraph: {
+    type: "website",
+    locale: "it_IT",
+    url: BASE_URL,
+    siteName: "Pipely",
+    title: "Pipely — CRM italiano con AI e automazioni",
+    description: "Pipely è il CRM pensato per team italiani. Pipeline Kanban, contatti, campagne email, automazioni workflow e AI Assistant. Gratis per sempre nel piano Starter.",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Pipely CRM" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Pipely — CRM italiano con AI e automazioni",
+    description: "Pipeline Kanban, contatti, campagne email, automazioni e AI Assistant. Gratis nel piano Starter.",
+    images: ["/og-image.png"],
+  },
+  alternates: {
+    canonical: BASE_URL,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-snippet": -1, "max-image-preview": "large" },
   },
 };
 

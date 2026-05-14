@@ -1,4 +1,17 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Pipely — CRM italiano con AI, pipeline Kanban e automazioni",
+  description: "Chiudi più affari con Pipely: CRM per team italiani con pipeline Kanban, contatti, campagne email, workflow automatizzati e AI Assistant integrato. Inizia gratis.",
+  alternates: { canonical: "https://www.pipely.it" },
+  openGraph: {
+    title: "Pipely — Chiudi più affari, lavora meno",
+    description: "CRM italiano con AI Assistant, pipeline Kanban, automazioni reali e campagne email. Gratis per sempre nel piano Starter.",
+    url: "https://www.pipely.it",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Pipely CRM — dashboard" }],
+  },
+};
 import {
   BarChart3,
   Briefcase,
@@ -130,9 +143,67 @@ const automationSteps = [
   { trigger: "Affare segnato come Vinto 🎉", actions: ["Notifica tutto il team", "Invia email onboarding", "Crea meeting kickoff"] },
 ];
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.pipely.it/#organization",
+      name: "Pipely",
+      url: "https://www.pipely.it",
+      logo: "https://www.pipely.it/pipely-app-icon-blue.svg",
+      contactPoint: {
+        "@type": "ContactPoint",
+        email: "support@pipely.it",
+        contactType: "customer support",
+        availableLanguage: "Italian",
+      },
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://www.pipely.it/#app",
+      name: "Pipely CRM",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web, iOS, Android",
+      url: "https://www.pipely.it",
+      description: "CRM italiano con pipeline Kanban, contatti, campagne email, automazioni workflow e AI Assistant integrato.",
+      offers: [
+        {
+          "@type": "Offer",
+          name: "Starter",
+          price: "0",
+          priceCurrency: "EUR",
+          description: "Piano gratuito per sempre",
+        },
+        {
+          "@type": "Offer",
+          name: "Pro",
+          price: "29",
+          priceCurrency: "EUR",
+          billingIncrement: "P1M",
+          description: "Pipeline illimitate, AI Assistant, automazioni avanzate",
+        },
+      ],
+      publisher: { "@id": "https://www.pipely.it/#organization" },
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.pipely.it/#website",
+      url: "https://www.pipely.it",
+      name: "Pipely",
+      publisher: { "@id": "https://www.pipely.it/#organization" },
+      inLanguage: "it-IT",
+    },
+  ],
+};
+
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white font-sans">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* ── Navbar ── */}
       <header className="sticky top-0 z-50 border-b border-slate-100 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
