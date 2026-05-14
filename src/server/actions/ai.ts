@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { chatCompletion } from "@/lib/openrouter";
 import type { AIInsight, AIEmailDraft } from "@/types/ai";
 import { getOrgPlan, checkFeature } from "@/lib/plan";
+import { getGuideContext } from "@/lib/guide-data";
 
 type ActionResult<T> = { data?: T; error?: string };
 
@@ -95,7 +96,12 @@ export async function askAssistant(message: string): Promise<ActionResult<string
   if (featureError) return { error: featureError };
 
   try {
-    const crmContext = await buildCrmContext(orgId);
+    const [crmContext, guideContext] = await Promise.all([
+      buildCrmContext(orgId),
+      Promise.resolve(getGuideContext(message)),
+    ]);
+
+    const isGuideContent = guideContext.startsWith("=== DOCUMENTAZIONE");
 
     const reply = await chatCompletion([
       {
@@ -103,10 +109,11 @@ export async function askAssistant(message: string): Promise<ActionResult<string
         content: `Sei l'assistente AI di Pipely, un CRM italiano per team di vendita.
 Rispondi sempre in italiano, in modo conciso e diretto (max 3-4 paragrafi).
 Usa i dati reali del CRM forniti per rispondere con precisione.
+Se la domanda riguarda come usare Pipely, usa la documentazione fornita.
 Se non hai abbastanza dati per rispondere, dillo chiaramente.
 Non inventare dati o numeri non presenti nel contesto.
 
-${crmContext}`,
+${crmContext}${isGuideContent ? `\n\n${guideContext}` : ""}`,
       },
       { role: "user", content: message },
     ], { maxTokens: 500, temperature: 0.6 });
