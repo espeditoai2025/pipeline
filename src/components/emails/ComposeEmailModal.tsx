@@ -1,18 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, FileText, Send, Save } from "lucide-react";
+import { Loader2, FileText, Send, Save, UserCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { sendEmail, saveDraft, incrementTemplateUsage } from "@/server/actions/emails";
+import { getContacts } from "@/server/actions/contacts";
 import { AIEmailWriter } from "@/components/ai/AIEmailWriter";
 import type { EmailThread, EmailTemplate, EmailMessage } from "@/types/emails";
 import type { AIEmailDraft } from "@/types/ai";
+
+type ContactOption = { id: string; name: string; email: string };
 
 const schema = z.object({
   to: z.string().email("Email non valida"),
@@ -53,6 +56,9 @@ function applyTemplate(tpl: EmailTemplate, senderName: string, replyThread?: Ema
 
 export function ComposeEmailModal({ open, onClose, replyThread, templates, onSent }: Props) {
   const [showTemplates, setShowTemplates] = useState(false);
+  const [contacts, setContacts] = useState<ContactOption[]>([]);
+  const [selectedContactId, setSelectedContactId] = useState("");
+  const [selectedContactName, setSelectedContactName] = useState("");
   const { data: session } = useSession();
   const myEmail = session?.user?.email ?? "";
   const myName = session?.user?.name ?? "Pipely CRM";
@@ -70,13 +76,51 @@ export function ComposeEmailModal({ open, onClose, replyThread, templates, onSen
     },
   });
 
+  useEffect(() => {
+    if (!open) return;
+    getContacts().then((cs) =>
+      setContacts(
+        cs
+          .filter((c) => c.email)
+          .map((c) => ({
+            id: c.id,
+            name: [c.firstName, c.lastName].filter(Boolean).join(" "),
+            email: c.email!,
+          }))
+      )
+    );
+    setSelectedContactId("");
+    setSelectedContactName("");
+    reset({
+      to: defaultTo,
+      cc: "",
+      subject: replyThread ? `RE: ${replyThread.subject}` : "",
+      body: "",
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  function handleContactSelect(e: React.ChangeEvent<HTMLSelectElement>) {
+    const id = e.target.value;
+    setSelectedContactId(id);
+    if (!id) {
+      setSelectedContactName("");
+      return;
+    }
+    const contact = contacts.find((c) => c.id === id);
+    if (contact) {
+      setSelectedContactName(contact.name);
+      setValue("to", contact.email);
+    }
+  }
+
   async function onSend(data: FormValues) {
     const result = await sendEmail({
       ...data,
       dealId: replyThread?.dealId ?? undefined,
       dealTitle: replyThread?.dealTitle ?? undefined,
-      contactId: replyThread?.contactId ?? undefined,
-      contactName: replyThread?.contactName ?? undefined,
+      contactId: selectedContactId || replyThread?.contactId || undefined,
+      contactName: selectedContactName || replyThread?.contactName || undefined,
     });
     if (result.error) { toast.error(result.error); return; }
     toast.success("Email inviata");
@@ -91,6 +135,8 @@ export function ComposeEmailModal({ open, onClose, replyThread, templates, onSen
       ...data,
       dealId: replyThread?.dealId ?? undefined,
       dealTitle: replyThread?.dealTitle ?? undefined,
+      contactId: selectedContactId || replyThread?.contactId || undefined,
+      contactName: selectedContactName || replyThread?.contactName || undefined,
     });
     if (result.error) { toast.error(result.error); return; }
     toast.success("Bozza salvata");
@@ -122,6 +168,29 @@ export function ComposeEmailModal({ open, onClose, replyThread, templates, onSen
 
         <SheetBody>
           <form id="compose-email-form" onSubmit={handleSubmit(onSend)} className="space-y-4">
+
+            {/* Contact picker */}
+            {!replyThread && contacts.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium mb-1.5 text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)]">
+                  <UserCircle className="inline h-3.5 w-3.5 mr-1 text-[var(--crm-primary)]" />
+                  Contatto esistente
+                </label>
+                <select
+                  value={selectedContactId}
+                  onChange={handleContactSelect}
+                  className={inputCls}
+                >
+                  <option value="">— Seleziona contatto (opzionale) —</option>
+                  {contacts.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} — {c.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium mb-1.5 text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)]">A *</label>
               <input {...register("to")} type="email" className={inputCls} placeholder="destinatario@esempio.it" />
