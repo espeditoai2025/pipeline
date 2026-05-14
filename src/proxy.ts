@@ -7,5 +7,8 @@ const { auth } = NextAuth(authConfig);
 export { auth as proxy };
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|public).*)"],
+  // Skip middleware for Next.js internals, static assets, and common file extensions
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml|webmanifest|css|js|woff|woff2|ttf|eot)$).*)",
+  ],
 };

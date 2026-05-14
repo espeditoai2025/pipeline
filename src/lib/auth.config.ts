@@ -27,7 +27,10 @@ export const authConfig: NextAuthConfig = {
         nextUrl.pathname.startsWith("/privacy") ||
         nextUrl.pathname.startsWith("/termini") ||
         nextUrl.pathname.startsWith("/cookie") ||
-        nextUrl.pathname.startsWith("/contatti");
+        nextUrl.pathname.startsWith("/contatti") ||
+        nextUrl.pathname === "/sitemap.xml" ||
+        nextUrl.pathname === "/robots.txt" ||
+        nextUrl.pathname.startsWith("/api/register");
 
       if (isPublic) return true;
       return isLoggedIn;
