@@ -4,12 +4,12 @@ import { CheckCircle2, ArrowRight, ChevronDown, Star } from "lucide-react";
 import { MarketingShell } from "@/components/marketing/MarketingShell";
 
 export const metadata: Metadata = {
-  title: "I Migliori CRM Italiani del 2025 — Guida Completa",
-  description: "Guida ai migliori CRM italiani del 2025: confronto funzionalità, prezzi e use case. Qual è il CRM giusto per la tua PMI? Scopri Pipely e le alternative.",
+  title: "I Migliori CRM Italiani del 2026 — Guida Completa",
+  description: "Guida ai migliori CRM italiani del 2026: confronto funzionalità, prezzi e use case. Qual è il CRM giusto per la tua PMI? Scopri Pipely e le alternative.",
   alternates: { canonical: "https://www.pipely.it/migliori-crm-italiani" },
   openGraph: {
-    title: "I Migliori CRM Italiani del 2025 — Guida Completa",
-    description: "Confronto tra i migliori CRM italiani del 2025. Prezzi, funzionalità e consigli per scegliere il CRM giusto per la tua PMI.",
+    title: "I Migliori CRM Italiani del 2026 — Guida Completa",
+    description: "Confronto tra i migliori CRM italiani del 2026. Prezzi, funzionalità e consigli per scegliere il CRM giusto per la tua PMI.",
     url: "https://www.pipely.it/migliori-crm-italiani",
     images: [{ url: "https://www.pipely.it/og-image.png", width: 1200, height: 630 }],
   },
@@ -20,14 +20,14 @@ const jsonLd = {
   "@graph": [
     {
       "@type": "WebPage",
-      name: "I Migliori CRM Italiani del 2025",
+      name: "I Migliori CRM Italiani del 2026",
       url: "https://www.pipely.it/migliori-crm-italiani",
       isPartOf: { "@id": "https://www.pipely.it/#website" },
     },
     {
       "@type": "Article",
-      headline: "I Migliori CRM Italiani del 2025 — Guida Completa",
-      description: "Guida ai migliori CRM italiani del 2025 per PMI: confronto funzionalità, prezzi e use case.",
+      headline: "I Migliori CRM Italiani del 2026 — Guida Completa",
+      description: "Guida ai migliori CRM italiani del 2026 per PMI: confronto funzionalità, prezzi e use case.",
       url: "https://www.pipely.it/migliori-crm-italiani",
       publisher: { "@id": "https://www.pipely.it/#organization" },
       inLanguage: "it-IT",
@@ -114,7 +114,7 @@ const crmList = [
 ];
 
 const faqs = [
-  { q: "Qual è il miglior CRM italiano del 2025?", a: "Per le PMI italiane, Pipely è la scelta più completa: piano gratuito per sempre, AI Assistant, automazioni, email marketing integrato e supporto 100% in italiano a 29€/mese per tutto il team." },
+  { q: "Qual è il miglior CRM italiano del 2026?", a: "Per le PMI italiane, Pipely è la scelta più completa: piano gratuito per sempre, AI Assistant, automazioni, email marketing integrato e supporto 100% in italiano a 29€/mese per tutto il team." },
   { q: "Esiste un CRM gratuito completamente in italiano?", a: "Sì. Pipely ha un piano Starter gratuito per sempre, senza carta di credito. Include 1 pipeline, fino a 500 contatti, calendario attività e import CSV/Excel." },
   { q: "Quanto costa mediamente un CRM per una PMI italiana?", a: "I prezzi variano molto: Pipely Pro costa 29€/mese per tutto il team. HubSpot Professional parte da €890/mese. Pipedrive parte da €14,90 per utente/mese. Per la maggior parte delle PMI, Pipely offre il miglior rapporto qualità/prezzo." },
   { q: "Un CRM italiano è meglio di uno straniero per le PMI?", a: "Sì, per diversi motivi pratici: interfaccia in italiano (nessuna traduzione parziale), supporto nella tua lingua senza barriere, conformità nativa al GDPR europeo e un team che capisce le esigenze del mercato italiano." },
@@ -136,10 +136,10 @@ export default function MiglioriCrmItalianiPage() {
         </div>
         <div className="relative mx-auto max-w-3xl">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1.5 text-xs font-medium text-blue-300">
-            Guida aggiornata 2025
+            Guida aggiornata 2026
           </div>
           <h1 className="mb-6 text-4xl font-semibold leading-tight tracking-tight text-white md:text-5xl">
-            I Migliori CRM Italiani del 2025
+            I Migliori CRM Italiani del 2026
           </h1>
           <p className="mx-auto text-lg leading-relaxed text-slate-300">
             Confronto completo tra i CRM più usati dalle PMI italiane: funzionalità, prezzi e consigli per scegliere il software giusto per il tuo team.
@@ -155,7 +155,7 @@ export default function MiglioriCrmItalianiPage() {
             Il mercato dei CRM è affollato di soluzioni internazionali costose e complesse. Per una PMI italiana, le priorità sono diverse: semplicità di utilizzo, prezzo sostenibile, supporto in italiano e funzionalità realmente utili al processo di vendita quotidiano.
           </p>
           <p className="text-slate-600 leading-relaxed">
-            In questa guida abbiamo selezionato i 3 CRM più rilevanti per le PMI italiane nel 2025, con un confronto onesto su funzionalità, prezzi e punti di forza.
+            In questa guida abbiamo selezionato i 3 CRM più rilevanti per le PMI italiane nel 2026, con un confronto onesto su funzionalità, prezzi e punti di forza.
           </p>
         </div>
       </section>

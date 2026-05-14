@@ -46,15 +46,15 @@ export const MOCK_SESSIONS: Session[] = [
 
 export const MOCK_API_KEYS: ApiKey[] = [
   { id: "key-1", name: "Integrazione Zapier", prefix: "crm_live_aB3x", scopes: ["deals:read", "contacts:read"], lastUsed: new Date(Date.now() - 3600_000).toISOString(), createdAt: "2024-02-10T10:00:00Z", expiresAt: null },
-  { id: "key-2", name: "Webhook produzione", prefix: "crm_live_kZ9y", scopes: ["deals:write", "contacts:write", "activities:write"], lastUsed: new Date(Date.now() - 86400_000 * 3).toISOString(), createdAt: "2024-03-01T10:00:00Z", expiresAt: "2025-03-01T00:00:00Z" },
+  { id: "key-2", name: "Webhook produzione", prefix: "crm_live_kZ9y", scopes: ["deals:write", "contacts:write", "activities:write"], lastUsed: new Date(Date.now() - 86400_000 * 3).toISOString(), createdAt: "2025-03-01T10:00:00Z", expiresAt: "2027-03-01T00:00:00Z" },
   { id: "key-3", name: "Test locale", prefix: "crm_test_tY2z", scopes: ["deals:read"], lastUsed: null, createdAt: "2024-04-15T10:00:00Z", expiresAt: null },
 ];
 
 export const MOCK_INVOICES: Invoice[] = [
-  { id: "inv-001", date: "2025-04-01", description: "Piano Pro — Aprile 2025", amount: 79, currency: "EUR", status: "paid", downloadUrl: "#" },
-  { id: "inv-002", date: "2025-03-01", description: "Piano Pro — Marzo 2025",  amount: 79, currency: "EUR", status: "paid", downloadUrl: "#" },
-  { id: "inv-003", date: "2025-02-01", description: "Piano Pro — Febbraio 2025", amount: 79, currency: "EUR", status: "paid", downloadUrl: "#" },
-  { id: "inv-004", date: "2025-01-01", description: "Piano Starter — Gennaio 2025", amount: 29, currency: "EUR", status: "paid", downloadUrl: "#" },
+  { id: "inv-001", date: "2026-05-01", description: "Piano Pro — Maggio 2026", amount: 29, currency: "EUR", status: "paid", downloadUrl: "#" },
+  { id: "inv-002", date: "2026-04-01", description: "Piano Pro — Aprile 2026", amount: 29, currency: "EUR", status: "paid", downloadUrl: "#" },
+  { id: "inv-003", date: "2026-03-01", description: "Piano Pro — Marzo 2026",  amount: 29, currency: "EUR", status: "paid", downloadUrl: "#" },
+  { id: "inv-004", date: "2026-02-01", description: "Piano Pro — Febbraio 2026", amount: 29, currency: "EUR", status: "paid", downloadUrl: "#" },
 ];
 
 export const MOCK_TEAM_MEMBERS: TeamMember[] = [

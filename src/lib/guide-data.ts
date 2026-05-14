@@ -533,7 +533,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
           "Completa, ripianifica o elimina le attività scadute",
         ]},
         { type: "heading", text: "Notifiche push" },
-        { type: "para", text: "Al momento Pipely non invia notifiche push automatiche per le attività in scadenza. Le notifiche push sono in roadmap per Q3 2025." },
+        { type: "para", text: "Al momento Pipely non invia notifiche push automatiche per le attività in scadenza. Le notifiche push sono in roadmap per Q4 2026." },
         { type: "tip", text: "Controlla le attività scadute ogni mattina dalla dashboard: mantenere questo numero a zero è un buon indicatore di un processo di vendita organizzato." },
       ]},
       { id: "a4", title: "Vista calendario delle attività", excerpt: "Usa la vista giornaliera e settimanale per organizzare il tuo piano di lavoro.", readTime: 3, blocks: [
@@ -1188,8 +1188,8 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         ]},
         { type: "heading", text: "Funzionalità in roadmap" },
         { type: "list", items: [
-          "Email di notifica per eventi chiave (previsto Q3 2025)",
-          "Notifiche push mobile via PWA (previsto Q3 2025)",
+          "Email di notifica per eventi chiave (previsto Q4 2026)",
+          "Notifiche push mobile via PWA (previsto Q4 2026)",
           "Personalizzazione degli eventi notificati",
         ]},
         { type: "tip", text: "Controlla le attività scadute ogni mattina dalla dashboard: il KPI \"Attività scadute\" è il modo più rapido per non perdere follow-up importanti." },
@@ -1450,7 +1450,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         { type: "para", text: "Le notifiche push PWA non sono ancora disponibili in Pipely. Al momento non riceverai alert sullo smartphone per attività in scadenza, affari aggiornati o altri eventi." },
         { type: "heading", text: "In roadmap" },
         { type: "list", items: [
-          "Notifiche push PWA per attività in scadenza (previsto Q3 2025)",
+          "Notifiche push PWA per attività in scadenza (previsto Q4 2026)",
           "Notifiche per affari assegnati",
           "Notifiche per messaggi dal team",
         ]},

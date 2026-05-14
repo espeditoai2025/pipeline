@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   openGraph: { title: "Termini di Servizio — Pipely CRM", url: "https://www.pipely.it/termini" },
 };
 
-const LAST_UPDATED = "13 maggio 2025";
+const LAST_UPDATED = "14 maggio 2026";
 
 export default function TerminiPage() {
   return (

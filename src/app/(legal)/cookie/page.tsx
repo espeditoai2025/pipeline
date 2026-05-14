@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   openGraph: { title: "Cookie Policy — Pipely CRM", url: "https://www.pipely.it/cookie" },
 };
 
-const LAST_UPDATED = "13 maggio 2025";
+const LAST_UPDATED = "14 maggio 2026";
 
 export default function CookiePage() {
   return (
