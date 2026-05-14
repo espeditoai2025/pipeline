@@ -317,12 +317,21 @@ export async function sendCampaign(id: string): Promise<AR<{ sent: number; faile
   const orgId = getOrgId(session);
   if (!orgId) return { error: "Non autorizzato" };
 
+  const plan = await getOrgPlan(orgId);
+  const featureError = checkFeature(plan, "emailCampaigns");
+  if (featureError) return { error: featureError };
+
   const campaign = await db.emailCampaign.findFirst({
     where: { id, organizationId: orgId },
     include: { list: { include: { contacts: { where: { unsubscribed: false } } } } },
   });
   if (!campaign) return { error: "Campagna non trovata" };
   if (campaign.status === "SENT") return { error: "Campagna già inviata" };
+
+  if (!resend) {
+    const smtp = await db.smtpConfig.findUnique({ where: { organizationId: orgId } });
+    if (!smtp?.isVerified) return { error: "Configura un provider email (SMTP o Resend) prima di inviare campagne." };
+  }
 
   await db.emailCampaign.update({ where: { id }, data: { status: "SENDING" } });
 
@@ -353,16 +362,11 @@ export async function sendCampaign(id: string): Promise<AR<{ sent: number; faile
     // Inject open-tracking pixel (1x1 GIF) at the bottom of the email
     html += `<img src="${appUrl}/api/track/open/${campaign.id}/${contact.id}" width="1" height="1" style="display:none;border:0" alt="" />`;
 
-    if (resend) {
-      try {
-        await resend.emails.send({ from, to: contact.email, subject: campaign.subject, html });
-        sent++;
-      } catch {
-        failed++;
-      }
-    } else {
-      // No Resend API key — record to DB only
+    try {
+      await resend!.emails.send({ from, to: contact.email, subject: campaign.subject, html });
       sent++;
+    } catch {
+      failed++;
     }
   }
 
