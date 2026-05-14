@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { deleteCampaign, sendCampaign } from "@/server/actions/campaigns";
 import { CampaignForm } from "./CampaignForm";
+import { UpgradeModal } from "@/components/shared/UpgradeModal";
 import type { EmailCampaign, EmailList, EmailTemplate } from "@/types/emails";
 
 type Props = {
@@ -13,6 +14,7 @@ type Props = {
   lists: EmailList[];
   templates: EmailTemplate[];
   onChange: (campaigns: EmailCampaign[]) => void;
+  canUseCampaigns?: boolean;
 };
 
 const STATUS_CONFIG: Record<EmailCampaign["status"], { label: string; cls: string; icon: React.ReactNode }> = {
@@ -33,13 +35,17 @@ function clickRate(c: EmailCampaign): string {
   return `${Math.round((c.totalClicked / c.totalSent) * 100)}%`;
 }
 
-export function CampaignsTab({ campaigns, lists, templates, onChange }: Props) {
+export function CampaignsTab({ campaigns, lists, templates, onChange, canUseCampaigns = false }: Props) {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<EmailCampaign | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
-  function openNew() { setEditing(null); setFormOpen(true); }
+  function openNew() {
+    if (!canUseCampaigns) { setUpgradeMsg("Campagne email è disponibile dal piano Pro."); return; }
+    setEditing(null); setFormOpen(true);
+  }
   function openEdit(c: EmailCampaign) { setEditing(c); setFormOpen(true); }
 
   function handleSaved(c: EmailCampaign) {
@@ -60,6 +66,7 @@ export function CampaignsTab({ campaigns, lists, templates, onChange }: Props) {
   }
 
   function handleSend(campaign: EmailCampaign) {
+    if (!canUseCampaigns) { setUpgradeMsg("Campagne email è disponibile dal piano Pro."); return; }
     setSendingId(campaign.id);
     startTransition(async () => {
       const res = await sendCampaign(campaign.id);
@@ -177,6 +184,8 @@ export function CampaignsTab({ campaigns, lists, templates, onChange }: Props) {
         templates={templates}
         onSaved={handleSaved}
       />
+
+      {upgradeMsg && <UpgradeModal message={upgradeMsg} onClose={() => setUpgradeMsg(null)} />}
     </div>
   );
 }

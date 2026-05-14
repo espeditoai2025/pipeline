@@ -6,6 +6,7 @@ import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { resend, FROM_DEFAULT, isEmailEnabled } from "@/lib/resend";
+import { getOrgPlan, getLimits } from "@/lib/plan";
 import type { EmailMessage, EmailTemplate } from "@/types/emails";
 
 function getOrgId(s: Session | null) {
@@ -93,6 +94,15 @@ export async function getEmails(): Promise<EmailMessage[]> {
   return rows.map((r) =>
     mapEmail(r, r.deal?.title, r.contact ? `${r.contact.firstName} ${r.contact.lastName ?? ""}`.trim() : null)
   );
+}
+
+export async function getMyPlanFeatures(): Promise<{ emailCampaigns: boolean; smtp: boolean; ai: boolean; automations: boolean }> {
+  const session = await auth();
+  const orgId = (session?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
+  if (!orgId) return { emailCampaigns: false, smtp: false, ai: false, automations: false };
+  const plan = await getOrgPlan(orgId);
+  const l = getLimits(plan);
+  return { emailCampaigns: l.emailCampaigns, smtp: l.smtp, ai: l.ai, automations: l.automations };
 }
 
 export async function getTemplates(): Promise<EmailTemplate[]> {

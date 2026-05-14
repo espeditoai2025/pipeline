@@ -8,7 +8,7 @@ import { TemplatesManager } from "@/components/emails/TemplatesManager";
 import { EmailListsTab } from "@/components/emails/EmailListsTab";
 import { CampaignsTab } from "@/components/emails/CampaignsTab";
 import { Button } from "@/components/ui/button";
-import { getEmails, getTemplates } from "@/server/actions/emails";
+import { getEmails, getTemplates, getMyPlanFeatures } from "@/server/actions/emails";
 import { getEmailLists, getCampaigns } from "@/server/actions/campaigns";
 import type { EmailThread, EmailMessage, EmailTemplate, EmailList, EmailCampaign } from "@/types/emails";
 
@@ -53,19 +53,21 @@ export default function EmailsPage() {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [lists, setLists] = useState<EmailList[]>([]);
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
+  const [canUseCampaigns, setCanUseCampaigns] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
   const [replyThread, setReplyThread] = useState<EmailThread | null>(null);
   const [, startTransition] = useTransition();
 
   useEffect(() => {
     startTransition(async () => {
-      const [msgs, tpls, lsts, camps] = await Promise.all([
-        getEmails(), getTemplates(), getEmailLists(), getCampaigns(),
+      const [msgs, tpls, lsts, camps, features] = await Promise.all([
+        getEmails(), getTemplates(), getEmailLists(), getCampaigns(), getMyPlanFeatures(),
       ]);
       setThreads(groupIntoThreads(msgs));
       setTemplates(tpls);
       setLists(lsts);
       setCampaigns(camps);
+      setCanUseCampaigns(features.emailCampaigns);
     });
   }, []);
 
@@ -161,7 +163,7 @@ export default function EmailsPage() {
       {tab === "inbox"     && <InboxView threads={threads} onCompose={handleCompose} />}
       {tab === "templates" && <TemplatesManager initialTemplates={templates} />}
       {tab === "lists"     && <EmailListsTab lists={lists} onChange={setLists} />}
-      {tab === "campaigns" && <CampaignsTab campaigns={campaigns} lists={lists} templates={templates} onChange={setCampaigns} />}
+      {tab === "campaigns" && <CampaignsTab campaigns={campaigns} lists={lists} templates={templates} onChange={setCampaigns} canUseCampaigns={canUseCampaigns} />}
 
       <ComposeEmailModal
         open={composeOpen}
