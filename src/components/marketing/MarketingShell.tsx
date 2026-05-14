@@ -12,6 +12,7 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
           <nav className="hidden items-center gap-8 md:flex">
             <Link href="/#features" className="text-sm text-slate-500 hover:text-slate-900 transition-colors">Funzionalità</Link>
             <Link href="/#pricing" className="text-sm text-slate-500 hover:text-slate-900 transition-colors">Prezzi</Link>
+            <Link href="/blog" className="text-sm text-slate-500 hover:text-slate-900 transition-colors">Blog</Link>
             <Link href="/contatti" className="text-sm text-slate-500 hover:text-slate-900 transition-colors">Contatti</Link>
           </nav>
           <div className="flex items-center gap-3">
@@ -40,6 +41,8 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
             <div className="flex flex-wrap justify-center gap-5 text-sm text-slate-400">
               <Link href="/#features" className="hover:text-white transition-colors">Funzionalità</Link>
               <Link href="/#pricing" className="hover:text-white transition-colors">Prezzi</Link>
+              <Link href="/blog" className="hover:text-white transition-colors">Blog</Link>
+              <Link href="/chi-siamo" className="hover:text-white transition-colors">Chi siamo</Link>
               <Link href="/contatti" className="hover:text-white transition-colors">Contatti</Link>
               <Link href="/login" className="hover:text-white transition-colors">Accedi</Link>
               <Link href="/register" className="hover:text-white transition-colors">Registrati</Link>
