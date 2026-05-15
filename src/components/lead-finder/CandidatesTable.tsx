@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, XCircle, ExternalLink, Loader2, Building2, User, MapPin, Users } from "lucide-react";
-import { approveCandidate, rejectCandidate } from "@/server/actions/lead-finder";
+import { CheckCircle2, XCircle, ExternalLink, Loader2, Building2, User, MapPin, Users, Trash2 } from "lucide-react";
+import { approveCandidate, rejectCandidate, rejectBelowScore } from "@/server/actions/lead-finder";
 import type { LeadCandidate } from "@/types/lead-finder";
 
 function ScoreBar({ score }: { score: number }) {
@@ -167,12 +167,27 @@ function CandidateRow({ candidate }: { candidate: LeadCandidate }) {
 
 type Props = {
   candidates: LeadCandidate[];
+  searchId: string;
 };
 
-export function CandidatesTable({ candidates }: Props) {
+export function CandidatesTable({ candidates, searchId }: Props) {
+  const router = useRouter();
+  const [isBulkPending, startBulkTransition] = useTransition();
+  const [bulkError, setBulkError] = useState<string | null>(null);
+
   const pending = candidates.filter((c) => c.status === "PENDING").length;
   const approved = candidates.filter((c) => c.status === "APPROVED").length;
   const rejected = candidates.filter((c) => c.status === "REJECTED").length;
+  const lowScorePending = candidates.filter((c) => c.status === "PENDING" && c.score < 70).length;
+
+  function handleRejectLowScore() {
+    startBulkTransition(async () => {
+      setBulkError(null);
+      const { count, error } = await rejectBelowScore(searchId, 70);
+      if (error) { setBulkError(error); return; }
+      if (count > 0) router.refresh();
+    });
+  }
 
   if (candidates.length === 0) {
     return (
@@ -199,11 +214,27 @@ export function CandidatesTable({ candidates }: Props) {
         ))}
       </div>
 
-      {pending > 0 && (
-        <p className="text-xs text-[var(--crm-neutral-500)]">
-          {pending} candidat{pending === 1 ? "o" : "i"} in attesa di revisione
-        </p>
-      )}
+      <div className="flex items-center justify-between gap-4">
+        {pending > 0 && (
+          <p className="text-xs text-[var(--crm-neutral-500)]">
+            {pending} candidat{pending === 1 ? "o" : "i"} in attesa di revisione
+          </p>
+        )}
+        {lowScorePending > 0 && (
+          <button
+            onClick={handleRejectLowScore}
+            disabled={isBulkPending}
+            className="ml-auto flex items-center gap-1.5 rounded-lg border border-red-200 dark:border-red-700/40 bg-red-50 dark:bg-red-900/20 px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-800/30 disabled:opacity-50 transition-colors"
+          >
+            {isBulkPending
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              : <Trash2 className="h-3.5 w-3.5" />
+            }
+            Elimina {lowScorePending} con score &lt; 70
+          </button>
+        )}
+      </div>
+      {bulkError && <p className="text-xs text-red-500">{bulkError}</p>}
 
       {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 bg-white dark:bg-[#1a1a2e]">

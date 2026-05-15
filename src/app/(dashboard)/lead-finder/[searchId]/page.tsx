@@ -82,7 +82,7 @@ export default async function SearchResultsPage({ params }: Props) {
       )}
 
       {/* Candidates table */}
-      <CandidatesTable candidates={candidates} />
+      <CandidatesTable candidates={candidates} searchId={searchId} />
     </div>
   );
 }

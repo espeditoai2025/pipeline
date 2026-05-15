@@ -327,6 +327,28 @@ export async function approveCandidate(
   return { leadId: newLead.id, error: null };
 }
 
+// ─── rejectBelowScore ─────────────────────────────────────────────────────
+
+export async function rejectBelowScore(
+  searchId: string,
+  threshold = 70
+): Promise<{ count: number; error: string | null }> {
+  const session = await auth();
+  const { orgId } = getIds(session);
+  if (!orgId) return { count: 0, error: "Non autorizzato" };
+
+  try {
+    const result = await db.leadCandidate.updateMany({
+      where: { searchId, organizationId: orgId, status: "PENDING", score: { lt: threshold } },
+      data: { status: "REJECTED" },
+    });
+    revalidatePath(`/lead-finder/${searchId}`);
+    return { count: result.count, error: null };
+  } catch (e) {
+    return { count: 0, error: e instanceof Error ? e.message : "Errore" };
+  }
+}
+
 // ─── rejectCandidate ──────────────────────────────────────────────────────
 
 export async function rejectCandidate(
