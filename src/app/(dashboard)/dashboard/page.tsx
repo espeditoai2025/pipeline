@@ -106,9 +106,9 @@ export default async function DashboardPage() {
         <p className="text-sm text-[var(--crm-neutral-500)] mt-0.5">{t("welcome")}</p>
       </div>
 
-      {onboarding && <OnboardingWizard status={onboarding} />}
-
       <VerticalModePicker currentMode={crmMode} />
+
+      {onboarding && <OnboardingWizard status={onboarding} />}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {kpiCards.map((kpi) => <KpiCard key={kpi.title} {...kpi} />)}
