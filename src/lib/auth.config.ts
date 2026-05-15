@@ -24,13 +24,21 @@ export const authConfig: NextAuthConfig = {
         nextUrl.pathname.startsWith("/forgot-password") ||
         nextUrl.pathname.startsWith("/api/auth") ||
         nextUrl.pathname.startsWith("/api/leads") ||
+        nextUrl.pathname.startsWith("/api/register") ||
         nextUrl.pathname.startsWith("/privacy") ||
         nextUrl.pathname.startsWith("/termini") ||
         nextUrl.pathname.startsWith("/cookie") ||
         nextUrl.pathname.startsWith("/contatti") ||
         nextUrl.pathname === "/sitemap.xml" ||
         nextUrl.pathname === "/robots.txt" ||
-        nextUrl.pathname.startsWith("/api/register");
+        // Landing page marketing e SEO
+        nextUrl.pathname.startsWith("/crm-per-") ||
+        nextUrl.pathname.startsWith("/crm-commerciale") ||
+        nextUrl.pathname.startsWith("/crm-email-marketing") ||
+        nextUrl.pathname.startsWith("/alternativa-") ||
+        nextUrl.pathname.startsWith("/migliori-") ||
+        nextUrl.pathname.startsWith("/chi-siamo") ||
+        nextUrl.pathname.startsWith("/blog");
 
       if (isPublic) return true;
       return isLoggedIn;
