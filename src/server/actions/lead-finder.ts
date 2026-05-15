@@ -175,14 +175,35 @@ export async function runSearch(
 
   try {
     // ── FASE 1: Google Places → aziende reali verificate ──────────────────
-    const placesQuery = [
-      search.keywords || search.sector,
+    // Se non ci sono keywords/settore, cerchiamo TUTTO (aziende + artigiani + professionisti)
+    const hasSpecificTerm = !!(search.keywords || search.sector);
+    const specificTerm = search.keywords || search.sector;
+
+    // Query primaria: termine specifico (o generico) + località
+    const primaryQuery = [
+      specificTerm || "aziende imprese",
       search.location,
     ].filter(Boolean).join(" ");
 
-    const placesResults = placesQuery
-      ? await searchGooglePlaces(placesQuery, search.maxResults)
-      : [];
+    let placesResults = await searchGooglePlaces(primaryQuery, search.maxResults);
+
+    // Se senza filtri specifici, aggiungi una seconda query per artigiani e professionisti
+    if (!hasSpecificTerm && search.location && placesResults.length < search.maxResults) {
+      const secondQuery = `artigiani professionisti attività commerciali ${search.location}`;
+      const secondResults = await searchGooglePlaces(secondQuery, search.maxResults - placesResults.length);
+      // Dedup per nome
+      const existing = new Set(placesResults.map((p) => p.companyName.toLowerCase()));
+      placesResults = [
+        ...placesResults,
+        ...secondResults.filter((p) => !existing.has(p.companyName.toLowerCase())),
+      ];
+    }
+
+    // Filtra risultati che sono enti pubblici/comuni (non aziende)
+    placesResults = placesResults.filter((p) => {
+      const lower = p.companyName.toLowerCase();
+      return !lower.startsWith("comune di") && !lower.startsWith("municipio") && !lower.startsWith("provincia di");
+    });
 
     const hasPlacesData = placesResults.length > 0;
 
@@ -196,7 +217,9 @@ export async function runSearch(
     if (search.companySize) criteria.push(`Dimensione azienda: ${search.companySize} dipendenti`);
     if (search.keywords) criteria.push(`Parole chiave: ${search.keywords}`);
     if (search.idealCustomer) criteria.push(`Descrizione cliente ideale: ${search.idealCustomer}`);
-    const criteriaText = criteria.length > 0 ? criteria.join("\n") : "Aziende B2B italiane generiche";
+    const criteriaText = criteria.length > 0
+      ? criteria.join("\n")
+      : `Qualsiasi azienda, artigiano o libero professionista${search.location ? ` di ${search.location}` : " italiano"}`;
 
     let parsed: Array<{
       companyName: string; website: string | null; sector: string | null;
