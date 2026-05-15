@@ -156,34 +156,56 @@ async function searchGooglePlaces(query: string, maxResults: number): Promise<Pl
 }
 
 // ─── FatturatoItalia scraper ──────────────────────────────────────────────
-// Source: fatturatoitalia.it — dati CCIAA per comune, ~15 aziende/pagina
+// Source: fatturatoitalia.it — dati CCIAA
+// Percorsi supportati: /comune/[slug], /regione/[slug], /settore/[slug]
 
-function toComuneSlug(location: string): string {
-  return (location.split(",")[0] ?? location)
+const ITALIAN_REGIONS = new Set([
+  "abruzzo", "basilicata", "calabria", "campania", "emilia-romagna",
+  "friuli-venezia-giulia", "lazio", "liguria", "lombardia", "marche",
+  "molise", "piemonte", "puglia", "sardegna", "sicilia", "toscana",
+  "trentino-alto-adige", "umbria", "valle-d-aosta", "veneto",
+  // varianti senza trattino
+  "emilia romagna", "friuli venezia giulia", "trentino alto adige", "valle daosta",
+]);
+
+function toSlug(text: string): string {
+  return text
     .trim()
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")  // remove accents
-    .replace(/['']/g, "")             // remove apostrophes
-    .replace(/\s+/g, "-")             // spaces → hyphens
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[''']/g, "")
+    .replace(/\s+/g, "-")
     .replace(/[^a-z0-9-]/g, "");
 }
 
-async function fetchFatturatoItalia(location: string, maxResults: number): Promise<PlacesResult[]> {
-  const slug = toComuneSlug(location);
-  if (!slug) return [];
+function detectLocationType(location: string): "regione" | "comune" {
+  const slug = toSlug(location.split(",")[0] ?? location);
+  return ITALIAN_REGIONS.has(slug) ? "regione" : "comune";
+}
 
+// Tenta di derivare uno slug settore da keywords / settore dell'utente
+function toSectorSlug(keywords?: string | null, sector?: string | null): string | null {
+  const raw = keywords ?? sector;
+  if (!raw) return null;
+  // Prendi la prima parola significativa (> 3 caratteri)
+  const words = raw
+    .split(/[\s,/\\|+]+/)
+    .map((w) => toSlug(w))
+    .filter((w) => w.length > 3);
+  return words[0] ?? null;
+}
+
+async function scrapeFatturatoPages(baseUrl: string, labelLocation: string, maxResults: number): Promise<PlacesResult[]> {
   const results: PlacesResult[] = [];
   const seenSlugs = new Set<string>();
-  const maxPages = Math.min(Math.ceil(maxResults / 15) + 2, 10);
-  const cityName = (location.split(",")[0] ?? location).trim();
+  // Nessun cap fisso: paginiamo finché non abbiamo abbastanza risultati o la pagina è vuota.
+  // Safety cap: 1 pagina ogni 15 risultati + 3 margine (es. 50 risultati → max ~7 pagine)
+  const maxPages = Math.ceil(maxResults / 15) + 3;
 
   for (let page = 1; page <= maxPages; page++) {
     try {
-      const url = page === 1
-        ? `https://www.fatturatoitalia.it/comune/${slug}`
-        : `https://www.fatturatoitalia.it/comune/${slug}/${page}`;
-
+      const url = page === 1 ? baseUrl : `${baseUrl}/${page}`;
       const res = await fetch(url, {
         headers: {
           "User-Agent": "Mozilla/5.0 (compatible; Pipely-CRM/1.0)",
@@ -191,12 +213,9 @@ async function fetchFatturatoItalia(location: string, maxResults: number): Promi
         },
         next: { revalidate: 86400 },
       });
-
       if (!res.ok) break;
       const html = await res.text();
 
-      // Match company links: href="/company_slug" with title="Fatturato NOME AZIENDA"
-      // Each company appears twice per row (name + revenue), deduplicate on slug
       const pattern = /href="https?:\/\/www\.fatturatoitalia\.it\/([a-z0-9][a-z0-9_-]+)"[^>]*title="(?:Fatturato\s+)?([^"]+)"/gi;
       let match: RegExpExecArray | null;
       let foundOnPage = 0;
@@ -204,20 +223,16 @@ async function fetchFatturatoItalia(location: string, maxResults: number): Promi
       while ((match = pattern.exec(html)) !== null) {
         const companySlug = match[1] ?? "";
         const rawName = (match[2] ?? "").replace(/^Fatturato\s+/i, "").trim();
-
-        // Skip navigation links (comune, provincia, regione pages)
         if (/^(comune|provincia|regione|settore|categoria)/.test(companySlug)) continue;
-        if (seenSlugs.has(companySlug)) continue;
-        if (!rawName || rawName.length < 2) continue;
-
+        if (seenSlugs.has(companySlug) || !rawName || rawName.length < 2) continue;
         seenSlugs.add(companySlug);
-        // Normalize company name: title case
+
         const companyName = rawName
           .toLowerCase()
           .replace(/\b\w/g, (c) => c.toUpperCase())
           .replace(/\bDi\b|\bDel\b|\bDella\b|\bDei\b|\bDegli\b|\bDelle\b|\bDa\b|\bIn\b|\bE\b/g, (m) => m.toLowerCase());
 
-        results.push({ companyName, website: null, phone: null, location: cityName });
+        results.push({ companyName, website: null, phone: null, location: labelLocation });
         foundOnPage++;
         if (results.length >= maxResults) break;
       }
@@ -227,8 +242,50 @@ async function fetchFatturatoItalia(location: string, maxResults: number): Promi
       break;
     }
   }
-
   return results;
+}
+
+async function fetchFatturatoItalia(
+  location: string,
+  maxResults: number,
+  keywords?: string | null,
+  sector?: string | null,
+): Promise<PlacesResult[]> {
+  const locSlug = toSlug(location.split(",")[0] ?? location);
+  if (!locSlug) return [];
+
+  const locType = detectLocationType(location);
+  const locationLabel = (location.split(",")[0] ?? location).trim();
+
+  // URL base per la localizzazione
+  const locBaseUrl = `https://www.fatturatoitalia.it/${locType}/${locSlug}`;
+
+  // URL base per settore (se presente)
+  const sectorSlug = toSectorSlug(keywords, sector);
+  const sectorBaseUrl = sectorSlug
+    ? `https://www.fatturatoitalia.it/settore/${sectorSlug}`
+    : null;
+
+  // Fetch in parallelo: per localizzazione + per settore (se disponibile)
+  const [locResults, sectorResults] = await Promise.all([
+    scrapeFatturatoPages(locBaseUrl, locationLabel, maxResults).catch(() => [] as PlacesResult[]),
+    sectorBaseUrl
+      ? scrapeFatturatoPages(sectorBaseUrl, locationLabel, maxResults).catch(() => [] as PlacesResult[])
+      : Promise.resolve([] as PlacesResult[]),
+  ]);
+
+  // Merge: i risultati per settore arricchiscono quelli per localizzazione
+  // Per il settore, teniamo solo le aziende con nome che include la location (se comune/regione noti)
+  // oppure tutte se la location è generica
+  const seen = new Set(locResults.map((r) => r.companyName.toLowerCase().slice(0, 12)));
+  const uniqueFromSector = sectorResults.filter((r) => {
+    const key = r.companyName.toLowerCase().slice(0, 12);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return [...locResults, ...uniqueFromSector].slice(0, maxResults);
 }
 
 // ─── JSON parsing helper ──────────────────────────────────────────────────
@@ -314,7 +371,7 @@ export async function runSearch(
       try {
         const needed = search.maxResults - placesResults.length;
         const fetchCount = needed > 0 ? search.maxResults : Math.floor(search.maxResults * 0.5);
-        fatturatoResults = await fetchFatturatoItalia(search.location, Math.max(fetchCount, 20));
+        fatturatoResults = await fetchFatturatoItalia(search.location, Math.max(fetchCount, 20), search.keywords, search.sector);
       } catch {
         // non-fatal: procedi senza
       }
