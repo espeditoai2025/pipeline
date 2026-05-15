@@ -150,11 +150,20 @@ IMPORTANTE: compila email e phone con dati reali trovati sul web. Se non trovi l
       { maxTokens: 3000, temperature: 0.5, model: process.env.OPENROUTER_MODEL_LEADFINDER ?? "perplexity/sonar" }
     );
 
-    // Extract JSON array robustly
-    const match = raw.match(/\[[\s\S]*\]/);
-    if (!match) throw new Error("Risposta AI non valida — nessun array JSON trovato");
+    // Strip markdown code fences if present, then extract JSON array
+    const stripped = raw
+      .replace(/```(?:json)?\s*/gi, "")
+      .replace(/```/g, "")
+      .trim();
+    const match = stripped.match(/\[[\s\S]*\]/);
+    if (!match) throw new Error(`Risposta AI non valida — nessun array JSON trovato. Risposta ricevuta: ${raw.slice(0, 300)}`);
 
-    const candidates = JSON.parse(match[0]) as Array<Record<string, unknown>>;
+    let candidates: Array<Record<string, unknown>>;
+    try {
+      candidates = JSON.parse(match[0]) as Array<Record<string, unknown>>;
+    } catch {
+      throw new Error(`JSON malformato nella risposta AI: ${match[0].slice(0, 200)}`);
+    }
     if (!Array.isArray(candidates)) throw new Error("Risposta AI non è un array");
 
     let parsed = candidates
@@ -194,7 +203,8 @@ IMPORTANTE: compila email e phone con dati reali trovati sul web. Se non trovi l
           ],
           { maxTokens: 1500, temperature: 0.2, model: process.env.OPENROUTER_MODEL_LEADFINDER ?? "perplexity/sonar" }
         );
-        const enrichMatch = enrichRaw.match(/\[[\s\S]*\]/);
+        const enrichStripped = enrichRaw.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
+        const enrichMatch = enrichStripped.match(/\[[\s\S]*\]/);
         if (enrichMatch) {
           const enriched = JSON.parse(enrichMatch[0]) as Array<{ companyName: string; email?: string; phone?: string }>;
           parsed = parsed.map((c) => {
