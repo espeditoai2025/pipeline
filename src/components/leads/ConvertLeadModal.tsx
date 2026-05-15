@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowRightCircle, Loader2, UserPlus, Building2, ChevronDown } from "lucide-react";
+import { ArrowRightCircle, Loader2, UserPlus, Building2, ChevronDown, Package } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { convertLead } from "@/server/actions/leads";
+import { getProducts } from "@/server/actions/products";
 import type { Lead } from "@/types/contacts";
+import type { Product } from "@/types/products";
 
 type Props = {
   open: boolean;
@@ -30,7 +32,17 @@ export function ConvertLeadModal({ open, onClose, lead, onConverted }: Props) {
   const [companyWebsite, setCompanyWebsite] = useState("");
   const [companySector, setCompanySector] = useState("");
   const [companySize, setCompanySize] = useState("");
+  const [addProduct, setAddProduct] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productId, setProductId] = useState("");
+  const [productQuantity, setProductQuantity] = useState(1);
+  const [productUnitPrice, setProductUnitPrice] = useState<number | "">("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    getProducts().then((list) => setProducts(list)).catch(() => {});
+  }, [open]);
 
   useEffect(() => {
     if (!lead) return;
@@ -74,6 +86,9 @@ export function ConvertLeadModal({ open, onClose, lead, onConverted }: Props) {
       companyWebsite: companyWebsite.trim(),
       companySector: companySector.trim(),
       companySize: companySize.trim(),
+      productId: addProduct && productId ? productId : undefined,
+      productQuantity: productQuantity,
+      productUnitPrice: productUnitPrice !== "" ? productUnitPrice : undefined,
     });
     setLoading(false);
     if (res.error) {
@@ -219,12 +234,69 @@ export function ConvertLeadModal({ open, onClose, lead, onConverted }: Props) {
               )}
             </div>
 
+            {/* Add product toggle */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setAddProduct((v) => !v)}
+                className="flex items-center gap-2 text-sm font-medium text-[var(--crm-primary)] hover:underline"
+              >
+                <Package className="h-4 w-4" />
+                {addProduct ? "Non aggiungere prodotto" : "Aggiungi un prodotto all'affare"}
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${addProduct ? "rotate-180" : ""}`} />
+              </button>
+
+              {addProduct && (
+                <div className="mt-3 space-y-3 rounded-xl border border-[var(--crm-neutral-100)] p-4 bg-[var(--crm-neutral-50)] dark:bg-white/5">
+                  <div>
+                    <label className="block text-xs font-medium mb-1 text-[var(--crm-neutral-600)]">Prodotto</label>
+                    <select
+                      value={productId}
+                      onChange={(e) => {
+                        setProductId(e.target.value);
+                        const p = products.find((x) => x.id === e.target.value);
+                        if (p) setProductUnitPrice(p.unitPrice);
+                      }}
+                      className={inputCls}
+                    >
+                      <option value="">— Seleziona prodotto —</option>
+                      {products.filter((p) => p.isActive !== false).map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}{p.code ? ` (${p.code})` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium mb-1 text-[var(--crm-neutral-600)]">Quantità</label>
+                      <input
+                        type="number" min={1} step={1}
+                        value={productQuantity}
+                        onChange={(e) => setProductQuantity(parseInt(e.target.value) || 1)}
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1 text-[var(--crm-neutral-600)]">Prezzo unitario (€)</label>
+                      <input
+                        type="number" min={0} step={0.01}
+                        value={productUnitPrice}
+                        onChange={(e) => setProductUnitPrice(parseFloat(e.target.value) || 0)}
+                        className={inputCls}
+                        placeholder="dal prodotto"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* What happens */}
             <div className="rounded-lg border border-[var(--crm-neutral-100)] p-3 text-xs text-[var(--crm-neutral-500)] space-y-1">
               <p className="font-semibold text-[var(--crm-neutral-700)]">Operazioni:</p>
               {createCompany && companyName.trim() && <p>• Crea un'azienda: {companyName.trim()}</p>}
               {createContact && !lead.contactId && <p>• Crea un nuovo contatto e lo collega all'affare{createCompany ? " e all'azienda" : ""}</p>}
               <p>• Crea un affare nel primo stage della pipeline predefinita</p>
+              {addProduct && productId && <p>• Aggiungi prodotto all'affare (q.tà {productQuantity}{productUnitPrice !== "" ? `, €${productUnitPrice}` : ""})</p>}
               <p>• Segna il lead come "Convertito"</p>
             </div>
 

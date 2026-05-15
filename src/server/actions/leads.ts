@@ -206,6 +206,9 @@ const convertSchema = z.object({
   companyWebsite: z.string().optional(),
   companySector: z.string().optional(),
   companySize: z.string().optional(),
+  productId: z.string().optional(),
+  productQuantity: z.number().int().min(1).default(1),
+  productUnitPrice: z.number().min(0).optional(),
 });
 
 export async function convertLead(
@@ -276,6 +279,24 @@ export async function convertLead(
         companyId: companyId ?? undefined,
       },
     });
+
+    // Optionally link a product to the deal
+    if (parsed.data.productId) {
+      let unitPrice = parsed.data.productUnitPrice;
+      if (unitPrice === undefined) {
+        const product = await db.product.findUnique({ where: { id: parsed.data.productId }, select: { unitPrice: true } });
+        unitPrice = product ? Number(product.unitPrice) : 0;
+      }
+      await db.dealProduct.create({
+        data: {
+          dealId: deal.id,
+          productId: parsed.data.productId,
+          quantity: parsed.data.productQuantity ?? 1,
+          unitPrice,
+          discount: 0,
+        },
+      });
+    }
 
     await db.lead.update({
       where: { id },

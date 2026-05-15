@@ -230,7 +230,7 @@ export function CandidatesTable({ candidates, searchId }: Props) {
               ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
               : <Trash2 className="h-3.5 w-3.5" />
             }
-            Elimina {lowScorePending} con score &lt; 70
+            Elimina risultati non pertinenti (score minore di 70)
           </button>
         )}
       </div>
