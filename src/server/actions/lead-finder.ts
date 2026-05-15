@@ -109,10 +109,9 @@ export async function runSearch(
     if (search.keywords) criteria.push(`Parole chiave: ${search.keywords}`);
     if (search.idealCustomer) criteria.push(`Descrizione cliente ideale: ${search.idealCustomer}`);
 
-    const systemPrompt = `Sei un esperto ricercatore di lead B2B per aziende italiane.
-Genera aziende target REALISTICHE e PLAUSIBILI che corrispondono ai criteri dati.
+    const systemPrompt = `Sei un esperto ricercatore di lead B2B. Usa la ricerca web per trovare aziende REALI che corrispondono ai criteri forniti.
+Cerca aziende esistenti con siti web verificabili, referenti reali e contatti validi.
 Rispondi SOLO con un array JSON valido, senza testo aggiuntivo, markdown o spiegazioni.
-Usa nomi di aziende credibili (possono essere reali o verosimili).
 Per ogni azienda assegna uno score da 0 a 100 in base a quanto corrisponde ai criteri.`;
 
     const userPrompt = `Criteri di ricerca:
@@ -140,7 +139,7 @@ Genera esattamente ${search.maxResults} aziende candidate in questo formato JSON
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      { maxTokens: 3000, temperature: 0.5 }
+      { maxTokens: 3000, temperature: 0.5, model: process.env.OPENROUTER_MODEL_LEADFINDER ?? "perplexity/sonar" }
     );
 
     // Extract JSON array robustly
