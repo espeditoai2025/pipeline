@@ -1267,6 +1267,29 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         { type: "tip", text: "Il setup può essere cambiato in qualsiasi momento senza perdere dati. Cambiarlo aggiorna solo la terminologia e le funzionalità suggerite." },
         { type: "warning", text: "Le funzionalità settore-specifiche dei 3 verticali (Immobiliare, Assicurazioni, E-commerce) sono in sviluppo e saranno disponibili prossimamente." },
       ]},
+      { id: "im8", title: "Ricerca globale (Cmd+K)", excerpt: "Cerca contatti, affari, aziende e lead istantaneamente da qualsiasi pagina con la scorciatoia Cmd+K.", readTime: 2, popular: true, blocks: [
+        { type: "heading", text: "Come aprire la ricerca" },
+        { type: "para", text: "Premi Cmd+K su Mac oppure Ctrl+K su Windows e Linux da qualsiasi pagina del CRM. Si apre un pannello di ricerca al centro dello schermo." },
+        { type: "heading", text: "Cosa puoi fare" },
+        { type: "list", items: [
+          "Cerca contatti per nome, email o telefono",
+          "Cerca affari per titolo (solo affari aperti)",
+          "Cerca aziende per nome",
+          "Cerca lead per titolo o email",
+          "Naviga rapidamente a qualsiasi sezione del CRM",
+          "Crea un nuovo affare, contatto, lead o attività con un click",
+        ]},
+        { type: "heading", text: "Come funziona" },
+        { type: "steps", items: [
+          "Premi Cmd+K — si apre il pannello di ricerca",
+          "Inizia a digitare (minimo 2 caratteri) per cercare nei tuoi dati",
+          "I risultati appaiono istantaneamente raggruppati per tipo",
+          "Usa le frecce ↑↓ per navigare tra i risultati",
+          "Premi Invio per aprire il record selezionato",
+          "Premi ESC per chiudere senza navigare",
+        ]},
+        { type: "tip", text: "Senza testo nel campo di ricerca, il pannello mostra la navigazione rapida a tutte le sezioni e le azioni rapide per creare nuovi record." },
+      ]},
       { id: "im6", title: "Cambiare piano o aggiornare i dati di fatturazione", excerpt: "Come upgradare il piano, aggiornare la carta e scaricare le fatture.", readTime: 4, blocks: [
         { type: "heading", text: "Dove gestire il piano" },
         { type: "steps", items: [
