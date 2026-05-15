@@ -1,9 +1,97 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Telescope, Loader2, ChevronDown } from "lucide-react";
+import { Telescope, Loader2, ChevronDown, MapPin } from "lucide-react";
 import { createSearch, runSearch } from "@/server/actions/lead-finder";
+
+function LocationAutocomplete({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchSuggestions = useCallback(async (q: string) => {
+    if (q.length < 2) { setSuggestions([]); setOpen(false); return; }
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/comuni?q=${encodeURIComponent(q)}`);
+      const data: string[] = await res.json();
+      setSuggestions(data);
+      setOpen(data.length > 0);
+    } catch {
+      setSuggestions([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  function handleInput(e: React.ChangeEvent<HTMLInputElement>) {
+    const v = e.target.value;
+    onChange(v);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchSuggestions(v), 300);
+  }
+
+  function handleSelect(s: string) {
+    onChange(s);
+    setOpen(false);
+    setSuggestions([]);
+  }
+
+  // Close on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="relative">
+        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--crm-neutral-400)] pointer-events-none" />
+        <input
+          value={value}
+          onChange={handleInput}
+          onFocus={() => suggestions.length > 0 && setOpen(true)}
+          placeholder='es. "Milano", "Cosenza", "Nord Italia"'
+          autoComplete="off"
+          className="w-full rounded-xl border border-[var(--crm-neutral-200)] dark:border-white/10 bg-white dark:bg-white/5 pl-9 pr-9 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] dark:text-white"
+        />
+        {loading && (
+          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-[var(--crm-neutral-400)]" />
+        )}
+      </div>
+      {open && suggestions.length > 0 && (
+        <ul className="absolute z-50 mt-1 w-full rounded-xl border border-[var(--crm-neutral-200)] dark:border-white/10 bg-white dark:bg-[#1a1a2e] shadow-lg overflow-hidden">
+          {suggestions.map((s) => (
+            <li key={s}>
+              <button
+                type="button"
+                onClick={() => handleSelect(s)}
+                className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-left text-[var(--crm-neutral-900)] dark:text-white hover:bg-[var(--crm-primary)]/10 transition-colors"
+              >
+                <MapPin className="h-3.5 w-3.5 text-[var(--crm-neutral-400)] shrink-0" />
+                {s}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 const SECTORS = [
   "Tecnologia / Software",
@@ -126,12 +214,7 @@ export function SearchForm() {
       {/* Paese/Città */}
       <div>
         <label className="block text-sm font-medium text-[var(--crm-neutral-700)] dark:text-white mb-1.5">Paese / Città</label>
-        <input
-          value={form.location}
-          onChange={(e) => set("location", e.target.value)}
-          placeholder='es. "Milano", "Nord Italia", "Italia", "Europa"'
-          className="w-full rounded-xl border border-[var(--crm-neutral-200)] dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] dark:text-white"
-        />
+        <LocationAutocomplete value={form.location} onChange={(v) => set("location", v)} />
       </div>
 
       {/* Parole chiave */}
