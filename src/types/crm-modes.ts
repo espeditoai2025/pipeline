@@ -27,14 +27,14 @@ export const CRM_MODES: Record<CrmModeId, CrmMode> = {
   CLASSIC: {
     id: "CLASSIC",
     name: "Classic",
-    description: "CRM generico per team di vendita B2B — adatto a PMI, agenzie, consulenti, startup e reti commerciali",
-    category: "Generico",
+    description: "Pipeline, contatti, lead e automazioni per team di vendita B2B. Adatto a PMI, agenzie, consulenti, startup e reti commerciali.",
+    category: "Vendita B2B",
     color: "blue",
     emoji: "🏢",
     features: BASE_FEATURES,
     dealLabel: "Affare",
     leadLabel: "Lead",
-    hint: "CRM generico B2B",
+    hint: "Pipeline e vendita B2B",
   },
   IMMOBILIARE: {
     id: "IMMOBILIARE",
