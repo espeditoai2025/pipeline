@@ -155,6 +155,82 @@ async function searchGooglePlaces(query: string, maxResults: number): Promise<Pl
   }
 }
 
+// ─── FatturatoItalia scraper ──────────────────────────────────────────────
+// Source: fatturatoitalia.it — dati CCIAA per comune, ~15 aziende/pagina
+
+function toComuneSlug(location: string): string {
+  return (location.split(",")[0] ?? location)
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")  // remove accents
+    .replace(/['']/g, "")             // remove apostrophes
+    .replace(/\s+/g, "-")             // spaces → hyphens
+    .replace(/[^a-z0-9-]/g, "");
+}
+
+async function fetchFatturatoItalia(location: string, maxResults: number): Promise<PlacesResult[]> {
+  const slug = toComuneSlug(location);
+  if (!slug) return [];
+
+  const results: PlacesResult[] = [];
+  const seenSlugs = new Set<string>();
+  const maxPages = Math.min(Math.ceil(maxResults / 15) + 2, 10);
+  const cityName = (location.split(",")[0] ?? location).trim();
+
+  for (let page = 1; page <= maxPages; page++) {
+    try {
+      const url = page === 1
+        ? `https://www.fatturatoitalia.it/comune/${slug}`
+        : `https://www.fatturatoitalia.it/comune/${slug}/${page}`;
+
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; Pipely-CRM/1.0)",
+          "Accept-Language": "it-IT,it;q=0.9",
+        },
+        next: { revalidate: 86400 },
+      });
+
+      if (!res.ok) break;
+      const html = await res.text();
+
+      // Match company links: href="/company_slug" with title="Fatturato NOME AZIENDA"
+      // Each company appears twice per row (name + revenue), deduplicate on slug
+      const pattern = /href="https?:\/\/www\.fatturatoitalia\.it\/([a-z0-9][a-z0-9_-]+)"[^>]*title="(?:Fatturato\s+)?([^"]+)"/gi;
+      let match: RegExpExecArray | null;
+      let foundOnPage = 0;
+
+      while ((match = pattern.exec(html)) !== null) {
+        const companySlug = match[1] ?? "";
+        const rawName = (match[2] ?? "").replace(/^Fatturato\s+/i, "").trim();
+
+        // Skip navigation links (comune, provincia, regione pages)
+        if (/^(comune|provincia|regione|settore|categoria)/.test(companySlug)) continue;
+        if (seenSlugs.has(companySlug)) continue;
+        if (!rawName || rawName.length < 2) continue;
+
+        seenSlugs.add(companySlug);
+        // Normalize company name: title case
+        const companyName = rawName
+          .toLowerCase()
+          .replace(/\b\w/g, (c) => c.toUpperCase())
+          .replace(/\bDi\b|\bDel\b|\bDella\b|\bDei\b|\bDegli\b|\bDelle\b|\bDa\b|\bIn\b|\bE\b/g, (m) => m.toLowerCase());
+
+        results.push({ companyName, website: null, phone: null, location: cityName });
+        foundOnPage++;
+        if (results.length >= maxResults) break;
+      }
+
+      if (foundOnPage === 0 || results.length >= maxResults) break;
+    } catch {
+      break;
+    }
+  }
+
+  return results;
+}
+
 // ─── JSON parsing helper ──────────────────────────────────────────────────
 
 function extractJsonArray(raw: string): Array<Record<string, unknown>> {
@@ -225,12 +301,39 @@ export async function runSearch(
     }
 
     // Escludi enti pubblici
+    const PUBLIC_PREFIXES = ["comune di", "municipio", "provincia di", "regione ", "asl ", "istituto comprensivo", "scuola "];
     placesResults = placesResults.filter((p) => {
       const l = p.companyName.toLowerCase();
-      return !l.startsWith("comune di") && !l.startsWith("municipio") && !l.startsWith("provincia di") && !l.startsWith("regione ");
+      return !PUBLIC_PREFIXES.some((pfx) => l.startsWith(pfx));
     });
 
-    const hasPlacesData = placesResults.length > 0;
+    // ── FASE 1b: FatturatoItalia → aziende CCIAA non su Google Maps ──────
+    // Aggiunge aziende registrate che non appaiono su Google Maps
+    let fatturatoResults: PlacesResult[] = [];
+    if (search.location) {
+      try {
+        const needed = search.maxResults - placesResults.length;
+        const fetchCount = needed > 0 ? search.maxResults : Math.floor(search.maxResults * 0.5);
+        fatturatoResults = await fetchFatturatoItalia(search.location, Math.max(fetchCount, 20));
+      } catch {
+        // non-fatal: procedi senza
+      }
+    }
+
+    // Merge Places + FatturatoItalia — deduplica per nome (prime 12 lettere)
+    const seenNames = new Set(placesResults.map((p) => p.companyName.toLowerCase().slice(0, 12)));
+    const newFromFatturato = fatturatoResults.filter((f) => {
+      const key = f.companyName.toLowerCase().slice(0, 12);
+      if (seenNames.has(key)) return false;
+      seenNames.add(key);
+      return true;
+    });
+
+    // Se la ricerca è specifica (keywords/settore), filtra FatturatoItalia con Sonar dopo
+    // Se generica, aggiungi tutte fino al limite
+    const allPlacesResults = [...placesResults, ...newFromFatturato].slice(0, search.maxResults);
+
+    const hasPlacesData = allPlacesResults.length > 0;
 
     // ── FASE 2: Perplexity/Sonar — arricchimento contatti in batch da 15 ──
 
@@ -258,8 +361,8 @@ export async function runSearch(
       const BATCH = 15;
       const enrichedAll: Array<Record<string, unknown>> = [];
 
-      for (let i = 0; i < placesResults.length; i += BATCH) {
-        const batch = placesResults.slice(i, i + BATCH);
+      for (let i = 0; i < allPlacesResults.length; i += BATCH) {
+        const batch = allPlacesResults.slice(i, i + BATCH);
         const companiesList = batch
           .map((p, idx) => `${i + idx + 1}. ${p.companyName}${p.website ? ` — ${p.website}` : ""}${p.location ? ` — ${p.location}` : ""}`)
           .join("\n");
@@ -269,7 +372,7 @@ export async function runSearch(
               {
                 role: "system",
                 content: `Sei un esperto ricercatore di lead B2B con accesso alla ricerca web in tempo reale.
-Hai ricevuto un elenco di attività reali da Google Maps. Per ognuna:
+Hai ricevuto un elenco di attività reali (da Google Maps e registro CCIAA). Per ognuna:
 1. Trova il referente (titolare, CEO, responsabile) cercando su sito web, LinkedIn, CCIAA
 2. Trova l'email (personale o generica: info@, commerciale@, contatti@)
 3. Assegna uno score 0-100 rispetto ai criteri del cliente ideale
@@ -287,8 +390,8 @@ Rispondi SOLO con JSON array, zero testo aggiuntivo, zero markdown.`,
         } catch { /* batch failure non-fatal */ }
       }
 
-      // Merge Places + Sonar
-      parsed = placesResults.map((p) => {
+      // Merge Places/CCIAA + Sonar
+      parsed = allPlacesResults.map((p) => {
         const match = enrichedAll.find(
           (e) => typeof e.companyName === "string" &&
             (e.companyName.toLowerCase().includes(p.companyName.toLowerCase().slice(0, 10)) ||
@@ -401,7 +504,9 @@ IMPORTANTE: usa email generica (info@, commerciale@) se non trovi quella persona
       organizationId: orgId,
       searchId,
       ...c,
-      source: hasPlacesData ? "Google Maps + AI" : "AI",
+      source: hasPlacesData
+        ? (fatturatoResults.length > 0 ? "Google Maps + CCIAA + AI" : "Google Maps + AI")
+        : "AI",
       status: "PENDING",
     }));
 
