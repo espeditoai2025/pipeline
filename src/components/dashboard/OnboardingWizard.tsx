@@ -206,7 +206,13 @@ export function OnboardingWizard({ status }: Props) {
             <p className="text-sm text-white/70 mt-0.5">
               {allDone
                 ? "Hai completato tutti i passi. Buon lavoro!"
-                : `${completedCount} di ${totalCount} passi completati — ci vorranno pochi minuti`}
+                : completedCount === 0
+                  ? `0 di ${totalCount} passi completati — inizia da qui, ci vorranno pochi minuti`
+                  : progressPct < 50
+                    ? `${completedCount} di ${totalCount} passi completati — ottimo inizio!`
+                    : progressPct < 85
+                      ? `${completedCount} di ${totalCount} passi completati — stai andando benissimo!`
+                      : `${completedCount} di ${totalCount} passi completati — ci sei quasi!`}
             </p>
           </div>
         </div>
