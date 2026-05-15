@@ -28,6 +28,8 @@ export type PlanLimits = {
   automations: boolean;
   emailCampaigns: boolean;
   smtp: boolean;
+  leadFinderPerDay: number | null; // null = unlimited; 0 = no access
+  leadFinderMaxResults: number;
 };
 
 export const LIMITS: Record<PlanTier, PlanLimits> = {
@@ -38,6 +40,8 @@ export const LIMITS: Record<PlanTier, PlanLimits> = {
     automations: false,
     emailCampaigns: false,
     smtp: false,
+    leadFinderPerDay: 1,
+    leadFinderMaxResults: 10,
   },
   pro: {
     maxPipelines: null,
@@ -46,6 +50,8 @@ export const LIMITS: Record<PlanTier, PlanLimits> = {
     automations: true,
     emailCampaigns: true,
     smtp: true,
+    leadFinderPerDay: null,
+    leadFinderMaxResults: 20,
   },
   enterprise: {
     maxPipelines: null,
@@ -54,6 +60,8 @@ export const LIMITS: Record<PlanTier, PlanLimits> = {
     automations: true,
     emailCampaigns: true,
     smtp: true,
+    leadFinderPerDay: null,
+    leadFinderMaxResults: 20,
   },
 };
 
@@ -79,6 +87,8 @@ const FEATURE_LABELS: Record<FeatureKey, string> = {
   automations: "Automazioni",
   emailCampaigns: "Campagne email",
   smtp: "Configurazione email SMTP",
+  leadFinderPerDay: "Lead Finder ricerche giornaliere",
+  leadFinderMaxResults: "Lead Finder candidati per ricerca",
 };
 
 export function checkFeature(plan: Plan | string, feature: FeatureKey): string | null {

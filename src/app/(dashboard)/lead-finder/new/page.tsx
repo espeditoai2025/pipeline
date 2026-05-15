@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { ChevronLeft, Telescope, Lightbulb } from "lucide-react";
 import { SearchForm } from "@/components/lead-finder/SearchForm";
+import { getLeadFinderInfo } from "@/server/actions/lead-finder";
 
-export default function NewLeadFinderPage() {
+export default async function NewLeadFinderPage() {
+  const info = await getLeadFinderInfo();
+
   return (
     <div className="max-w-2xl space-y-6">
       {/* Breadcrumb */}
@@ -36,7 +39,7 @@ export default function NewLeadFinderPage() {
 
       {/* Form */}
       <div className="rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 bg-white dark:bg-[#1a1a2e] p-6">
-        <SearchForm />
+        <SearchForm maxResultsLimit={info.maxResults} isStarter={info.perDay !== null} />
       </div>
     </div>
   );

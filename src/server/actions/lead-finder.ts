@@ -6,7 +6,7 @@ import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { chatCompletion } from "@/lib/openrouter";
-import { getOrgPlan, checkFeature } from "@/lib/plan";
+import { getOrgPlan, getLimits, checkFeature } from "@/lib/plan";
 import { createLead } from "@/server/actions/leads";
 import type { LeadFinderSearch, LeadCandidate } from "@/types/lead-finder";
 
@@ -64,15 +64,32 @@ export async function createSearch(
   if (!orgId) return { data: null, error: "Non autorizzato" };
 
   const plan = await getOrgPlan(orgId);
-  const planError = checkFeature(plan, "ai");
-  if (planError) return { data: null, error: planError };
+  const limits = getLimits(plan);
+
+  // Check daily limit for STARTER
+  if (limits.leadFinderPerDay !== null) {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const todayCount = await db.leadFinderSearch.count({
+      where: { organizationId: orgId, createdAt: { gte: startOfDay } },
+    });
+    if (todayCount >= limits.leadFinderPerDay) {
+      return { data: null, error: `Hai raggiunto il limite di ${limits.leadFinderPerDay} ricerca al giorno del piano Starter. Passa a PRO per ricerche illimitate.` };
+    }
+  }
 
   const parsed = searchSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Input non valido" };
 
+  // Cap maxResults at plan limit
+  const cappedData = {
+    ...parsed.data,
+    maxResults: Math.min(parsed.data.maxResults, limits.leadFinderMaxResults),
+  };
+
   try {
     const row = await db.leadFinderSearch.create({
-      data: { organizationId: orgId, ...parsed.data, status: "PENDING" },
+      data: { organizationId: orgId, ...cappedData, status: "PENDING" },
     });
     revalidatePath("/lead-finder");
     return { data: mapSearch(row), error: null };
@@ -161,10 +178,6 @@ export async function runSearch(
   const session = await auth();
   const { orgId } = getIds(session);
   if (!orgId) return { error: "Non autorizzato" };
-
-  const plan = await getOrgPlan(orgId);
-  const planError = checkFeature(plan, "ai");
-  if (planError) return { error: planError };
 
   const search = await db.leadFinderSearch.findFirst({
     where: { id: searchId, organizationId: orgId },
@@ -537,4 +550,52 @@ export async function rejectCandidate(
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Errore" };
   }
+}
+
+// ─── deleteSearch ─────────────────────────────────────────────────────────
+
+export async function deleteSearch(
+  searchId: string
+): Promise<{ error: string | null }> {
+  const session = await auth();
+  const { orgId } = getIds(session);
+  if (!orgId) return { error: "Non autorizzato" };
+
+  try {
+    await db.leadFinderSearch.delete({
+      where: { id: searchId, organizationId: orgId },
+    });
+    revalidatePath("/lead-finder");
+    return { error: null };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Errore eliminazione" };
+  }
+}
+
+// ─── getLeadFinderInfo ────────────────────────────────────────────────────
+// Returns plan limits + today's usage for the current org
+
+export async function getLeadFinderInfo(): Promise<{
+  perDay: number | null;
+  maxResults: number;
+  usedToday: number;
+}> {
+  const session = await auth();
+  const { orgId } = getIds(session);
+  if (!orgId) return { perDay: 0, maxResults: 10, usedToday: 0 };
+
+  const plan = await getOrgPlan(orgId);
+  const limits = getLimits(plan);
+
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const usedToday = limits.leadFinderPerDay !== null
+    ? await db.leadFinderSearch.count({ where: { organizationId: orgId, createdAt: { gte: startOfDay } } })
+    : 0;
+
+  return {
+    perDay: limits.leadFinderPerDay,
+    maxResults: limits.leadFinderMaxResults,
+    usedToday,
+  };
 }

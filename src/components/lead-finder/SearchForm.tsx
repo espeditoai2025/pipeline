@@ -119,10 +119,17 @@ const COMPANY_SIZES = [
   { value: "1000+", label: "1000+ dipendenti" },
 ];
 
-export function SearchForm() {
+type SearchFormProps = {
+  maxResultsLimit?: number;
+  isStarter?: boolean;
+};
+
+export function SearchForm({ maxResultsLimit = 20, isStarter = false }: SearchFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  const defaultResults = Math.min(10, maxResultsLimit);
 
   const [form, setForm] = useState({
     name: "",
@@ -131,7 +138,7 @@ export function SearchForm() {
     companySize: "",
     keywords: "",
     idealCustomer: "",
-    maxResults: 10,
+    maxResults: defaultResults,
   });
 
   function set(field: keyof typeof form, value: string | number) {
@@ -247,11 +254,14 @@ export function SearchForm() {
       <div>
         <label className="block text-sm font-medium text-[var(--crm-neutral-700)] dark:text-white mb-1.5">
           Numero massimo candidati: <span className="text-[var(--crm-primary)] font-bold">{form.maxResults}</span>
+          {isStarter && (
+            <span className="ml-2 text-xs font-normal text-[var(--crm-neutral-400)]">(max {maxResultsLimit} con piano Starter)</span>
+          )}
         </label>
         <input
           type="range"
           min={3}
-          max={20}
+          max={maxResultsLimit}
           step={1}
           value={form.maxResults}
           onChange={(e) => set("maxResults", parseInt(e.target.value))}
@@ -259,7 +269,7 @@ export function SearchForm() {
         />
         <div className="flex justify-between text-xs text-[var(--crm-neutral-400)] mt-1">
           <span>3</span>
-          <span>20</span>
+          <span>{maxResultsLimit}</span>
         </div>
       </div>
 
