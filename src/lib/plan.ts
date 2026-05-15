@@ -51,7 +51,7 @@ export const LIMITS: Record<PlanTier, PlanLimits> = {
     emailCampaigns: true,
     smtp: true,
     leadFinderPerDay: null,
-    leadFinderMaxResults: 20,
+    leadFinderMaxResults: 50,
   },
   enterprise: {
     maxPipelines: null,
@@ -61,7 +61,7 @@ export const LIMITS: Record<PlanTier, PlanLimits> = {
     emailCampaigns: true,
     smtp: true,
     leadFinderPerDay: null,
-    leadFinderMaxResults: 20,
+    leadFinderMaxResults: 50,
   },
 };
 

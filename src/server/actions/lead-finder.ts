@@ -51,7 +51,7 @@ const searchSchema = z.object({
   companySize: z.string().optional(),
   keywords: z.string().optional(),
   idealCustomer: z.string().optional(),
-  maxResults: z.number().int().min(3).max(20).default(10),
+  maxResults: z.number().int().min(3).max(50).default(10),
 });
 
 // ─── createSearch ─────────────────────────────────────────────────────────
@@ -188,41 +188,51 @@ export async function runSearch(
 
   try {
     // ── FASE 1: Google Places → aziende reali verificate ──────────────────
-    // Se non ci sono keywords/settore, cerchiamo TUTTO (aziende + artigiani + professionisti)
     const hasSpecificTerm = !!(search.keywords || search.sector);
-    const specificTerm = search.keywords || search.sector;
+    const loc = search.location ?? "";
 
-    // Query primaria: termine specifico (o generico) + località
-    const primaryQuery = [
-      specificTerm || "aziende imprese",
-      search.location,
-    ].filter(Boolean).join(" ");
+    // Categorie da interrogare in parallelo quando la ricerca è generica
+    const GENERIC_CATEGORIES = [
+      "aziende imprese commercio",
+      "artigiani costruzioni edilizia",
+      "bar ristoranti alberghi turismo",
+      "professionisti servizi consulenza",
+      "negozi attività",
+    ];
 
-    let placesResults = await searchGooglePlaces(primaryQuery, search.maxResults);
+    let placesResults: PlacesResult[];
 
-    // Se senza filtri specifici, aggiungi una seconda query per artigiani e professionisti
-    if (!hasSpecificTerm && search.location && placesResults.length < search.maxResults) {
-      const secondQuery = `artigiani professionisti attività commerciali ${search.location}`;
-      const secondResults = await searchGooglePlaces(secondQuery, search.maxResults - placesResults.length);
-      // Dedup per nome
-      const existing = new Set(placesResults.map((p) => p.companyName.toLowerCase()));
-      placesResults = [
-        ...placesResults,
-        ...secondResults.filter((p) => !existing.has(p.companyName.toLowerCase())),
-      ];
+    if (hasSpecificTerm) {
+      // Ricerca specifica: singola query con il termine dell'utente
+      const q = `${search.keywords ?? search.sector} ${loc}`.trim();
+      placesResults = await searchGooglePlaces(q, search.maxResults);
+    } else {
+      // Ricerca generica: 5 categorie in parallelo per massima copertura
+      const queries = loc
+        ? GENERIC_CATEGORIES.map((cat) => `${cat} ${loc}`)
+        : [`aziende imprese artigiani professionisti ${loc}`.trim()];
+      const allArrays = await Promise.all(queries.map((q) => searchGooglePlaces(q, 20)));
+      const seen = new Set<string>();
+      placesResults = allArrays
+        .flat()
+        .filter((p) => {
+          const key = p.companyName.toLowerCase().slice(0, 20);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .slice(0, search.maxResults);
     }
 
-    // Filtra risultati che sono enti pubblici/comuni (non aziende)
+    // Escludi enti pubblici
     placesResults = placesResults.filter((p) => {
-      const lower = p.companyName.toLowerCase();
-      return !lower.startsWith("comune di") && !lower.startsWith("municipio") && !lower.startsWith("provincia di");
+      const l = p.companyName.toLowerCase();
+      return !l.startsWith("comune di") && !l.startsWith("municipio") && !l.startsWith("provincia di") && !l.startsWith("regione ");
     });
 
     const hasPlacesData = placesResults.length > 0;
 
-    // ── FASE 2: Perplexity/Sonar ──────────────────────────────────────────
-    // Se abbiamo dati da Places: Sonar arricchisce solo contatti + scoring
-    // Altrimenti: Sonar trova tutto da zero (fallback)
+    // ── FASE 2: Perplexity/Sonar — arricchimento contatti in batch da 15 ──
 
     const criteria: string[] = [];
     if (search.sector) criteria.push(`Settore: ${search.sector}`);
@@ -234,63 +244,55 @@ export async function runSearch(
       ? criteria.join("\n")
       : `Qualsiasi azienda, artigiano o libero professionista${search.location ? ` di ${search.location}` : " italiano"}`;
 
-    let parsed: Array<{
+    type ParsedCandidate = {
       companyName: string; website: string | null; sector: string | null;
       location: string | null; companySize: string | null; contactName: string | null;
       contactRole: string | null; email: string | null; phone: string | null;
       linkedinUrl: string | null; score: number; motivation: string | null;
-    }>;
+    };
+
+    let parsed: ParsedCandidate[];
 
     if (hasPlacesData) {
-      // Sonar arricchisce le aziende reali trovate da Google Places
-      const companiesList = placesResults
-        .map((p, i) => `${i + 1}. ${p.companyName}${p.website ? ` — ${p.website}` : ""}${p.location ? ` — ${p.location}` : ""}`)
-        .join("\n");
+      // Batch Sonar enrichment: 15 aziende per chiamata
+      const BATCH = 15;
+      const enrichedAll: Array<Record<string, unknown>> = [];
 
-      const raw = await chatCompletion(
-        [
-          {
-            role: "system",
-            content: `Sei un esperto ricercatore di lead B2B con accesso alla ricerca web in tempo reale.
-Ti vengono fornite aziende REALI già verificate da Google Maps. Il tuo compito è:
-1. Trovare il referente principale (CEO, titolare, direttore commerciale) cercando su LinkedIn, sito web, CCIAA, comunicati stampa
-2. Trovare l'email di contatto (personale o generica info@/commerciale@)
-3. Assegnare uno score 0-100 in base alla corrispondenza con i criteri del cliente ideale
-4. Scrivere una breve motivazione dello score
-Rispondi SOLO con JSON array valido, zero testo aggiuntivo, zero markdown.`,
-          },
-          {
-            role: "user",
-            content: `Criteri cliente ideale:
-${criteriaText}
+      for (let i = 0; i < placesResults.length; i += BATCH) {
+        const batch = placesResults.slice(i, i + BATCH);
+        const companiesList = batch
+          .map((p, idx) => `${i + idx + 1}. ${p.companyName}${p.website ? ` — ${p.website}` : ""}${p.location ? ` — ${p.location}` : ""}`)
+          .join("\n");
+        try {
+          const raw = await chatCompletion(
+            [
+              {
+                role: "system",
+                content: `Sei un esperto ricercatore di lead B2B con accesso alla ricerca web in tempo reale.
+Hai ricevuto un elenco di attività reali da Google Maps. Per ognuna:
+1. Trova il referente (titolare, CEO, responsabile) cercando su sito web, LinkedIn, CCIAA
+2. Trova l'email (personale o generica: info@, commerciale@, contatti@)
+3. Assegna uno score 0-100 rispetto ai criteri del cliente ideale
+4. Scrivi una motivazione sintetica
+Rispondi SOLO con JSON array, zero testo aggiuntivo, zero markdown.`,
+              },
+              {
+                role: "user",
+                content: `Criteri cliente ideale:\n${criteriaText}\n\nAttività da arricchire:\n${companiesList}\n\nJSON array (un oggetto per ogni attività, stesso ordine):\n[{"companyName":"...","contactName":"...","contactRole":"...","email":"...","linkedinUrl":"...","score":80,"motivation":"..."}]`,
+              },
+            ],
+            { maxTokens: 2000, temperature: 0.4, model: process.env.OPENROUTER_MODEL_LEADFINDER ?? "perplexity/sonar" }
+          );
+          try { enrichedAll.push(...extractJsonArray(raw)); } catch { /* batch fallback */ }
+        } catch { /* batch failure non-fatal */ }
+      }
 
-Aziende reali da arricchire (trovate su Google Maps):
-${companiesList}
-
-Per ognuna cerca sul web il referente e restituisci SOLO questo JSON array:
-[
-  {
-    "companyName": "nome esatto come sopra",
-    "contactName": "Nome Cognome del titolare/CEO",
-    "contactRole": "CEO / Titolare / Direttore Commerciale",
-    "email": "email trovata sul web",
-    "linkedinUrl": "https://linkedin.com/...",
-    "score": 85,
-    "motivation": "perché corrisponde ai criteri"
-  }
-]`,
-          },
-        ],
-        { maxTokens: 3000, temperature: 0.4, model: process.env.OPENROUTER_MODEL_LEADFINDER ?? "perplexity/sonar" }
-      );
-
-      const enriched = extractJsonArray(raw) as Array<Record<string, unknown>>;
-
-      // Merge Google Places data + Sonar enrichment
+      // Merge Places + Sonar
       parsed = placesResults.map((p) => {
-        const match = enriched.find(
+        const match = enrichedAll.find(
           (e) => typeof e.companyName === "string" &&
-            e.companyName.toLowerCase().includes(p.companyName.toLowerCase().slice(0, 8))
+            (e.companyName.toLowerCase().includes(p.companyName.toLowerCase().slice(0, 10)) ||
+             p.companyName.toLowerCase().includes((e.companyName as string).toLowerCase().slice(0, 10)))
         );
         return {
           companyName: p.companyName,
