@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Search, Rocket, GitBranch, Users, Zap, Calendar, Mail, Megaphone,
@@ -8,8 +8,11 @@ import {
   Plug, Smartphone, CreditCard, HelpCircle, PlayCircle,
   ChevronRight, ChevronLeft, ArrowUpRight, BookOpen, Star,
   Clock, CheckCircle2, X, ExternalLink, Lightbulb, AlertTriangle, ListChecks,
+  Layers,
 } from "lucide-react";
-import { GUIDE_SECTIONS, type GuideArticle, type GuideBlock, type GuideSection } from "@/lib/guide-data";
+import { GUIDE_SECTIONS, type GuideArticle, type GuideBlock, type GuideSection, type CrmModeId } from "@/lib/guide-data";
+import { getCrmMode } from "@/server/actions/crm-mode";
+import { CRM_MODES } from "@/types/crm-modes";
 
 // ─── UI-only types (add icon/color/bgColor to GuideSection) ──────────────────
 
@@ -41,6 +44,7 @@ const SECTION_META: Record<string, { icon: React.ElementType; color: string; bgC
   fatturazione: { icon: CreditCard, color: "text-amber-600",   bgColor: "bg-amber-50 dark:bg-amber-900/20" },
   problemi:     { icon: HelpCircle, color: "text-red-600",     bgColor: "bg-red-50 dark:bg-red-900/20" },
   tutorial:     { icon: PlayCircle, color: "text-rose-600",    bgColor: "bg-rose-50 dark:bg-rose-900/20" },
+  settoriale:   { icon: Layers,     color: "text-fuchsia-600", bgColor: "bg-fuchsia-50 dark:bg-fuchsia-900/20" },
 };
 
 const CATEGORIES: Category[] = GUIDE_SECTIONS.map((s) => ({
@@ -48,7 +52,7 @@ const CATEGORIES: Category[] = GUIDE_SECTIONS.map((s) => ({
   ...(SECTION_META[s.id] ?? { icon: HelpCircle, color: "text-slate-600", bgColor: "bg-slate-50" }),
 }));
 const POPULAR_ARTICLES = CATEGORIES.flatMap((c) =>
-  c.articles.filter((a) => a.popular).map((a) => ({ ...a, category: c.label, categoryId: c.id, color: c.color, bgColor: c.bgColor, icon: c.icon }))
+  c.articles.filter((a) => a.popular && !a.modes).map((a) => ({ ...a, category: c.label, categoryId: c.id, color: c.color, bgColor: c.bgColor, icon: c.icon }))
 ).slice(0, 6);
 
 // â”€â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -229,8 +233,9 @@ function ArticleRow({ article, compact = false, onClick }: { article: Article; c
   );
 }
 
-function CategoryDetail({ cat, onBack, onArticleClick }: { cat: Category; onBack: () => void; onArticleClick: (a: Article) => void }) {
+function CategoryDetail({ cat, onBack, onArticleClick, crmMode }: { cat: Category; onBack: () => void; onArticleClick: (a: Article) => void; crmMode: CrmModeId }) {
   const Icon = cat.icon;
+  const visibleArticles = cat.articles.filter((a) => !a.modes || a.modes.includes(crmMode));
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -255,11 +260,11 @@ function CategoryDetail({ cat, onBack, onArticleClick }: { cat: Category; onBack
 
       <div className="rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 bg-white dark:bg-[#1a1a2e] p-5">
         <h2 className="text-sm font-semibold text-[var(--crm-neutral-900)] dark:text-white mb-1">
-          {cat.articles.length} articoli in questa categoria
+          {visibleArticles.length} articoli in questa categoria
         </h2>
         <p className="text-xs text-[var(--crm-neutral-500)] mb-4">Clicca su un articolo per leggere la guida completa.</p>
         <div>
-          {cat.articles.map((a) => (
+          {visibleArticles.map((a) => (
             <ArticleRow key={a.id} article={a} onClick={() => onArticleClick(a)} />
           ))}
         </div>
@@ -289,16 +294,32 @@ export default function GuidaPage() {
   const [search, setSearch] = useState("");
   const [selectedCat, setSelectedCat] = useState<Category | null>(null);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
+  const [crmMode, setCrmMode] = useState<CrmModeId>("CLASSIC");
+
+  useEffect(() => {
+    getCrmMode().then(setCrmMode);
+  }, []);
+
+  const mainCategories = useMemo(() => CATEGORIES.filter((c) => c.id !== "settoriale"), []);
+
+  const sectorCat = useMemo(() => CATEGORIES.find((c) => c.id === "settoriale"), []);
+  const sectorArticles = useMemo(() => {
+    if (!sectorCat || crmMode === "CLASSIC") return [];
+    return sectorCat.articles.filter((a) => a.modes?.includes(crmMode));
+  }, [sectorCat, crmMode]);
 
   const searchResults = useMemo(() => {
     const q = search.toLowerCase().trim();
     if (!q) return [];
     return CATEGORIES.flatMap((c) =>
       c.articles
-        .filter((a) => a.title.toLowerCase().includes(q) || a.excerpt.toLowerCase().includes(q))
+        .filter((a) =>
+          (!a.modes || a.modes.includes(crmMode)) &&
+          (a.title.toLowerCase().includes(q) || a.excerpt.toLowerCase().includes(q))
+        )
         .map((a) => ({ ...a, category: c.label, categoryId: c.id, catIcon: c.icon, color: c.color, bgColor: c.bgColor }))
     );
-  }, [search]);
+  }, [search, crmMode]);
 
   if (selectedCat && selectedArticle && !search) {
     return (
@@ -319,6 +340,7 @@ export default function GuidaPage() {
           cat={selectedCat}
           onBack={() => setSelectedCat(null)}
           onArticleClick={(a) => setSelectedArticle(a)}
+          crmMode={crmMode}
         />
       </div>
     );
@@ -506,17 +528,44 @@ export default function GuidaPage() {
             </div>
           </div>
 
+          {/* Sector-specific articles strip */}
+          {sectorArticles.length > 0 && sectorCat && (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <Layers className="h-4 w-4 text-fuchsia-600" />
+                <h2 className="text-sm font-semibold text-[var(--crm-neutral-900)] dark:text-white">
+                  Guide per {CRM_MODES[crmMode].name}
+                </h2>
+                <span className="rounded-full bg-fuchsia-50 dark:bg-fuchsia-900/20 px-2 py-0.5 text-xs font-medium text-fuchsia-600">
+                  Il tuo setup
+                </span>
+              </div>
+              <div className="rounded-xl border border-fuchsia-100 dark:border-fuchsia-800/30 bg-white dark:bg-[#1a1a2e] p-4 divide-y divide-[var(--crm-neutral-100)] dark:divide-white/10">
+                {sectorArticles.map((a) => (
+                  <ArticleRow
+                    key={a.id}
+                    article={a}
+                    onClick={() => {
+                      setSelectedCat(sectorCat);
+                      setSelectedArticle(a);
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* All categories */}
           <div>
             <div className="flex items-center gap-2 mb-4">
               <BookOpen className="h-4 w-4 text-[var(--crm-primary)]" />
               <h2 className="text-sm font-semibold text-[var(--crm-neutral-900)] dark:text-white">Tutte le categorie</h2>
               <span className="rounded-full bg-[var(--crm-neutral-100)] dark:bg-white/10 px-2 py-0.5 text-xs text-[var(--crm-neutral-500)]">
-                {CATEGORIES.length}
+                {mainCategories.length}
               </span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {CATEGORIES.map((cat) => (
+              {mainCategories.map((cat) => (
                 <CategoryCard key={cat.id} cat={cat} onClick={() => setSelectedCat(cat)} />
               ))}
             </div>

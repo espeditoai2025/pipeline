@@ -88,6 +88,43 @@ async function buildCrmContext(orgId: string): Promise<string> {
   return lines.join("\n");
 }
 
+// ─── Sector-specific context per CRM mode ─────────────────────────────────
+
+const SECTOR_CONTEXT: Partial<Record<string, string>> = {
+  IMMOBILIARE: `=== CONTESTO SETTORE IMMOBILIARE ===
+Terminologia settore: le "Trattative" sono acquisti/vendite/affitti di immobili, gli "Acquirenti/Venditori" sono i lead. Usa sempre questa terminologia nelle risposte.
+Focus operativo:
+- Pipeline compravendite e affitti: monitora ogni trattativa dallo stage "Valutazione immobile" fino al "Rogito firmato"
+- Database acquirenti e venditori: tieni traccia delle preferenze (zona, budget, metratura, tipologia)
+- Follow-up post-visita: attività pianificate entro 24-48h da ogni sopralluogo sono critiche
+- Campi personalizzati: budget massimo, preferenze zona, tipo immobile (residenziale/commerciale), metratura desiderata
+- Report provvigioni: traccia valore trattativa × percentuale per calcolo commissioni
+- Affari fermi = trattative senza aggiornamento → rischio perdita mandato
+- Priorità azioni: follow-up visite scaduti > trattative senza documenti > acquirenti non ricontattati`,
+
+  ASSICURAZIONI: `=== CONTESTO SETTORE ASSICURAZIONI ===
+Terminologia settore: le "Polizze" sono gli affari/deal, i "Clienti assicurati" sono i contatti. Usa questa terminologia.
+Focus operativo:
+- Portfolio polizze: ogni cliente ha una o più polizze attive — il valore pipeline è premio annuo × clienti
+- Scadenzario rinnovi: le polizze in scadenza nei prossimi 30/60/90 giorni sono la priorità assoluta
+- Cross-selling: a ogni cliente vita proponi danni/auto, e viceversa — usa campi personalizzati per tipo polizza
+- Lead qualificati: chi ha richiesto un preventivo nelle ultime 2 settimane va contattato entro 48h
+- Affari fermi = polizze in trattativa senza contatti → rischio che il cliente firmi con un competitor
+- Attività scadute = rinnovi non gestiti → perdita diretta di portafoglio
+- Priorità azioni: rinnovi in scadenza < 30gg > preventivi non seguiti > cross-selling clienti monoprodotto`,
+
+  ECOMMERCE: `=== CONTESTO SETTORE ECOMMERCE B2B ===
+Terminologia settore: gli "Ordini ricorrenti" sono affari/deal, i "Clienti wholesale" sono i contatti B2B. Usa questa terminologia.
+Focus operativo:
+- Pipeline ordini ricorrenti: traccia contratti con buyer grossisti, distributori, marketplace B2B
+- Segmentazione LTV: clienti con alto lifetime value (ordini frequenti + alto importo) richiedono account manager dedicato
+- Clienti inattivi: buyer B2B senza ordine da 60+ giorni = rischio churn → pianifica riattivazione
+- Contratti in rinnovo: clienti con accordo quadro annuale in scadenza = priorità commerciale
+- Lead B2B qualificati: aziende che hanno richiesto catalogo o listino prezzi → contatto entro 24h
+- Affari fermi = trattative B2B bloccate → spesso richiedono approvazione interna cliente
+- Priorità azioni: contratti in scadenza > clienti inattivi 60gg > lead con richiesta listino`,
+};
+
 // ─── askAssistant ─────────────────────────────────────────────────────────
 
 export async function askAssistant(message: string): Promise<ActionResult<string>> {
@@ -111,6 +148,7 @@ export async function askAssistant(message: string): Promise<ActionResult<string
     const modeContext = `Setup CRM attivo: ${mode.name} (${mode.category}) — terminologia: "${mode.dealLabel}" per gli affari, "${mode.leadLabel}" per i lead.`;
 
     const isGuideContent = guideContext.startsWith("=== DOCUMENTAZIONE");
+    const sectorContext = SECTOR_CONTEXT[crmMode] ?? "";
 
     const reply = await chatCompletion([
       {
@@ -132,7 +170,7 @@ Funzionalità chiave di Pipely (per domande su come si usa):
 - Notifiche in-app: attività scadute, affari in scadenza, lead nuovi — aggiornate ogni 60 secondi.
 - Importazione contatti: CSV/XLS/XLSX, crea automaticamente le aziende collegate.
 
-${modeContext}
+${modeContext}${sectorContext ? `\n\n${sectorContext}` : ""}
 
 ${crmContext}${isGuideContent ? `\n\n${guideContext}` : ""}`,
       },
