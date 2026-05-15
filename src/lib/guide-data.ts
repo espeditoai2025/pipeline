@@ -10,6 +10,8 @@ export type GuideBlock =
   | { type: "warning"; text: string }
   | { type: "link"; text: string; href: string };
 
+export type CrmModeId = "CLASSIC" | "IMMOBILIARE" | "ASSICURAZIONI" | "ECOMMERCE";
+
 export type GuideArticle = {
   id: string;
   title: string;
@@ -17,6 +19,7 @@ export type GuideArticle = {
   readTime: number;
   popular?: boolean;
   blocks?: GuideBlock[];
+  modes?: CrmModeId[];  // se assente = visibile a tutti i setup
 };
 
 export type GuideSection = {
@@ -1881,6 +1884,167 @@ export const GUIDE_SECTIONS: GuideSection[] = [
           "Gestione degli affari nella vista Kanban da mobile",
         ]},
         { type: "tip", text: "Iscriviti alla newsletter Pipely per essere avvisato quando nuovi tutorial vengono pubblicati." },
+      ]},
+    ],
+  },
+  {
+    id: "settoriale",
+    label: "Guida per settore",
+    description: "Articoli specifici per il tuo setup CRM: Immobiliare, Assicurazioni, E-commerce",
+    articles: [
+      // ── IMMOBILIARE ──────────────────────────────────────────────────────
+      { id: "se1", title: "Gestire compravendite e affitti con pipeline separate", excerpt: "Come configurare pipeline distinte per compravendite e locazioni e gestire ogni trattativa al meglio.", readTime: 4, popular: true, modes: ["IMMOBILIARE"], blocks: [
+        { type: "heading", text: "Perché usare pipeline separate" },
+        { type: "para", text: "Compravendite e affitti hanno cicli di vendita, tempistiche e documentazione completamente diversi. Con pipeline separate puoi tracciare lo stato di ogni trattativa in modo chiaro e misurare le performance per tipologia." },
+        { type: "heading", text: "Come creare pipeline separate" },
+        { type: "steps", items: [
+          "Vai su Affari → Pipeline (icona ingranaggio o Impostazioni → Pipeline)",
+          "Crea una pipeline \"Compravendite\" con stage: Ricerca immobile → Proposta → Preliminare → Rogito",
+          "Crea una pipeline \"Affitti\" con stage: Ricerca → Visita → Proposta → Contratto firmato",
+          "Quando crei un affare, seleziona la pipeline corretta dal menu a tendina",
+        ]},
+        { type: "heading", text: "Stage consigliati per compravendite" },
+        { type: "list", items: [
+          "Ricerca immobile — l'acquirente ha comunicato le sue esigenze",
+          "Visite programmate — almeno una visita effettuata",
+          "Proposta d'acquisto — offerta presentata al venditore",
+          "Preliminare firmato — compromesso stipulato",
+          "Rogito — atto notarile completato",
+        ]},
+        { type: "tip", text: "Usa i campi personalizzati (Impostazioni → Campi) per aggiungere: indirizzo immobile, prezzo richiesto, prezzo offerto, superficie mq, classe energetica." },
+      ]},
+      { id: "se2", title: "Acquirenti e venditori: come organizzare i contatti", excerpt: "Strategie per distinguere acquirenti, venditori, locatari e proprietari nel database contatti.", readTime: 3, modes: ["IMMOBILIARE"], blocks: [
+        { type: "heading", text: "Tag per tipologia di contatto" },
+        { type: "para", text: "Pipely permette di aggiungere tag ai contatti. Crea tag dedicati per distinguere il ruolo di ogni persona nel tuo portafoglio: Acquirente, Venditore, Locatario, Proprietario." },
+        { type: "heading", text: "Campi personalizzati per acquirenti" },
+        { type: "list", items: [
+          "Budget massimo (numero)",
+          "Zone di interesse (testo)",
+          "Tipologia cercata — appartamento, villa, ufficio (select)",
+          "Superficie minima mq (numero)",
+          "Con mutuo — sì/no (booleano)",
+        ]},
+        { type: "heading", text: "Campi personalizzati per venditori" },
+        { type: "list", items: [
+          "Prezzo di richiesta (numero)",
+          "Prezzo minimo accettabile (numero)",
+          "Motivazione alla vendita (select: trasloco, successione, investimento)",
+          "Disponibilità al rogito (data)",
+        ]},
+        { type: "tip", text: "Aggiungi i campi personalizzati in Impostazioni → Campi → Contatti. Sono visibili nel profilo di ogni contatto e nella scheda dell'affare collegato." },
+      ]},
+      { id: "se3", title: "Follow-up dopo una visita: non perdere l'acquirente", excerpt: "Come pianificare il follow-up post-visita e usare le automazioni per non dimenticare nessun contatto.", readTime: 3, modes: ["IMMOBILIARE"], blocks: [
+        { type: "heading", text: "Il momento critico: le 24 ore dopo la visita" },
+        { type: "para", text: "L'acquirente è più ricettivo nelle 24-48 ore dopo una visita. Un follow-up tempestivo può fare la differenza tra una proposta e un silenzio. Pipely ti aiuta a non dimenticare nessun contatto." },
+        { type: "heading", text: "Come pianificare il follow-up" },
+        { type: "steps", items: [
+          "Dopo ogni visita, apri l'affare e aggiungi un'attività di tipo \"Chiamata\" o \"Email\"",
+          "Imposta la scadenza a 24 ore dalla visita",
+          "Aggiungi una nota con le impressioni dell'acquirente durante la visita",
+          "Alla chiamata, aggiorna lo stage dell'affare (avanzamento o scarto)",
+        ]},
+        { type: "heading", text: "Automazione follow-up visita" },
+        { type: "para", text: "In Automazioni puoi creare un workflow: Trigger → Affare spostato nello stage 'Visite programmate' → Azione: crea attività 'Follow-up post-visita' con scadenza +1 giorno. Così non devi ricordartelo manualmente." },
+        { type: "tip", text: "Gli affari senza aggiornamenti da oltre 14 giorni vengono segnalati come 'in rotting' nella dashboard. Monitora quotidianamente questa sezione per non perdere trattative ferme." },
+      ]},
+
+      // ── ASSICURAZIONI ────────────────────────────────────────────────────
+      { id: "se4", title: "Gestire il portafoglio polizze con il CRM", excerpt: "Come usare Pipely per tracciare polizze attive, rinnovi in scadenza e nuove opportunità.", readTime: 4, popular: true, modes: ["ASSICURAZIONI"], blocks: [
+        { type: "heading", text: "La struttura consigliata" },
+        { type: "para", text: "In Pipely puoi gestire il portafoglio polizze usando tre elementi: i Contatti (gli assicurati), gli Affari (le singole polizze o opportunità) e le Attività (rinnovi, scadenze, appuntamenti)." },
+        { type: "heading", text: "Pipeline consigliata per nuove polizze" },
+        { type: "list", items: [
+          "Lead entrato — primo contatto con il potenziale assicurato",
+          "Analisi bisogni — raccolta dati e analisi delle esigenze",
+          "Proposta inviata — preventivo o proposta trasmessa",
+          "In attesa di firma — cliente ha accettato, in attesa di firma",
+          "Polizza attiva — contratto firmato e attivo",
+        ]},
+        { type: "heading", text: "Tracciare i rinnovi" },
+        { type: "para", text: "Per ogni polizza attiva, crea un'attività di tipo 'Scadenza' con la data di rinnovo. Imposta un promemoria 30-60 giorni prima della scadenza per contattare il cliente in anticipo." },
+        { type: "tip", text: "Usa i campi personalizzati (Impostazioni → Campi → Affari) per aggiungere: Tipo polizza (RC Auto, Vita, Casa, Salute), Data scadenza polizza, Premio annuo, Compagnia assicurativa." },
+      ]},
+      { id: "se5", title: "Scadenzario polizze: come non perdere un rinnovo", excerpt: "Configura promemoria e attività automatiche per ogni polizza in scadenza nel tuo portafoglio.", readTime: 3, modes: ["ASSICURAZIONI"], blocks: [
+        { type: "heading", text: "Metodo manuale: attività di scadenza" },
+        { type: "steps", items: [
+          "Apri il profilo del cliente (Contatti)",
+          "Vai nella tab Attività e crea una nuova attività di tipo 'Scadenza'",
+          "Titolo: 'Rinnovo polizza RC Auto — [Nome cliente]'",
+          "Imposta la scadenza a 45 giorni prima del rinnovo effettivo",
+          "Assegnala all'agente responsabile",
+        ]},
+        { type: "heading", text: "Metodo automatico: workflow di rinnovo" },
+        { type: "para", text: "In Automazioni, crea un workflow: Trigger → Affare spostato nello stage 'Polizza attiva' → Azione: crea attività 'Contatta per rinnovo' con scadenza calcolata. Ogni volta che una polizza viene attivata, il promemoria viene creato automaticamente." },
+        { type: "heading", text: "Monitorare le scadenze dalla dashboard" },
+        { type: "para", text: "Il widget 'Attività scadute' nella dashboard mostra tutte le attività non completate oltre la data di scadenza. Monitora questa sezione quotidianamente per intervenire in tempo su ogni rinnovo." },
+        { type: "warning", text: "Le funzionalità di gestione polizze dedicate (scadenzario automatico, notifiche di rinnovo) sono in sviluppo e saranno disponibili prossimamente nel setup Assicurazioni." },
+      ]},
+      { id: "se6", title: "Cross-selling: proporre polizze aggiuntive ai clienti esistenti", excerpt: "Come usare il CRM per identificare opportunità di cross-selling nel portafoglio clienti.", readTime: 3, modes: ["ASSICURAZIONI"], blocks: [
+        { type: "heading", text: "Identificare le opportunità" },
+        { type: "para", text: "Il cross-selling assicurativo è più efficace con i clienti già in portafoglio: hanno già fiducia nell'agente e il costo di acquisizione è zero. Usa i campi personalizzati per tracciare le polizze che ogni cliente NON ha ancora." },
+        { type: "heading", text: "Campi personalizzati consigliati" },
+        { type: "list", items: [
+          "Ha RC Auto (booleano)",
+          "Ha polizza Casa (booleano)",
+          "Ha polizza Vita (booleano)",
+          "Ha polizza Salute (booleano)",
+          "Potenziale cross-selling (select: Alto, Medio, Basso)",
+        ]},
+        { type: "tip", text: "Usa i filtri nella lista Contatti per creare segmenti: es. 'Ha RC Auto = Sì' AND 'Ha polizza Casa = No' → lista di clienti a cui proporre la polizza casa." },
+      ]},
+
+      // ── ECOMMERCE ────────────────────────────────────────────────────────
+      { id: "se7", title: "Gestire clienti B2B wholesale con il CRM", excerpt: "Come strutturare pipeline e contatti per la vendita wholesale a negozi, rivenditori e catene.", readTime: 4, popular: true, modes: ["ECOMMERCE"], blocks: [
+        { type: "heading", text: "B2B vs B2C nel CRM" },
+        { type: "para", text: "Nel CRM il focus è sulla gestione delle relazioni B2B: rivenditori, distributori, catene. I clienti B2C (consumatori finali) vengono gestiti principalmente tramite email marketing e campagne, non con pipeline individuali." },
+        { type: "heading", text: "Pipeline consigliata per wholesale" },
+        { type: "list", items: [
+          "Lead rivenditore — primo contatto con un potenziale rivenditore",
+          "Demo / campionario inviato — invio materiali o campioni",
+          "Trattativa prezzo — negoziazione condizioni commerciali",
+          "Primo ordine — primo ordine ricevuto",
+          "Cliente attivo — ordini ricorrenti in corso",
+        ]},
+        { type: "heading", text: "Campi personalizzati per rivenditori" },
+        { type: "list", items: [
+          "Tipo canale (select: Negozio fisico, E-commerce, Entrambi)",
+          "Volume acquisti mensile stimato (numero)",
+          "Categoria prodotto principale (select)",
+          "Sconto applicato % (numero)",
+          "Responsabile acquisti (testo)",
+        ]},
+        { type: "tip", text: "Usa il campo 'Azienda' per tracciare l'organizzazione del rivenditore e collegare più contatti (es. responsabile acquisti + direttore) alla stessa azienda." },
+      ]},
+      { id: "se8", title: "Segmentare i clienti per valore e frequenza acquisto", excerpt: "Come usare i campi personalizzati e i filtri per identificare i clienti ad alto valore e pianificare azioni mirate.", readTime: 3, modes: ["ECOMMERCE"], blocks: [
+        { type: "heading", text: "I segmenti chiave per l'e-commerce B2B" },
+        { type: "list", items: [
+          "Top client — alto valore + alta frequenza: priorità massima, offerte dedicate",
+          "A rischio churning — alta frequenza nel passato, ultimi 3 mesi silenziosi",
+          "Da sviluppare — basso valore ma alta frequenza: potenziale di crescita con upsell",
+          "Dormienti — nessun ordine da 6+ mesi: campagna di riattivazione",
+        ]},
+        { type: "heading", text: "Come implementare la segmentazione" },
+        { type: "steps", items: [
+          "Aggiungi campo personalizzato 'Valore LTV' (numero) sui Contatti",
+          "Aggiungi campo 'Segmento cliente' (select: Top, Da sviluppare, A rischio, Dormiente)",
+          "Aggiorna il segmento a ogni chiusura di ordine o trimestrale",
+          "Usa i filtri nella lista Contatti per creare liste per campagne email mirate",
+        ]},
+        { type: "tip", text: "Collega ogni ordine/contratto come Affare al contatto cliente. In questo modo puoi vedere l'intera storia degli ordini nella timeline del contatto." },
+      ]},
+      { id: "se9", title: "Pipeline ordini ricorrenti e contratti annuali", excerpt: "Come tracciare rinnovi, reorder e contratti a lungo termine con clienti wholesale.", readTime: 3, modes: ["ECOMMERCE"], blocks: [
+        { type: "heading", text: "Il problema dei contratti ricorrenti" },
+        { type: "para", text: "I clienti wholesale spesso hanno contratti annuali o fanno reorder periodici. Senza un sistema, questi rinnovi si perdono. Con Pipely puoi tracciare ogni rinnovo come un affare separato e pianificare il contatto in anticipo." },
+        { type: "heading", text: "Pipeline per contratti ricorrenti" },
+        { type: "list", items: [
+          "In scadenza — contratto che scade entro 60 giorni",
+          "Rinnovo in trattativa — contattato, discussione condizioni",
+          "Rinnovo confermato — contratto rinnovato",
+          "Perso — cliente non ha rinnovato (analizza il motivo)",
+        ]},
+        { type: "heading", text: "Automazione rinnovi" },
+        { type: "para", text: "Crea un workflow: Trigger → Affare spostato in 'Contratto attivo' → Azione: crea affare 'Rinnovo [Nome cliente]' nello stage 'In scadenza' con scadenza a +12 mesi. Ogni contratto genera automaticamente il suo rinnovo futuro." },
+        { type: "tip", text: "Usa il campo 'Data rinnovo contratto' (data) nei campi personalizzati degli Affari per tenere sempre visibile quando scade ogni contratto." },
       ]},
     ],
   },
