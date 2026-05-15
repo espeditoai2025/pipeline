@@ -109,30 +109,38 @@ export async function runSearch(
     if (search.keywords) criteria.push(`Parole chiave: ${search.keywords}`);
     if (search.idealCustomer) criteria.push(`Descrizione cliente ideale: ${search.idealCustomer}`);
 
-    const systemPrompt = `Sei un esperto ricercatore di lead B2B. Usa la ricerca web per trovare aziende REALI che corrispondono ai criteri forniti.
-Cerca aziende esistenti con siti web verificabili, referenti reali e contatti validi.
-Rispondi SOLO con un array JSON valido, senza testo aggiuntivo, markdown o spiegazioni.
-Per ogni azienda assegna uno score da 0 a 100 in base a quanto corrisponde ai criteri.`;
+    const systemPrompt = `Sei un esperto ricercatore di lead B2B con accesso alla ricerca web in tempo reale.
+Il tuo compito è trovare aziende REALI con i relativi referenti commerciali (CEO, titolare, direttore commerciale, responsabile acquisti).
+Per ogni azienda cerca attivamente:
+- Il sito web ufficiale
+- Il nome e cognome del referente principale (CEO, titolare o direttore commerciale)
+- L'email di contatto (cerca su sito web, LinkedIn, pagine "Contatti", CCIAA, comunicati stampa)
+- Il numero di telefono (cerca su sito web, pagina contatti, Google Maps, PagineGialle)
+- Il profilo LinkedIn dell'azienda o del referente
+Rispondi SOLO con un array JSON valido, senza testo aggiuntivo, markdown o spiegazioni.`;
 
     const userPrompt = `Criteri di ricerca:
-${criteria.length > 0 ? criteria.join("\n") : "Nessun criterio specifico — genera aziende B2B generiche"}
+${criteria.length > 0 ? criteria.join("\n") : "Aziende B2B italiane generiche"}
 
-Genera esattamente ${search.maxResults} aziende candidate in questo formato JSON array (nessun testo extra):
+Trova esattamente ${search.maxResults} aziende reali. Per ognuna cerca sul web il referente e i contatti.
+Rispondi SOLO con questo JSON array (zero testo extra, zero markdown):
 [
   {
     "companyName": "Nome Azienda Srl",
-    "website": "www.esempio.it",
-    "sector": "settore",
-    "location": "Milano, Italia",
+    "website": "www.nomeazienda.it",
+    "sector": "settore preciso",
+    "location": "Città, Provincia",
     "companySize": "11-50",
-    "contactName": "Mario Rossi",
-    "contactRole": "CEO",
-    "email": "mario.rossi@esempio.it",
+    "contactName": "Nome Cognome",
+    "contactRole": "CEO / Titolare / Direttore Commerciale",
+    "email": "nome@nomeazienda.it",
     "phone": "+39 02 1234567",
+    "linkedinUrl": "https://www.linkedin.com/company/nome-azienda",
     "score": 87,
-    "motivation": "Azienda tech B2B a Milano, dimensione ideale, keywords match"
+    "motivation": "perché corrisponde ai criteri"
   }
-]`;
+]
+IMPORTANTE: compila email e phone con dati reali trovati sul web. Se non trovi l'email personale usa quella generica dell'azienda (info@, commerciale@, contatti@). Se non trovi il telefono usa quello presente sulla pagina contatti del sito.`;
 
     const raw = await chatCompletion(
       [
@@ -149,11 +157,9 @@ Genera esattamente ${search.maxResults} aziende candidate in questo formato JSON
     const candidates = JSON.parse(match[0]) as Array<Record<string, unknown>>;
     if (!Array.isArray(candidates)) throw new Error("Risposta AI non è un array");
 
-    const rows = candidates
+    let parsed = candidates
       .filter((c) => typeof c.companyName === "string" && c.companyName)
       .map((c) => ({
-        organizationId: orgId,
-        searchId,
         companyName: String(c.companyName ?? ""),
         website: c.website ? String(c.website) : null,
         sector: c.sector ? String(c.sector) : null,
@@ -163,11 +169,56 @@ Genera esattamente ${search.maxResults} aziende candidate in questo formato JSON
         contactRole: c.contactRole ? String(c.contactRole) : null,
         email: c.email ? String(c.email) : null,
         phone: c.phone ? String(c.phone) : null,
+        linkedinUrl: c.linkedinUrl ? String(c.linkedinUrl) : null,
         score: typeof c.score === "number" ? Math.min(100, Math.max(0, Math.round(c.score))) : 50,
-        source: "AI",
         motivation: c.motivation ? String(c.motivation) : null,
-        status: "PENDING",
       }));
+
+    // Enrichment pass: for companies still missing email+phone, ask Sonar to find them
+    const missing = parsed.filter((c) => !c.email && !c.phone);
+    if (missing.length > 0) {
+      try {
+        const enrichPrompt = missing
+          .map((c) => `- ${c.companyName}${c.website ? ` (${c.website})` : ""}`)
+          .join("\n");
+        const enrichRaw = await chatCompletion(
+          [
+            {
+              role: "system",
+              content: `Cerca sul web i contatti (email e telefono) delle seguenti aziende italiane. Rispondi SOLO con JSON array, zero testo extra.`,
+            },
+            {
+              role: "user",
+              content: `Per ognuna di queste aziende trova email di contatto e numero di telefono cercando su sito web, pagina contatti, LinkedIn, PagineGialle:\n${enrichPrompt}\n\nRispondi con JSON array:\n[{"companyName":"...","email":"...","phone":"..."}]`,
+            },
+          ],
+          { maxTokens: 1500, temperature: 0.2, model: process.env.OPENROUTER_MODEL_LEADFINDER ?? "perplexity/sonar" }
+        );
+        const enrichMatch = enrichRaw.match(/\[[\s\S]*\]/);
+        if (enrichMatch) {
+          const enriched = JSON.parse(enrichMatch[0]) as Array<{ companyName: string; email?: string; phone?: string }>;
+          parsed = parsed.map((c) => {
+            const found = enriched.find((e) => e.companyName?.toLowerCase().includes(c.companyName.toLowerCase().slice(0, 10)));
+            if (!found) return c;
+            return {
+              ...c,
+              email: c.email ?? (found.email || null),
+              phone: c.phone ?? (found.phone || null),
+            };
+          });
+        }
+      } catch {
+        // enrichment failure is non-fatal — proceed with what we have
+      }
+    }
+
+    const rows = parsed.map((c) => ({
+      organizationId: orgId,
+      searchId,
+      ...c,
+      source: "AI",
+      status: "PENDING",
+    }));
 
     await db.leadCandidate.createMany({ data: rows });
     await db.leadFinderSearch.update({ where: { id: searchId }, data: { status: "DONE" } });
