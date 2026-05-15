@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowRightCircle, Loader2, UserPlus, ChevronDown } from "lucide-react";
+import { ArrowRightCircle, Loader2, UserPlus, Building2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { convertLead } from "@/server/actions/leads";
-import type { Lead, LeadStatus } from "@/types/contacts";
+import type { Lead } from "@/types/contacts";
 
 type Props = {
   open: boolean;
@@ -25,6 +25,11 @@ export function ConvertLeadModal({ open, onClose, lead, onConverted }: Props) {
   const [contactLastName, setContactLastName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
+  const [createCompany, setCreateCompany] = useState(false);
+  const [companyName, setCompanyName] = useState("");
+  const [companyWebsite, setCompanyWebsite] = useState("");
+  const [companySector, setCompanySector] = useState("");
+  const [companySize, setCompanySize] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -33,11 +38,19 @@ export function ConvertLeadModal({ open, onClose, lead, onConverted }: Props) {
     setDealValue(0);
     setCreateContact(!lead.contactId);
     // Pre-fill contact from lead data
-    const nameParts = lead.title.split(" ");
+    const d = (lead.data ?? {}) as Record<string, string>;
+    const nameParts = (d.contactName ?? lead.title).split(" ");
     setContactFirstName(nameParts[0] ?? "");
     setContactLastName(nameParts.slice(1).join(" "));
     setContactEmail(lead.email ?? "");
     setContactPhone(lead.phone ?? "");
+    // Pre-fill company from lead data (Lead Finder candidates store these)
+    const hasCompanyData = !!(d.companyName ?? d.website ?? d.sector);
+    setCreateCompany(hasCompanyData);
+    setCompanyName(d.companyName ?? lead.title);
+    setCompanyWebsite(d.website ?? "");
+    setCompanySector(d.sector ?? "");
+    setCompanySize(d.companySize ?? "");
   }, [lead]);
 
   if (!lead) return null;
@@ -56,16 +69,21 @@ export function ConvertLeadModal({ open, onClose, lead, onConverted }: Props) {
       contactLastName: contactLastName.trim(),
       contactEmail: contactEmail.trim(),
       contactPhone: contactPhone.trim(),
+      createCompany,
+      companyName: companyName.trim(),
+      companyWebsite: companyWebsite.trim(),
+      companySector: companySector.trim(),
+      companySize: companySize.trim(),
     });
     setLoading(false);
     if (res.error) {
       toast.error(res.error);
     } else {
-      toast.success(
-        res.contactId
-          ? "Lead convertito: contatto e affare creati!"
-          : "Lead convertito in affare"
-      );
+      const parts: string[] = [];
+      if (res.companyId) parts.push("azienda");
+      if (res.contactId) parts.push("contatto");
+      parts.push("affare");
+      toast.success(`Lead convertito: ${parts.join(", ")} creat${parts.length > 1 ? "i" : "o"}!`);
       onConverted(lead.id, res.dealId!);
       onClose();
     }
@@ -158,11 +176,55 @@ export function ConvertLeadModal({ open, onClose, lead, onConverted }: Props) {
               </div>
             )}
 
+            {/* Create company toggle */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setCreateCompany((v) => !v)}
+                className="flex items-center gap-2 text-sm font-medium text-[var(--crm-primary)] hover:underline"
+              >
+                <Building2 className="h-4 w-4" />
+                {createCompany ? "Non creare azienda" : "Crea anche un'azienda"}
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${createCompany ? "rotate-180" : ""}`} />
+              </button>
+
+              {createCompany && (
+                <div className="mt-3 space-y-3 rounded-xl border border-[var(--crm-neutral-100)] p-4 bg-[var(--crm-neutral-50)] dark:bg-white/5">
+                  <div>
+                    <label className="block text-xs font-medium mb-1 text-[var(--crm-neutral-600)]">Nome azienda *</label>
+                    <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} className={inputCls} placeholder="Acme Srl" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1 text-[var(--crm-neutral-600)]">Sito web</label>
+                    <input value={companyWebsite} onChange={(e) => setCompanyWebsite(e.target.value)} className={inputCls} placeholder="www.acme.it" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium mb-1 text-[var(--crm-neutral-600)]">Settore</label>
+                      <input value={companySector} onChange={(e) => setCompanySector(e.target.value)} className={inputCls} placeholder="es. Tecnologia" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1 text-[var(--crm-neutral-600)]">Dimensione</label>
+                      <select value={companySize} onChange={(e) => setCompanySize(e.target.value)} className={inputCls}>
+                        <option value="">—</option>
+                        <option value="1-10">1–10</option>
+                        <option value="11-50">11–50</option>
+                        <option value="51-200">51–200</option>
+                        <option value="201-1000">201–1000</option>
+                        <option value="1000+">1000+</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* What happens */}
             <div className="rounded-lg border border-[var(--crm-neutral-100)] p-3 text-xs text-[var(--crm-neutral-500)] space-y-1">
               <p className="font-semibold text-[var(--crm-neutral-700)]">Operazioni:</p>
+              {createCompany && companyName.trim() && <p>• Crea un'azienda: {companyName.trim()}</p>}
+              {createContact && !lead.contactId && <p>• Crea un nuovo contatto e lo collega all'affare{createCompany ? " e all'azienda" : ""}</p>}
               <p>• Crea un affare nel primo stage della pipeline predefinita</p>
-              {createContact && !lead.contactId && <p>• Crea un nuovo contatto e lo collega all'affare</p>}
               <p>• Segna il lead come "Convertito"</p>
             </div>
 

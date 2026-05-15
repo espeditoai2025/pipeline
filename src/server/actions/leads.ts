@@ -201,31 +201,51 @@ const convertSchema = z.object({
   contactLastName: z.string().optional(),
   contactEmail: z.string().optional(),
   contactPhone: z.string().optional(),
+  createCompany: z.boolean().default(false),
+  companyName: z.string().optional(),
+  companyWebsite: z.string().optional(),
+  companySector: z.string().optional(),
+  companySize: z.string().optional(),
 });
 
 export async function convertLead(
   id: string,
   input: z.infer<typeof convertSchema>
-): Promise<{ dealId: string | null; contactId: string | null; error: string | null }> {
+): Promise<{ dealId: string | null; contactId: string | null; companyId: string | null; error: string | null }> {
   const session = await auth();
   const { orgId, userId } = getIds(session);
-  if (!session || !orgId || !userId) return { dealId: null, contactId: null, error: "Non autorizzato" };
+  if (!session || !orgId || !userId) return { dealId: null, contactId: null, companyId: null, error: "Non autorizzato" };
 
   const parsed = convertSchema.safeParse(input);
-  if (!parsed.success) return { dealId: null, contactId: null, error: "Dati non validi" };
+  if (!parsed.success) return { dealId: null, contactId: null, companyId: null, error: "Dati non validi" };
 
   try {
     const lead = await db.lead.findUnique({ where: { id, organizationId: orgId } });
-    if (!lead) return { dealId: null, contactId: null, error: "Lead non trovato" };
-    if (lead.status === "CONVERTED") return { dealId: null, contactId: null, error: "Lead già convertito" };
+    if (!lead) return { dealId: null, contactId: null, companyId: null, error: "Lead non trovato" };
+    if (lead.status === "CONVERTED") return { dealId: null, contactId: null, companyId: null, error: "Lead già convertito" };
 
     const pipeline = await db.pipeline.findFirst({
       where: { organizationId: orgId },
       include: { stages: { orderBy: { position: "asc" }, take: 1 } },
     });
-    if (!pipeline?.stages[0]) return { dealId: null, contactId: null, error: "Nessuna pipeline configurata" };
+    if (!pipeline?.stages[0]) return { dealId: null, contactId: null, companyId: null, error: "Nessuna pipeline configurata" };
 
-    // Optionally create a Contact
+    // Optionally create a Company
+    let companyId: string | null = null;
+    if (parsed.data.createCompany && parsed.data.companyName) {
+      const company = await db.company.create({
+        data: {
+          name: parsed.data.companyName,
+          website: parsed.data.companyWebsite || null,
+          industry: parsed.data.companySector || null,
+          size: parsed.data.companySize || null,
+          organizationId: orgId,
+        },
+      });
+      companyId = company.id;
+    }
+
+    // Optionally create a Contact (linked to company if created)
     let contactId: string | null = lead.contactId ?? null;
     if (parsed.data.createContact && parsed.data.contactFirstName) {
       const contact = await db.contact.create({
@@ -236,6 +256,7 @@ export async function convertLead(
           phone: parsed.data.contactPhone || lead.phone || null,
           organizationId: orgId,
           ownerId: userId,
+          companyId: companyId ?? undefined,
         },
       });
       contactId = contact.id;
@@ -252,6 +273,7 @@ export async function convertLead(
         organizationId: orgId,
         ownerId: userId,
         contactId: contactId ?? undefined,
+        companyId: companyId ?? undefined,
       },
     });
 
@@ -263,8 +285,9 @@ export async function convertLead(
     revalidatePath("/leads");
     revalidatePath("/deals");
     revalidatePath("/contacts");
-    return { dealId: deal.id, contactId, error: null };
+    revalidatePath("/companies");
+    return { dealId: deal.id, contactId, companyId, error: null };
   } catch (e) {
-    return { dealId: null, contactId: null, error: e instanceof Error ? e.message : "Errore durante la conversione" };
+    return { dealId: null, contactId: null, companyId: null, error: e instanceof Error ? e.message : "Errore durante la conversione" };
   }
 }
