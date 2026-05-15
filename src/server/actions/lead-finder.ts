@@ -105,6 +105,11 @@ type PlacesResult = {
   website: string | null;
   phone: string | null;
   location: string | null;
+  // Campi extra da fatturatoitalia.it scraping
+  piva?: string | null;
+  address?: string | null;
+  sector?: string | null;
+  fatturatoSlug?: string | null;
 };
 
 async function searchGooglePlaces(query: string, maxResults: number): Promise<PlacesResult[]> {
@@ -196,21 +201,21 @@ function toSectorSlug(keywords?: string | null, sector?: string | null): string 
   return words[0] ?? null;
 }
 
-async function scrapeFatturatoPages(baseUrl: string, labelLocation: string, maxResults: number): Promise<PlacesResult[]> {
+// Scraping pagina listing → restituisce slug + nome
+async function scrapeFatturatoPages(
+  baseUrl: string,
+  labelLocation: string,
+  maxResults: number,
+): Promise<PlacesResult[]> {
   const results: PlacesResult[] = [];
   const seenSlugs = new Set<string>();
-  // Nessun cap fisso: paginiamo finché non abbiamo abbastanza risultati o la pagina è vuota.
-  // Safety cap: 1 pagina ogni 15 risultati + 3 margine (es. 50 risultati → max ~7 pagine)
   const maxPages = Math.ceil(maxResults / 15) + 3;
 
   for (let page = 1; page <= maxPages; page++) {
     try {
       const url = page === 1 ? baseUrl : `${baseUrl}/${page}`;
       const res = await fetch(url, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; Pipely-CRM/1.0)",
-          "Accept-Language": "it-IT,it;q=0.9",
-        },
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; Pipely-CRM/1.0)", "Accept-Language": "it-IT,it;q=0.9" },
         next: { revalidate: 86400 },
       });
       if (!res.ok) break;
@@ -232,7 +237,7 @@ async function scrapeFatturatoPages(baseUrl: string, labelLocation: string, maxR
           .replace(/\b\w/g, (c) => c.toUpperCase())
           .replace(/\bDi\b|\bDel\b|\bDella\b|\bDei\b|\bDegli\b|\bDelle\b|\bDa\b|\bIn\b|\bE\b/g, (m) => m.toLowerCase());
 
-        results.push({ companyName, website: null, phone: null, location: labelLocation });
+        results.push({ companyName, website: null, phone: null, location: labelLocation, fatturatoSlug: companySlug });
         foundOnPage++;
         if (results.length >= maxResults) break;
       }
@@ -243,6 +248,67 @@ async function scrapeFatturatoPages(baseUrl: string, labelLocation: string, maxR
     }
   }
   return results;
+}
+
+// Scraping pagina dettaglio azienda → P.IVA, indirizzo, settore ATECO, sito, telefono
+async function fetchFatturatoDetail(slug: string): Promise<Partial<PlacesResult>> {
+  try {
+    const res = await fetch(`https://www.fatturatoitalia.it/${slug}`, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; Pipely-CRM/1.0)", "Accept-Language": "it-IT,it;q=0.9" },
+      next: { revalidate: 86400 },
+    });
+    if (!res.ok) return {};
+    const html = await res.text();
+
+    // P.IVA — 11 cifre consecutive
+    const pivaM = html.match(/(?:P\.?\s*IVA|Partita\s+IVA)[:\s]*(\d{11})/i) ?? html.match(/\b(\d{11})\b/);
+    const piva = pivaM?.[1] ?? null;
+
+    // Indirizzo — pattern comune nelle pagine italiane
+    const addrM = html.match(/(?:Indirizzo|Sede legale|Via|Viale|Corso|Piazza|Largo|Strada)[:\s]+([^<\n]{5,80})/i);
+    const address = addrM ? addrM[1]?.trim().replace(/\s+/g, " ") ?? null : null;
+
+    // Settore / ATECO
+    const sectorM = html.match(/(?:Attivit[àa]|Settore|ATECO|Codice attivit)[:\s]+([^<\n]{4,80})/i);
+    const sector = sectorM ? sectorM[1]?.trim().replace(/\s+/g, " ") ?? null : null;
+
+    // Telefono — pattern numeri italiani
+    const phoneM = html.match(/(?:Tel(?:efono)?|Phone)[:\s]*(\+?[\d\s\-.()/]{8,20})/i)
+      ?? html.match(/\b((?:\+39[\s.-]?)?0\d{1,3}[\s.-]?\d{5,8}|\b3\d{9}\b)/);
+    const phone = phoneM ? phoneM[1]?.trim() ?? null : null;
+
+    // Sito web esterno (non fatturatoitalia.it)
+    const siteM = html.match(/href="(https?:\/\/(?!(?:www\.)?fatturatoitalia\.it)[^"]{6,80})"/i);
+    const website = siteM?.[1] ?? null;
+
+    return { piva, address, sector, phone: phone ?? null, website };
+  } catch {
+    return {};
+  }
+}
+
+// Arricchisce un batch di aziende con dati dal dettaglio (10 richieste in parallelo)
+async function enrichWithFatturatoDetails(companies: PlacesResult[]): Promise<PlacesResult[]> {
+  const CONCURRENCY = 10;
+  const enriched = [...companies];
+
+  for (let i = 0; i < enriched.length; i += CONCURRENCY) {
+    const batch = enriched.slice(i, i + CONCURRENCY);
+    const details = await Promise.all(
+      batch.map((c) => c.fatturatoSlug ? fetchFatturatoDetail(c.fatturatoSlug) : Promise.resolve({} as Partial<PlacesResult>))
+    );
+    details.forEach((d, idx) => {
+      const c = enriched[i + idx];
+      if (!c) return;
+      if (d.piva) c.piva = d.piva;
+      if (d.address) c.address = d.address;
+      if (d.sector && !c.sector) c.sector = d.sector;
+      if (d.phone && !c.phone) c.phone = d.phone;
+      if (d.website && !c.website) c.website = d.website;
+    });
+  }
+
+  return enriched;
 }
 
 async function fetchFatturatoItalia(
@@ -285,7 +351,11 @@ async function fetchFatturatoItalia(
     return true;
   });
 
-  return [...locResults, ...uniqueFromSector].slice(0, maxResults);
+  const merged = [...locResults, ...uniqueFromSector].slice(0, maxResults);
+
+  // Arricchisci con dati dalla pagina dettaglio (P.IVA, indirizzo, settore, tel, sito)
+  const enriched = await enrichWithFatturatoDetails(merged);
+  return enriched;
 }
 
 // ─── JSON parsing helper ──────────────────────────────────────────────────
@@ -421,7 +491,15 @@ export async function runSearch(
       for (let i = 0; i < allPlacesResults.length; i += BATCH) {
         const batch = allPlacesResults.slice(i, i + BATCH);
         const companiesList = batch
-          .map((p, idx) => `${i + idx + 1}. ${p.companyName}${p.website ? ` — ${p.website}` : ""}${p.location ? ` — ${p.location}` : ""}`)
+          .map((p, idx) => {
+            let line = `${i + idx + 1}. ${p.companyName}`;
+            if (p.piva) line += ` (P.IVA: ${p.piva})`;
+            if (p.website) line += ` — ${p.website}`;
+            if (p.address) line += ` — ${p.address}`;
+            else if (p.location) line += ` — ${p.location}`;
+            if (p.sector) line += ` — Settore: ${p.sector}`;
+            return line;
+          })
           .join("\n");
         try {
           const raw = await chatCompletion(
@@ -457,8 +535,8 @@ Rispondi SOLO con JSON array, zero testo aggiuntivo, zero markdown.`,
         return {
           companyName: p.companyName,
           website: p.website,
-          sector: search.sector ?? null,
-          location: p.location,
+          sector: p.sector ?? search.sector ?? null,
+          location: p.address ?? p.location,
           companySize: search.companySize ?? null,
           phone: p.phone,
           contactName: match?.contactName ? String(match.contactName) : null,
