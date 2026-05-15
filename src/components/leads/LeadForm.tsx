@@ -58,25 +58,21 @@ export function LeadForm({ open, onClose, lead, onSaved }: Props) {
     if (!open) return;
     getContacts().then((cs) => setContacts(cs.map((c) => ({ id: c.id, firstName: c.firstName, lastName: c.lastName ?? null, email: c.email ?? null }))));
     getTeamMembers().then((ms) => setMembers(ms.map((m) => ({ id: m.id, name: m.name ?? null, email: m.email }))));
-    setScoreVal(lead?.score ?? 50);
-  }, [open, lead?.score]);
+  }, [open]);
 
   const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: lead
-      ? {
-          title: lead.title,
-          source: lead.source ?? "",
-          score: lead.score,
-          status: lead.status,
-          email: lead.email ?? "",
-          phone: lead.phone ?? "",
-          notes: lead.notes ?? "",
-          ownerId: lead.ownerId ?? "",
-          contactId: lead.contactId ?? "",
-        }
-      : { title: "", source: "", score: 50, status: "NEW", email: "", phone: "", notes: "", ownerId: "", contactId: "" },
+    defaultValues: { title: "", source: "", score: 50, status: "NEW", email: "", phone: "", notes: "", ownerId: "", contactId: "" },
   });
+
+  useEffect(() => {
+    if (!open) return;
+    const vals = lead
+      ? { title: lead.title, source: lead.source ?? "", score: lead.score, status: lead.status, email: lead.email ?? "", phone: lead.phone ?? "", notes: lead.notes ?? "", ownerId: lead.ownerId ?? "", contactId: lead.contactId ?? "" }
+      : { title: "", source: "", score: 50, status: "NEW" as const, email: "", phone: "", notes: "", ownerId: "", contactId: "" };
+    reset(vals);
+    setScoreVal(lead?.score ?? 50);
+  }, [open, lead, reset]);
 
   const watchedScore = watch("score");
   useEffect(() => { setScoreVal(watchedScore); }, [watchedScore]);
