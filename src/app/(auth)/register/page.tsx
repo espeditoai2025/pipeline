@@ -78,7 +78,7 @@ export default function RegisterPage() {
       router.push("/login?registered=1");
       return;
     }
-    router.push("/dashboard");
+    router.push(isInvite ? "/dashboard" : "/setup");
   }
 
   return (

@@ -2,11 +2,12 @@ import { getTranslations } from "next-intl/server";
 import { ArrowUpRight, ArrowDownRight, Briefcase, CheckCircle, Euro, TrendingUp, Target } from "lucide-react";
 import type { Metadata } from "next";
 import { PipelineOverviewChart } from "@/components/charts/PipelineOverviewChart";
+import { redirect } from "next/navigation";
 import { getDashboardData, getOnboardingStatus } from "@/server/actions/dashboard";
-import { getCrmMode } from "@/server/actions/crm-mode";
+import { getCrmMode, isCrmModeSet } from "@/server/actions/crm-mode";
 import { AIInsightsStrip } from "@/components/ai/AIInsightsStrip";
 import { OnboardingWizard } from "@/components/dashboard/OnboardingWizard";
-import { VerticalModePicker } from "@/components/dashboard/VerticalModePicker";
+import { CrmModeBadge } from "@/components/dashboard/CrmModeBadge";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("dashboard");
@@ -55,6 +56,9 @@ function KpiCard({ title, value, sub, change, positive, icon: Icon, iconColor, i
 
 export default async function DashboardPage() {
   const t = await getTranslations("dashboard");
+  const modeSet = await isCrmModeSet();
+  if (!modeSet) redirect("/setup");
+
   const [data, onboarding, crmMode] = await Promise.all([getDashboardData(), getOnboardingStatus(), getCrmMode()]);
 
   const kpis = data?.kpis ?? {
@@ -106,7 +110,7 @@ export default async function DashboardPage() {
         <p className="text-sm text-[var(--crm-neutral-500)] mt-0.5">{t("welcome")}</p>
       </div>
 
-      <VerticalModePicker currentMode={crmMode} />
+      <CrmModeBadge currentMode={crmMode} />
 
       {onboarding && <OnboardingWizard status={onboarding} />}
 

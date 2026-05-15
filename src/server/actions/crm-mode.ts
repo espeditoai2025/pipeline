@@ -23,6 +23,18 @@ export async function getCrmMode(): Promise<CrmModeId> {
   return (org?.crmMode as CrmModeId | null) ?? DEFAULT_MODE;
 }
 
+export async function isCrmModeSet(): Promise<boolean> {
+  const session = await auth();
+  const orgId = getOrgId(session);
+  if (!orgId) return false;
+
+  const org = await db.organization.findUnique({
+    where: { id: orgId },
+    select: { crmMode: true },
+  });
+  return !!org?.crmMode;
+}
+
 export async function setCrmMode(mode: CrmModeId): Promise<{ error?: string }> {
   const session = await auth();
   const orgId = getOrgId(session);
