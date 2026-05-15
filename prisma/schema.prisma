@@ -35,21 +35,23 @@ model Organization {
   // CRM vertical mode (CLASSIC | PMI | AGENZIE | COMMERCIALE | CONSULENTI | STARTUP | IMMOBILIARE | ASSICURAZIONI | ECOMMERCE)
   crmMode String?
 
-  users          User[]
-  invitations    Invitation[]
-  pipelines      Pipeline[]
-  deals          Deal[]
-  contacts       Contact[]
-  companies      Company[]
-  activities     Activity[]
-  leads          Lead[]
-  products       Product[]
-  workflows      Workflow[]
-  customFields   CustomField[]
-  emailTemplates EmailTemplate[]
-  emailLists     EmailList[]
-  emailCampaigns EmailCampaign[]
-  smtpConfig     SmtpConfig?
+  users               User[]
+  invitations         Invitation[]
+  pipelines           Pipeline[]
+  deals               Deal[]
+  contacts            Contact[]
+  companies           Company[]
+  activities          Activity[]
+  leads               Lead[]
+  products            Product[]
+  workflows           Workflow[]
+  customFields        CustomField[]
+  emailTemplates      EmailTemplate[]
+  emailLists          EmailList[]
+  emailCampaigns      EmailCampaign[]
+  smtpConfig          SmtpConfig?
+  leadFinderSearches  LeadFinderSearch[]
+  leadCandidates      LeadCandidate[]
 }
 
 model Invitation {
@@ -538,6 +540,55 @@ enum CampaignStatus {
   SENDING
   SENT
   PAUSED
+}
+
+// ============ LEAD FINDER ============
+
+model LeadFinderSearch {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  sector         String?
+  location       String?
+  companySize    String?
+  keywords       String?
+  idealCustomer  String?
+  maxResults     Int          @default(10)
+  status         String       @default("PENDING") // PENDING | RUNNING | DONE | FAILED
+  error          String?
+  candidates     LeadCandidate[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+}
+
+model LeadCandidate {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  searchId       String
+  search         LeadFinderSearch @relation(fields: [searchId], references: [id], onDelete: Cascade)
+  companyName    String
+  website        String?
+  sector         String?
+  location       String?
+  companySize    String?
+  contactName    String?
+  contactRole    String?
+  email          String?
+  phone          String?
+  linkedinUrl    String?
+  score          Int              @default(0)
+  source         String           @default("AI")
+  motivation     String?
+  status         String           @default("PENDING") // PENDING | APPROVED | REJECTED
+  leadId         String?
+  createdAt      DateTime         @default(now())
+
+  @@index([organizationId])
+  @@index([searchId])
 }
 
 // ============ SMTP CONFIG ============
