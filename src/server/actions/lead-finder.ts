@@ -110,13 +110,102 @@ type PlacesResult = {
   address?: string | null;
   sector?: string | null;
   fatturatoSlug?: string | null;
+  email?: string | null; // scraped dal sito aziendale
 };
 
-async function searchGooglePlaces(query: string, maxResults: number): Promise<PlacesResult[]> {
+// ─── Geocoding helper (Nominatim) ────────────────────────────────────────────
+// Restituisce lat/lon + raggio + provincia (per fallback FatturatoItalia)
+
+type GeoResult = {
+  lat: number;
+  lon: number;
+  radius: number;
+  provinceSlug: string | null; // slug della provincia per /provincia/{slug}
+};
+
+async function geocodeLocation(location: string): Promise<GeoResult | null> {
+  if (!location.trim()) return null;
+  try {
+    const q = encodeURIComponent((location.split(",")[0] ?? location).trim());
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${q}&format=json&countrycodes=it&limit=1&addressdetails=1`,
+      { headers: { "User-Agent": "Pipely-CRM/1.0 (contact@pipely.it)" } }
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as Array<{
+      lat: string;
+      lon: string;
+      boundingbox?: string[];
+      address?: {
+        county?: string;       // "Città metropolitana di Milano"
+        state_district?: string; // "Città metropolitana di Milano"
+        province?: string;
+        state?: string;
+        city?: string;
+        town?: string;
+        village?: string;
+      };
+    }>;
+    const first = data[0];
+    if (!first?.lat || !first?.lon) return null;
+
+    const lat = parseFloat(first.lat);
+    const lon = parseFloat(first.lon);
+    let radius = 25000;
+    if (first.boundingbox?.length === 4) {
+      const bb = first.boundingbox.map(Number);
+      const s = bb[0] ?? lat, n = bb[1] ?? lat, w = bb[2] ?? lon, e = bb[3] ?? lon;
+      const latM = (n - s) * 111000;
+      const lonM = (e - w) * 111000 * Math.cos((lat * Math.PI) / 180);
+      radius = Math.max(15000, Math.min(Math.hypot(latM, lonM) / 2, 200000));
+    }
+
+    // Estrai provincia da addressdetails Nominatim
+    // "Città metropolitana di Milano" → "milano", "Provincia di Bergamo" → "bergamo"
+    const addr = first.address;
+    const rawProvince =
+      addr?.county ?? addr?.state_district ?? addr?.province ?? null;
+    let provinceSlug: string | null = null;
+    if (rawProvince) {
+      const cleaned = rawProvince
+        .replace(/\bCitt[aà]\s+metropolitana\s+di\s*/i, "")
+        .replace(/\bProvincia\s+di\s*/i, "")
+        .replace(/\bProv\.\s*/i, "")
+        .trim();
+      provinceSlug = toSlug(cleaned);
+    }
+
+    return { lat, lon, radius, provinceSlug };
+  } catch {
+    return null;
+  }
+}
+
+async function searchGooglePlaces(
+  query: string,
+  maxResults: number,
+  coords?: { lat: number; lon: number; radius: number } | null,
+): Promise<PlacesResult[]> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) return [];
 
   try {
+    const body: Record<string, unknown> = {
+      textQuery: query,
+      maxResultCount: Math.min(maxResults, 20),
+      languageCode: "it",
+      regionCode: "IT",
+    };
+    // locationRestriction garantisce i risultati nell'area geografica specificata
+    if (coords) {
+      body.locationRestriction = {
+        circle: {
+          center: { latitude: coords.lat, longitude: coords.lon },
+          radius: coords.radius,
+        },
+      };
+    }
+
     const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
       method: "POST",
       headers: {
@@ -124,12 +213,7 @@ async function searchGooglePlaces(query: string, maxResults: number): Promise<Pl
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.internationalPhoneNumber,places.websiteUri,places.businessStatus",
       },
-      body: JSON.stringify({
-        textQuery: query,
-        maxResultCount: Math.min(maxResults, 20),
-        languageCode: "it",
-        regionCode: "IT",
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) return [];
@@ -162,15 +246,33 @@ async function searchGooglePlaces(query: string, maxResults: number): Promise<Pl
 
 // ─── FatturatoItalia scraper ──────────────────────────────────────────────
 // Source: fatturatoitalia.it — dati CCIAA
-// Percorsi supportati: /comune/[slug], /regione/[slug], /settore/[slug]
+// Percorsi supportati: /comune/[slug], /provincia/[slug], /regione/[slug]
 
 const ITALIAN_REGIONS = new Set([
   "abruzzo", "basilicata", "calabria", "campania", "emilia-romagna",
   "friuli-venezia-giulia", "lazio", "liguria", "lombardia", "marche",
   "molise", "piemonte", "puglia", "sardegna", "sicilia", "toscana",
   "trentino-alto-adige", "umbria", "valle-d-aosta", "veneto",
-  // varianti senza trattino
   "emilia romagna", "friuli venezia giulia", "trentino alto adige", "valle daosta",
+]);
+
+const ITALIAN_PROVINCES = new Set([
+  "agrigento", "alessandria", "ancona", "aosta", "arezzo", "ascoli-piceno", "asti",
+  "avellino", "bari", "barletta-andria-trani", "belluno", "benevento", "bergamo",
+  "biella", "bologna", "bolzano", "brescia", "brindisi", "cagliari", "caltanissetta",
+  "campobasso", "caserta", "catania", "catanzaro", "chieti", "como", "cosenza",
+  "cremona", "crotone", "cuneo", "enna", "fermo", "ferrara", "firenze", "foggia",
+  "forli-cesena", "frosinone", "genova", "gorizia", "grosseto", "imperia", "isernia",
+  "la-spezia", "l-aquila", "latina", "lecce", "lecco", "livorno", "lodi", "lucca",
+  "macerata", "mantova", "massa-carrara", "matera", "messina", "milano", "modena",
+  "monza-e-della-brianza", "napoli", "novara", "nuoro", "oristano", "padova",
+  "palermo", "parma", "pavia", "perugia", "pesaro-e-urbino", "pescara", "piacenza",
+  "pisa", "pistoia", "pordenone", "potenza", "prato", "ragusa", "ravenna",
+  "reggio-calabria", "reggio-emilia", "rieti", "rimini", "roma", "rovigo",
+  "salerno", "sassari", "savona", "siena", "siracusa", "sondrio", "sud-sardegna",
+  "taranto", "teramo", "terni", "torino", "trapani", "trento", "treviso",
+  "trieste", "udine", "varese", "venezia", "verbano-cusio-ossola", "vercelli",
+  "verona", "vibo-valentia", "vicenza", "viterbo",
 ]);
 
 function toSlug(text: string): string {
@@ -184,24 +286,26 @@ function toSlug(text: string): string {
     .replace(/[^a-z0-9-]/g, "");
 }
 
-function detectLocationType(location: string): "regione" | "comune" {
-  const slug = toSlug(location.split(",")[0] ?? location);
-  return ITALIAN_REGIONS.has(slug) ? "regione" : "comune";
+function detectLocationType(location: string): "regione" | "provincia" | "comune" {
+  // Normalizza rimuovendo prefissi tipo "Provincia di", "Prov."
+  const clean = (location.split(",")[0] ?? location)
+    .replace(/\bprovincia\s+di\s*/i, "")
+    .replace(/\bprov\.\s*/i, "")
+    .trim();
+  const slug = toSlug(clean);
+  if (ITALIAN_REGIONS.has(slug)) return "regione";
+  if (ITALIAN_PROVINCES.has(slug)) return "provincia";
+  return "comune";
 }
 
-// Tenta di derivare uno slug settore da keywords / settore dell'utente
-function toSectorSlug(keywords?: string | null, sector?: string | null): string | null {
-  const raw = keywords ?? sector;
-  if (!raw) return null;
-  // Prendi la prima parola significativa (> 3 caratteri)
-  const words = raw
-    .split(/[\s,/\\|+]+/)
-    .map((w) => toSlug(w))
-    .filter((w) => w.length > 3);
-  return words[0] ?? null;
+// Estrae P.IVA direttamente dallo slug URL (es. "mario-rossi-srl-01234567890" → "01234567890")
+// Molto piu' affidabile del regex HTML
+function extractVatFromSlug(slug: string): string | null {
+  const m = slug.match(/(\d{11})$/);
+  return m?.[1] ?? null;
 }
 
-// Scraping pagina listing → restituisce slug + nome
+// Scraping pagina listing FatturatoItalia → array di aziende con slug e P.IVA estratto dall'URL
 async function scrapeFatturatoPages(
   baseUrl: string,
   labelLocation: string,
@@ -209,37 +313,71 @@ async function scrapeFatturatoPages(
 ): Promise<PlacesResult[]> {
   const results: PlacesResult[] = [];
   const seenSlugs = new Set<string>();
-  const maxPages = Math.ceil(maxResults / 15) + 3;
+  // Stima: ~15 aziende per pagina, +2 pagine di buffer
+  const maxPages = Math.ceil(maxResults / 15) + 2;
+
+  // Pattern: href="https://www.fatturatoitalia.it/nome-azienda-12345678901"
+  // Il VAT (11 cifre) è sempre alla fine dello slug
+  const COMPANY_LINK = /href="https?:\/\/www\.fatturatoitalia\.it\/([a-z0-9][a-z0-9_-]*-\d{11})[/"]/gi;
+  // Fallback per link senza VAT esplicito (pagine piu' vecchie)
+  const COMPANY_LINK_FALLBACK = /href="https?:\/\/www\.fatturatoitalia\.it\/([a-z0-9][a-z0-9_-]+)"[^>]*title="([^"]+)"/gi;
+  // Pattern per il nome dell'azienda nel title o testo link
+  const NAME_FROM_TITLE = /title="(?:Fatturato\s+)?([^"]{2,80})"/i;
 
   for (let page = 1; page <= maxPages; page++) {
     try {
+      // FatturatoItalia usa /2, /3, ecc. per la paginazione
       const url = page === 1 ? baseUrl : `${baseUrl}/${page}`;
       const res = await fetch(url, {
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; Pipely-CRM/1.0)", "Accept-Language": "it-IT,it;q=0.9" },
-        next: { revalidate: 86400 },
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Accept-Language": "it-IT,it;q=0.9",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+        next: { revalidate: 3600 }, // cache 1 ora
       });
       if (!res.ok) break;
       const html = await res.text();
 
-      const pattern = /href="https?:\/\/www\.fatturatoitalia\.it\/([a-z0-9][a-z0-9_-]+)"[^>]*title="(?:Fatturato\s+)?([^"]+)"/gi;
-      let match: RegExpExecArray | null;
       let foundOnPage = 0;
 
-      while ((match = pattern.exec(html)) !== null) {
-        const companySlug = match[1] ?? "";
-        const rawName = (match[2] ?? "").replace(/^Fatturato\s+/i, "").trim();
-        if (/^(comune|provincia|regione|settore|categoria)/.test(companySlug)) continue;
-        if (seenSlugs.has(companySlug) || !rawName || rawName.length < 2) continue;
-        seenSlugs.add(companySlug);
+      // Strategia 1: link con slug+VAT — VAT estratto dall'URL (affidabile)
+      COMPANY_LINK.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = COMPANY_LINK.exec(html)) !== null) {
+        const slug = m[1] ?? "";
+        if (seenSlugs.has(slug)) continue;
 
-        const companyName = rawName
-          .toLowerCase()
-          .replace(/\b\w/g, (c) => c.toUpperCase())
-          .replace(/\bDi\b|\bDel\b|\bDella\b|\bDei\b|\bDegli\b|\bDelle\b|\bDa\b|\bIn\b|\bE\b/g, (m) => m.toLowerCase());
+        // Estrai il nome dal title attribute nella stessa zona HTML
+        const context = html.slice(Math.max(0, m.index - 10), m.index + m[0].length + 100);
+        const titleM = context.match(NAME_FROM_TITLE);
+        const rawName = titleM?.[1]?.replace(/^Fatturato\s+/i, "").trim() ?? "";
+        if (!rawName || rawName.length < 2) continue;
 
-        results.push({ companyName, website: null, phone: null, location: labelLocation, fatturatoSlug: companySlug });
+        seenSlugs.add(slug);
+        const piva = extractVatFromSlug(slug);
+        const companyName = normalizeCompanyName(rawName);
+        results.push({ companyName, website: null, phone: null, location: labelLocation, fatturatoSlug: slug, piva });
         foundOnPage++;
         if (results.length >= maxResults) break;
+      }
+
+      // Strategia 2 (fallback): link con title ma slug senza VAT
+      if (foundOnPage === 0) {
+        COMPANY_LINK_FALLBACK.lastIndex = 0;
+        while ((m = COMPANY_LINK_FALLBACK.exec(html)) !== null) {
+          const slug = m[1] ?? "";
+          const rawName = (m[2] ?? "").replace(/^Fatturato\s+/i, "").trim();
+          // Escludi pagine di navigazione
+          if (/^(comune|provincia|regione|settore|analisi|catasto|servizi|listino)/.test(slug)) continue;
+          if (seenSlugs.has(slug) || !rawName || rawName.length < 2) continue;
+          seenSlugs.add(slug);
+          const piva = extractVatFromSlug(slug);
+          const companyName = normalizeCompanyName(rawName);
+          results.push({ companyName, website: null, phone: null, location: labelLocation, fatturatoSlug: slug, piva });
+          foundOnPage++;
+          if (results.length >= maxResults) break;
+        }
       }
 
       if (foundOnPage === 0 || results.length >= maxResults) break;
@@ -250,48 +388,105 @@ async function scrapeFatturatoPages(
   return results;
 }
 
-// Scraping pagina dettaglio azienda → P.IVA, indirizzo, settore ATECO, sito, telefono
+function normalizeCompanyName(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .replace(/\bDi\b|\bDel\b|\bDella\b|\bDei\b|\bDegli\b|\bDelle\b|\bDa\b|\bIn\b|\bE\b/g, (m) => m.toLowerCase());
+}
+
+// Scraping pagina dettaglio azienda → indirizzo, settore ATECO, sito, telefono
+// Nota: P.IVA viene gia' estratta dallo slug URL (extractVatFromSlug) — piu' affidabile
 async function fetchFatturatoDetail(slug: string): Promise<Partial<PlacesResult>> {
   try {
     const res = await fetch(`https://www.fatturatoitalia.it/${slug}`, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; Pipely-CRM/1.0)", "Accept-Language": "it-IT,it;q=0.9" },
-      next: { revalidate: 86400 },
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept-Language": "it-IT,it;q=0.9",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+      next: { revalidate: 3600 },
     });
     if (!res.ok) return {};
     const html = await res.text();
 
-    // P.IVA — 11 cifre consecutive
-    const pivaM = html.match(/(?:P\.?\s*IVA|Partita\s+IVA)[:\s]*(\d{11})/i) ?? html.match(/\b(\d{11})\b/);
-    const piva = pivaM?.[1] ?? null;
+    // Indirizzo sede legale
+    const addrM = html.match(
+      /(?:Indirizzo|Sede\s+legale|Sede\s+operativa|Via|Viale|Corso|Piazza|Largo|Strada|Loc\.?)[:\s]+([^<\n]{5,100})/i
+    );
+    const address = addrM?.[1]?.trim().replace(/\s+/g, " ") ?? null;
 
-    // Indirizzo — pattern comune nelle pagine italiane
-    const addrM = html.match(/(?:Indirizzo|Sede legale|Via|Viale|Corso|Piazza|Largo|Strada)[:\s]+([^<\n]{5,80})/i);
-    const address = addrM ? addrM[1]?.trim().replace(/\s+/g, " ") ?? null : null;
+    // Settore / ATECO (descrizione attivita')
+    const sectorM = html.match(
+      /(?:Attivit[àa]\s+economica|Settore|Descrizione\s+ATECO|ATECO|Codice\s+attivit)[:\s]+([^<\n]{4,120})/i
+    );
+    const sector = sectorM?.[1]?.trim().replace(/\s+/g, " ") ?? null;
 
-    // Settore / ATECO
-    const sectorM = html.match(/(?:Attivit[àa]|Settore|ATECO|Codice attivit)[:\s]+([^<\n]{4,80})/i);
-    const sector = sectorM ? sectorM[1]?.trim().replace(/\s+/g, " ") ?? null : null;
+    // Telefono — fisso italiano (0xx...) o mobile (3xx...)
+    const phoneM =
+      html.match(/(?:Tel(?:efono)?|Telefono\s+fisso|Phone)[:\s]*(\+?[\d\s\-.()/]{8,20})/i) ??
+      html.match(/\b((?:\+39[\s.-]?)?0\d{1,3}[\s.-]?\d{5,8})\b/) ??
+      html.match(/\b(3\d{9})\b/);
+    const phone = phoneM?.[1]?.trim() ?? null;
 
-    // Telefono — pattern numeri italiani
-    const phoneM = html.match(/(?:Tel(?:efono)?|Phone)[:\s]*(\+?[\d\s\-.()/]{8,20})/i)
-      ?? html.match(/\b((?:\+39[\s.-]?)?0\d{1,3}[\s.-]?\d{5,8}|\b3\d{9}\b)/);
-    const phone = phoneM ? phoneM[1]?.trim() ?? null : null;
+    // Sito web aziendale — link esterno non FatturatoItalia, non analytics/CDN
+    // Cerca specificamente link con testo tipo "Sito web", "www.", o href significativo
+    const SKIP_DOMAINS = /fatturatoitalia\.it|google\.|facebook\.|linkedin\.|twitter\.|instagram\.|youtube\.|googleapis\.|gstatic\.|cloudflare\.|amazonaws\.|cdn\./i;
+    const siteMatches = [...html.matchAll(/href="(https?:\/\/[^"]{6,100})"/gi)];
+    const website = siteMatches
+      .map((m) => m[1] ?? "")
+      .find((u) => u && !SKIP_DOMAINS.test(u) && !u.includes("?") && u.split("/").length <= 4)
+      ?? null;
 
-    // Sito web esterno (non fatturatoitalia.it)
-    const siteM = html.match(/href="(https?:\/\/(?!(?:www\.)?fatturatoitalia\.it)[^"]{6,80})"/i);
-    const website = siteM?.[1] ?? null;
-
-    return { piva, address, sector, phone: phone ?? null, website };
+    return { address, sector, phone, website };
   } catch {
     return {};
   }
 }
 
-// Arricchisce un batch di aziende con dati dal dettaglio (10 richieste in parallelo)
+// ─── Scraping email dal sito aziendale ────────────────────────────────────
+// Cerca mailto: link nella homepage e nella pagina /contatti — fonte piu' affidabile
+
+async function scrapeEmailFromWebsite(website: string): Promise<string | null> {
+  const base = website.replace(/\/$/, "");
+  const SKIP_PATTERNS = /\.(png|jpg|jpeg|gif|svg|css|js|pdf)$/i;
+  const SKIP_EMAILS = /^(noreply|no-reply|donotreply|support|webmaster|admin|postmaster|info-|privacy|cookie|dpo@)/i;
+
+  for (const path of ["", "/contatti", "/contact", "/chi-siamo"]) {
+    try {
+      const res = await fetch(`${base}${path}`, {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; Pipely-CRM/1.0)" },
+        signal: AbortSignal.timeout(6000),
+        redirect: "follow",
+      });
+      if (!res.ok) continue;
+      const html = await res.text();
+      // Priorita' 1: mailto: link espliciti
+      const mailtoMatches = [...html.matchAll(/mailto:([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/gi)];
+      for (const m of mailtoMatches) {
+        const email = m[1]?.toLowerCase();
+        if (email && !SKIP_PATTERNS.test(email) && !SKIP_EMAILS.test(email)) return email;
+      }
+      // Priorita' 2: pattern email nel testo visibile (non dentro script/style)
+      const textOnly = html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "");
+      const emailMatches = [...textOnly.matchAll(/\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/g)];
+      for (const m of emailMatches) {
+        const email = m[1]?.toLowerCase();
+        if (email && !SKIP_PATTERNS.test(email) && !SKIP_EMAILS.test(email)) return email;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+// Arricchisce un batch di aziende con dati dal dettaglio CCIAA + email dal sito
 async function enrichWithFatturatoDetails(companies: PlacesResult[]): Promise<PlacesResult[]> {
-  const CONCURRENCY = 10;
+  const CONCURRENCY = 8;
   const enriched = [...companies];
 
+  // Fase 1: dati CCIAA dalla pagina FatturatoItalia
   for (let i = 0; i < enriched.length; i += CONCURRENCY) {
     const batch = enriched.slice(i, i + CONCURRENCY);
     const details = await Promise.all(
@@ -300,7 +495,7 @@ async function enrichWithFatturatoDetails(companies: PlacesResult[]): Promise<Pl
     details.forEach((d, idx) => {
       const c = enriched[i + idx];
       if (!c) return;
-      if (d.piva) c.piva = d.piva;
+      // piva: non sovrascrivere se gia' estratto dallo slug (piu' affidabile)
       if (d.address) c.address = d.address;
       if (d.sector && !c.sector) c.sector = d.sector;
       if (d.phone && !c.phone) c.phone = d.phone;
@@ -308,54 +503,75 @@ async function enrichWithFatturatoDetails(companies: PlacesResult[]): Promise<Pl
     });
   }
 
+  // Fase 2: scraping email dal sito aziendale (solo per chi ha website)
+  const withWebsite = enriched.filter((c) => c.website);
+  for (let i = 0; i < withWebsite.length; i += CONCURRENCY) {
+    const batch = withWebsite.slice(i, i + CONCURRENCY);
+    const emails = await Promise.all(batch.map((c) => scrapeEmailFromWebsite(c.website!)));
+    emails.forEach((email, idx) => {
+      const c = batch[idx];
+      if (c && email) (c as PlacesResult & { email?: string }).email = email;
+    });
+  }
+
   return enriched;
 }
 
+// Tenta di fare scraping su FatturatoItalia con catena di fallback geografica:
+// 1. /comune/{slug}        — solo grandi comuni (pochissimi hanno pagina dedicata)
+// 2. /provincia/{slug}     — tutti i 107 capoluoghi di provincia (copertura principale)
+// 3. /provincia/{geo}      — provincia ricavata da Nominatim (per citta' non capoluogo)
+// 4. /regione/{slug}       — intera regione come ultimo fallback
 async function fetchFatturatoItalia(
   location: string,
   maxResults: number,
-  keywords?: string | null,
-  sector?: string | null,
+  geo?: GeoResult | null,
 ): Promise<PlacesResult[]> {
-  const locSlug = toSlug(location.split(",")[0] ?? location);
+  const rawName = (location.split(",")[0] ?? location)
+    .replace(/\bprovincia\s+di\s*/i, "")
+    .replace(/\bprov\.\s*/i, "")
+    .trim();
+  const locSlug = toSlug(rawName);
   if (!locSlug) return [];
 
   const locType = detectLocationType(location);
-  const locationLabel = (location.split(",")[0] ?? location).trim();
+  const locationLabel = rawName;
+  const BASE = "https://www.fatturatoitalia.it";
 
-  // URL base per la localizzazione
-  const locBaseUrl = `https://www.fatturatoitalia.it/${locType}/${locSlug}`;
+  async function tryUrl(url: string): Promise<PlacesResult[]> {
+    return scrapeFatturatoPages(url, locationLabel, maxResults).catch(() => []);
+  }
 
-  // URL base per settore (se presente)
-  const sectorSlug = toSectorSlug(keywords, sector);
-  const sectorBaseUrl = sectorSlug
-    ? `https://www.fatturatoitalia.it/settore/${sectorSlug}`
-    : null;
+  // Strategia principale basata sul tipo di localita'
+  if (locType === "regione") {
+    const results = await tryUrl(`${BASE}/regione/${locSlug}`);
+    return enrichWithFatturatoDetails(results.slice(0, maxResults));
+  }
 
-  // Fetch in parallelo: per localizzazione + per settore (se disponibile)
-  const [locResults, sectorResults] = await Promise.all([
-    scrapeFatturatoPages(locBaseUrl, locationLabel, maxResults).catch(() => [] as PlacesResult[]),
-    sectorBaseUrl
-      ? scrapeFatturatoPages(sectorBaseUrl, locationLabel, maxResults).catch(() => [] as PlacesResult[])
-      : Promise.resolve([] as PlacesResult[]),
-  ]);
+  if (locType === "provincia") {
+    const results = await tryUrl(`${BASE}/provincia/${locSlug}`);
+    return enrichWithFatturatoDetails(results.slice(0, maxResults));
+  }
 
-  // Merge: i risultati per settore arricchiscono quelli per localizzazione
-  // Per il settore, teniamo solo le aziende con nome che include la location (se comune/regione noti)
-  // oppure tutte se la location è generica
-  const seen = new Set(locResults.map((r) => r.companyName.toLowerCase().slice(0, 12)));
-  const uniqueFromSector = sectorResults.filter((r) => {
-    const key = r.companyName.toLowerCase().slice(0, 12);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  // locType === "comune": prova piu' URL in sequenza fino a trovare risultati
+  const urlsToTry: string[] = [
+    `${BASE}/comune/${locSlug}`,           // es. /comune/napoli (pochi comuni hanno pagina)
+    `${BASE}/provincia/${locSlug}`,        // es. /provincia/milano (se il comune = capoluogo)
+  ];
 
-  const merged = [...locResults, ...uniqueFromSector].slice(0, maxResults);
+  // Aggiungi provincia da Nominatim se disponibile e diversa dal comune
+  if (geo?.provinceSlug && geo.provinceSlug !== locSlug) {
+    urlsToTry.push(`${BASE}/provincia/${geo.provinceSlug}`);
+  }
 
-  // Arricchisci con dati dalla pagina dettaglio (P.IVA, indirizzo, settore, tel, sito)
-  const enriched = await enrichWithFatturatoDetails(merged);
-  return enriched;
+  for (const url of urlsToTry) {
+    const results = await tryUrl(url);
+    if (results.length > 0) {
+      return enrichWithFatturatoDetails(results.slice(0, maxResults));
+    }
+  }
+
+  return [];
 }
 
 // ─── JSON parsing helper ──────────────────────────────────────────────────
@@ -394,27 +610,47 @@ export async function runSearch(
     const hasSpecificTerm = !!(search.keywords || search.sector);
     const loc = search.location ?? "";
 
-    // Categorie da interrogare in parallelo quando la ricerca è generica
-    const GENERIC_CATEGORIES = [
-      "aziende imprese commercio",
-      "artigiani costruzioni edilizia",
-      "bar ristoranti alberghi turismo",
-      "professionisti servizi consulenza",
-      "negozi attività",
+    // Geocoding: ottieni coordinate per locationRestriction (vincolo geografico preciso)
+    const coords = loc ? await geocodeLocation(loc) : null;
+
+    // Categorie Places per massima copertura: aziende + artigiani + professionisti
+    // La localita' e' garantita da locationRestriction, NON dal testo della query
+    const ALL_CATEGORIES = [
+      // Imprese e societa'
+      "aziende imprese societa srl",
+      "negozi commercio attivita",
+      // Artigiani
+      "artigiani idraulici elettricisti impianti",
+      "artigiani edili costruzioni ristrutturazioni",
+      "artigiani meccanici officine carrozzerie",
+      "artigiani falegnami installatori serramenti",
+      // Liberi professionisti
+      "avvocati notai commercialisti consulenti",
+      "medici dentisti fisioterapisti",
+      "architetti ingegneri geometri",
+      // Ristorazione turismo
+      "ristoranti bar pizzerie gelaterie",
+      "hotel agriturismo bed breakfast",
+      // Servizi vari
+      "parrucchieri estetisti centri benessere",
+      "palestre scuole guida centri sportivi",
     ];
 
     let placesResults: PlacesResult[];
 
     if (hasSpecificTerm) {
-      // Ricerca specifica: singola query con il termine dell'utente
-      const q = `${search.keywords ?? search.sector} ${loc}`.trim();
-      placesResults = await searchGooglePlaces(q, search.maxResults);
+      // Ricerca specifica: keyword/settore come query + locationRestriction
+      // Se geocoding fallisce, aggiunge la location nel testo come fallback
+      const q = coords
+        ? (search.keywords ?? search.sector ?? "").trim()
+        : `${search.keywords ?? search.sector} ${loc}`.trim();
+      placesResults = await searchGooglePlaces(q, search.maxResults, coords);
     } else {
-      // Ricerca generica: 5 categorie in parallelo per massima copertura
-      const queries = loc
-        ? GENERIC_CATEGORIES.map((cat) => `${cat} ${loc}`)
-        : [`aziende imprese artigiani professionisti ${loc}`.trim()];
-      const allArrays = await Promise.all(queries.map((q) => searchGooglePlaces(q, 20)));
+      // Ricerca generica: tutte le categorie in parallelo, localita' da locationRestriction
+      const queries = coords
+        ? ALL_CATEGORIES
+        : ALL_CATEGORIES.map((cat) => `${cat} ${loc}`.trim());
+      const allArrays = await Promise.all(queries.map((q) => searchGooglePlaces(q, 20, coords)));
       const seen = new Set<string>();
       placesResults = allArrays
         .flat()
@@ -435,13 +671,16 @@ export async function runSearch(
     });
 
     // ── FASE 1b: FatturatoItalia → aziende CCIAA non su Google Maps ──────
-    // Aggiunge aziende registrate che non appaiono su Google Maps
+    // Aggiunge aziende registrate (comune/provincia/regione) con dati CCIAA verificati
+    // Passa geo per il fallback provincia da Nominatim (citta' non capoluogo)
     let fatturatoResults: PlacesResult[] = [];
     if (search.location) {
       try {
-        const needed = search.maxResults - placesResults.length;
-        const fetchCount = needed > 0 ? search.maxResults : Math.floor(search.maxResults * 0.5);
-        fatturatoResults = await fetchFatturatoItalia(search.location, Math.max(fetchCount, 20), search.keywords, search.sector);
+        fatturatoResults = await fetchFatturatoItalia(
+          search.location,
+          Math.max(search.maxResults, 30),
+          coords,
+        );
       } catch {
         // non-fatal: procedi senza
       }
@@ -507,19 +746,22 @@ export async function runSearch(
               {
                 role: "system",
                 content: `Sei un esperto ricercatore di lead B2B con accesso alla ricerca web in tempo reale.
-Hai ricevuto un elenco di attività reali (da Google Maps e registro CCIAA). Per ognuna:
-1. Trova il referente (titolare, CEO, responsabile) cercando su sito web, LinkedIn, CCIAA
-2. Trova l'email (personale o generica: info@, commerciale@, contatti@)
+Hai ricevuto un elenco di attività reali (da Google Maps e registro CCIAA italiano). Per ognuna:
+1. Cerca il referente (titolare, CEO, responsabile) sul sito web ufficiale o LinkedIn
+2. Cerca l'email reale (personale o generica: info@, commerciale@, contatti@) — SOLO se la trovi verificata sul web
 3. Assegna uno score 0-100 rispetto ai criteri del cliente ideale
-4. Scrivi una motivazione sintetica
-Rispondi SOLO con JSON array, zero testo aggiuntivo, zero markdown.`,
+4. Scrivi una motivazione sintetica (1-2 frasi)
+REGOLE FONDAMENTALI:
+- NON inventare email, nomi o dati non trovati — usa null se non trovi nulla
+- NON costruire LinkedIn URL a caso — usa null se non trovi il profilo reale
+- Rispondi SOLO con JSON array valido, zero testo aggiuntivo, zero markdown`,
               },
               {
                 role: "user",
-                content: `Criteri cliente ideale:\n${criteriaText}\n\nAttività da arricchire:\n${companiesList}\n\nJSON array (un oggetto per ogni attività, stesso ordine):\n[{"companyName":"...","contactName":"...","contactRole":"...","email":"...","linkedinUrl":"...","score":80,"motivation":"..."}]`,
+                content: `Criteri cliente ideale:\n${criteriaText}\n\nAttività da arricchire:\n${companiesList}\n\nJSON array (un oggetto per ogni attività, stesso ordine):\n[{"companyName":"...","contactName":"...","contactRole":"...","email":"...","score":80,"motivation":"..."}]`,
               },
             ],
-            { maxTokens: 2000, temperature: 0.4, model: process.env.OPENROUTER_MODEL_LEADFINDER ?? "perplexity/sonar" }
+            { maxTokens: 2000, temperature: 0.1, model: process.env.OPENROUTER_MODEL_LEADFINDER ?? "perplexity/sonar" }
           );
           try { enrichedAll.push(...extractJsonArray(raw)); } catch { /* batch fallback */ }
         } catch { /* batch failure non-fatal */ }
@@ -541,30 +783,37 @@ Rispondi SOLO con JSON array, zero testo aggiuntivo, zero markdown.`,
           phone: p.phone,
           contactName: match?.contactName ? String(match.contactName) : null,
           contactRole: match?.contactRole ? String(match.contactRole) : null,
-          email: match?.email ? String(match.email) : null,
-          linkedinUrl: match?.linkedinUrl ? String(match.linkedinUrl) : null,
+          // Priorita': email scraped dal sito reale, poi da Sonar, poi null
+          email: (p as PlacesResult & { email?: string }).email
+            ?? (match?.email ? String(match.email) : null),
+          linkedinUrl: null,
           score: typeof match?.score === "number" ? Math.min(100, Math.max(0, Math.round(match.score))) : 60,
           motivation: match?.motivation ? String(match.motivation) : null,
         };
       });
 
     } else {
-      // Fallback: Sonar trova tutto da zero
+      // Fallback: Sonar trova tutto da zero (solo se Places e FatturatoItalia hanno fallito)
       const raw = await chatCompletion(
         [
           {
             role: "system",
             content: `Sei un esperto ricercatore di lead B2B con accesso alla ricerca web in tempo reale.
-Trova aziende REALI con i relativi referenti commerciali (CEO, titolare, direttore commerciale).
-Per ogni azienda cerca: sito web, referente principale, email, telefono, profilo LinkedIn.
-Rispondi SOLO con JSON array valido, zero testo aggiuntivo, zero markdown.`,
+Cerca aziende REALI che trovi effettivamente su internet. Per ogni azienda verifica sito web, referente, contatti.
+REGOLE FONDAMENTALI:
+- Includi SOLO aziende con sede nella localita' specificata — NON aziende di altre citta' o regioni
+- NON inventare dati: se non trovi un campo, usa null
+- NON costruire siti web o email a caso — inserisci solo quelli che verifichi sul web
+- Se non riesci a trovare abbastanza aziende reali, restituisci meno oggetti (non aggiungere aziende false)
+- Rispondi SOLO con JSON array valido, zero testo aggiuntivo, zero markdown`,
           },
           {
             role: "user",
             content: `Criteri di ricerca:
 ${criteriaText}
 
-Trova esattamente ${search.maxResults} aziende reali. Rispondi SOLO con JSON array:
+Cerca fino a ${search.maxResults} aziende reali con sede esclusivamente in: ${loc || "Italia"}.
+Rispondi SOLO con JSON array:
 [
   {
     "companyName": "Nome Azienda Srl",
@@ -574,17 +823,16 @@ Trova esattamente ${search.maxResults} aziende reali. Rispondi SOLO con JSON arr
     "companySize": "11-50",
     "contactName": "Nome Cognome",
     "contactRole": "CEO / Titolare",
-    "email": "nome@azienda.it",
+    "email": "info@nomeazienda.it",
     "phone": "+39 02 1234567",
-    "linkedinUrl": "https://linkedin.com/company/...",
     "score": 85,
-    "motivation": "perché corrisponde ai criteri"
+    "motivation": "perche' corrisponde ai criteri"
   }
 ]
-IMPORTANTE: usa email generica (info@, commerciale@) se non trovi quella personale.`,
+Usa email generica (info@, commerciale@) solo se la trovi sul sito reale. Lascia null se non la trovi.`,
           },
         ],
-        { maxTokens: 3000, temperature: 0.5, model: process.env.OPENROUTER_MODEL_LEADFINDER ?? "perplexity/sonar" }
+        { maxTokens: 3000, temperature: 0.2, model: process.env.OPENROUTER_MODEL_LEADFINDER ?? "perplexity/sonar" }
       );
 
       const candidates = extractJsonArray(raw);
@@ -607,6 +855,7 @@ IMPORTANTE: usa email generica (info@, commerciale@) se non trovi quella persona
     }
 
     // Enrichment pass: aziende ancora senza email → secondo tentativo Sonar
+    // Esclude chi ha gia' l'email scraped dal sito (piu' affidabile)
     const stillMissingEmail = parsed.filter((c) => !c.email);
     if (stillMissingEmail.length > 0) {
       try {
@@ -615,8 +864,8 @@ IMPORTANTE: usa email generica (info@, commerciale@) se non trovi quella persona
           .join("\n");
         const enrichRaw = await chatCompletion(
           [
-            { role: "system", content: "Cerca sul web email e telefono delle seguenti aziende italiane. Rispondi SOLO con JSON array, zero testo extra." },
-            { role: "user", content: `Trova email e telefono cercando su sito web, pagina contatti, LinkedIn, PagineGialle:\n${enrichPrompt}\n\nJSON array:\n[{"companyName":"...","email":"...","phone":"..."}]` },
+            { role: "system", content: "Cerca sul web email e telefono delle seguenti aziende italiane. NON inventare email — inserisci SOLO quelle che trovi verificate sul sito ufficiale o pagine contatti. Se non trovi nulla, lascia null. Rispondi SOLO con JSON array, zero testo extra." },
+            { role: "user", content: `Cerca email e telefono sul sito ufficiale o pagina contatti di queste aziende:\n${enrichPrompt}\n\nJSON array:\n[{"companyName":"...","email":"...","phone":"..."}]` },
           ],
           { maxTokens: 1500, temperature: 0.2, model: process.env.OPENROUTER_MODEL_LEADFINDER ?? "perplexity/sonar" }
         );
