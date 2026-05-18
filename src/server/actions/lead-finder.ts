@@ -110,6 +110,8 @@ function mapCandidate(c: {
   website: string | null; sector: string | null; location: string | null;
   companySize: string | null; contactName: string | null; contactRole: string | null;
   email: string | null; phone: string | null; linkedinUrl: string | null;
+  piva: string | null; ateco: string | null; nDipendenti: string | null;
+  formaGiuridica: string | null; annoFondazione: string | null;
   score: number; source: string; motivation: string | null; status: string;
   leadId: string | null; createdAt: Date;
 }): LeadCandidate {
@@ -185,6 +187,10 @@ type PlacesResult = {
   piva?: string | null;
   address?: string | null;
   sector?: string | null;
+  ateco?: string | null;
+  nDipendenti?: string | null;
+  formaGiuridica?: string | null;
+  annoFondazione?: string | null;
   fatturatoSlug?: string | null;
   email?: string | null;
   _inactive?: boolean; // flag interno — azienda cessata/non attiva, da scartare
@@ -483,9 +489,12 @@ async function fetchFatturatoDetail(slug: string): Promise<Partial<PlacesResult>
     const address = addressParts.length > 0 ? addressParts.join(", ") : null;
 
     // Settore: usa la descrizione attività prevalente (più leggibile del codice ATECO)
-    const ateco = extractDetailField(html, "ATECO");
+    const atecoCode = extractDetailField(html, "ATECO");
     const attivita = extractDetailField(html, "Attività prevalente");
-    const sector = attivita ?? (ateco ? `ATECO ${ateco}` : null);
+    const sector = attivita ?? (atecoCode ? `ATECO ${atecoCode}` : null);
+    const nDipendenti = extractDetailField(html, "N. Dipendenti");
+    const formaGiuridica = extractDetailField(html, "Forma giuridica");
+    const annoFondazione = extractDetailField(html, "Anno Fondazione");
 
     // Telefono: cerca link tel: oppure pattern numeri italiani
     const SKIP_DOMAINS = /fatturatoitalia\.it|google\.|facebook\.|linkedin\.|twitter\.|instagram\.|youtube\.|googleapis\.|gstatic\.|cloudflare\.|amazonaws\.|cdn\.|numeroverde\.com|adcapital\.it/i;
@@ -503,7 +512,7 @@ async function fetchFatturatoDetail(slug: string): Promise<Partial<PlacesResult>
       .find((u) => u && !SKIP_DOMAINS.test(u) && !u.includes("?") && u.split("/").length <= 4)
       ?? null;
 
-    return { address, sector, phone, website };
+    return { address, sector, ateco: atecoCode, nDipendenti, formaGiuridica, annoFondazione, phone, website };
   } catch {
     return {};
   }
@@ -565,6 +574,10 @@ async function enrichWithFatturatoDetails(companies: PlacesResult[]): Promise<Pl
       if (d._inactive) { inactiveIdxs.add(i + idx); return; }
       if (d.address) c.address = d.address;
       if (d.sector && !c.sector) c.sector = d.sector;
+      if (d.ateco && !c.ateco) c.ateco = d.ateco;
+      if (d.nDipendenti && !c.nDipendenti) c.nDipendenti = d.nDipendenti;
+      if (d.formaGiuridica && !c.formaGiuridica) c.formaGiuridica = d.formaGiuridica;
+      if (d.annoFondazione && !c.annoFondazione) c.annoFondazione = d.annoFondazione;
       if (d.phone && !c.phone) c.phone = d.phone;
       if (d.website && !c.website) c.website = d.website;
     });
@@ -652,6 +665,7 @@ type ScraperServiceCompany = {
   piva?: string | null;
   address?: string | null;
   sector?: string | null;
+  ateco?: string | null;
   phone?: string | null;
   email?: string | null;
   website?: string | null;
@@ -827,6 +841,10 @@ export async function runSearch(
             piva: c.piva ?? null,
             address: c.address ?? null,
             sector: c.sector ?? null,
+            ateco: c.ateco ?? null,
+            nDipendenti: c.n_dipendenti ?? null,
+            formaGiuridica: c.forma_giuridica ?? null,
+            annoFondazione: c.anno_fondazione ?? null,
             email: c.email ?? null,
           }));
         } else if (!available) {
@@ -903,7 +921,10 @@ export async function runSearch(
       companyName: string; website: string | null; sector: string | null;
       location: string | null; companySize: string | null; contactName: string | null;
       contactRole: string | null; email: string | null; phone: string | null;
-      linkedinUrl: string | null; score: number; motivation: string | null;
+      linkedinUrl: string | null;
+      piva: string | null; ateco: string | null; nDipendenti: string | null;
+      formaGiuridica: string | null; annoFondazione: string | null;
+      score: number; motivation: string | null;
     };
 
     let parsed: ParsedCandidate[];
@@ -992,6 +1013,11 @@ REGOLE FONDAMENTALI:
           contactRole: match?.contactRole ? String(match.contactRole) : null,
           email,
           linkedinUrl: null,
+          piva: (p as PlacesResult).piva ?? null,
+          ateco: (p as PlacesResult).ateco ?? null,
+          nDipendenti: (p as PlacesResult).nDipendenti ?? null,
+          formaGiuridica: (p as PlacesResult).formaGiuridica ?? null,
+          annoFondazione: (p as PlacesResult).annoFondazione ?? null,
           score,
           motivation,
         };
@@ -1054,6 +1080,11 @@ Usa email generica (info@, commerciale@) solo se la trovi sul sito reale. Lascia
           email: sanitizeEmail(c.email ? String(c.email) : null),
           phone: sanitizePhone(c.phone ? String(c.phone) : null),
           linkedinUrl: null,
+          piva: null,
+          ateco: null,
+          nDipendenti: null,
+          formaGiuridica: null,
+          annoFondazione: null,
           score: typeof c.score === "number" ? Math.min(100, Math.max(0, Math.round(c.score))) : 50,
           motivation: c.motivation ? String(c.motivation) : null,
         }));
@@ -1206,6 +1237,11 @@ export async function approveCandidate(
       contactName: candidate.contactName,
       contactRole: candidate.contactRole,
       linkedinUrl: candidate.linkedinUrl,
+      piva: candidate.piva,
+      ateco: candidate.ateco,
+      nDipendenti: candidate.nDipendenti,
+      formaGiuridica: candidate.formaGiuridica,
+      annoFondazione: candidate.annoFondazione,
       source: "Lead Finder AI",
     },
   });

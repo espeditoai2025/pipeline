@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, XCircle, ExternalLink, Loader2, Building2, User, MapPin, Users, Trash2 } from "lucide-react";
+import { CheckCircle2, XCircle, ExternalLink, Loader2, Building2, User, MapPin, Users, Trash2, Phone, Hash, Briefcase, Calendar } from "lucide-react";
 import { approveCandidate, rejectCandidate, rejectBelowScore } from "@/server/actions/lead-finder";
 import type { LeadCandidate } from "@/types/lead-finder";
 
@@ -103,9 +103,30 @@ function CandidateRow({ candidate }: { candidate: LeadCandidate }) {
               <MapPin className="h-3 w-3" /> {candidate.location}
             </p>
           )}
-          {candidate.companySize && (
+          {candidate.phone && (
             <p className="flex items-center gap-1 text-xs text-[var(--crm-neutral-500)]">
-              <Users className="h-3 w-3" /> {candidate.companySize} dip.
+              <Phone className="h-3 w-3" /> {candidate.phone}
+            </p>
+          )}
+          {candidate.piva && (
+            <p className="flex items-center gap-1 text-xs text-[var(--crm-neutral-500)]">
+              <Hash className="h-3 w-3" /> P.IVA {candidate.piva}
+            </p>
+          )}
+          {candidate.ateco && (
+            <p className="flex items-center gap-1 text-xs text-[var(--crm-neutral-400)]">
+              <Briefcase className="h-3 w-3" /> ATECO {candidate.ateco}
+            </p>
+          )}
+          {(candidate.nDipendenti ?? candidate.companySize) && (
+            <p className="flex items-center gap-1 text-xs text-[var(--crm-neutral-500)]">
+              <Users className="h-3 w-3" /> {candidate.nDipendenti ?? candidate.companySize} dip.
+            </p>
+          )}
+          {(candidate.formaGiuridica || candidate.annoFondazione) && (
+            <p className="flex items-center gap-1 text-xs text-[var(--crm-neutral-400)]">
+              <Calendar className="h-3 w-3" />
+              {[candidate.formaGiuridica, candidate.annoFondazione ? `est. ${candidate.annoFondazione}` : null].filter(Boolean).join(" · ")}
             </p>
           )}
         </div>

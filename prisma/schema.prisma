@@ -586,6 +586,12 @@ model LeadCandidate {
   email          String?
   phone          String?
   linkedinUrl    String?
+  // Campi CCIAA da FatturatoItalia
+  piva           String?
+  ateco          String?
+  nDipendenti    String?
+  formaGiuridica String?
+  annoFondazione String?
   score          Int              @default(0)
   source         String           @default("AI")
   motivation     String?

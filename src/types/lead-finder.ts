@@ -15,6 +15,12 @@ export type LeadCandidate = {
   email: string | null;
   phone: string | null;
   linkedinUrl: string | null;
+  // Campi CCIAA da FatturatoItalia
+  piva: string | null;
+  ateco: string | null;
+  nDipendenti: string | null;
+  formaGiuridica: string | null;
+  annoFondazione: string | null;
   score: number;
   source: string;
   motivation: string | null;

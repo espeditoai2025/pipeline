@@ -54,6 +54,7 @@ class Company(BaseModel):
     piva: Optional[str] = None
     address: Optional[str] = None
     sector: Optional[str] = None
+    ateco: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
     website: Optional[str] = None
@@ -154,8 +155,8 @@ async def _fetch_detail(client: httpx.AsyncClient, slug: str) -> dict:
         address = ", ".join(p for p in [via, citta, provincia] if p) or None
 
         attivita = _field_from_detail(soup, "Attività prevalente")
-        ateco = _field_from_detail(soup, "ATECO")
-        sector = attivita or (f"ATECO {ateco}" if ateco else None)
+        ateco_code = _field_from_detail(soup, "ATECO")
+        sector = attivita or (f"ATECO {ateco_code}" if ateco_code else None)
 
         n_dip = _field_from_detail(soup, "N. Dipendenti")
         forma = _field_from_detail(soup, "Forma giuridica")
@@ -188,6 +189,7 @@ async def _fetch_detail(client: httpx.AsyncClient, slug: str) -> dict:
         return {
             "address": address,
             "sector": sector,
+            "ateco": ateco_code,
             "phone": _sanitize_phone(phone),
             "website": website,
             "n_dipendenti": n_dip,
@@ -428,6 +430,7 @@ async def search(req: SearchRequest, request: Request):
             piva=c.get("piva"),
             address=c.get("address"),
             sector=c.get("sector"),
+            ateco=c.get("ateco"),
             phone=c.get("phone"),
             email=c.get("email"),
             website=c.get("website"),
