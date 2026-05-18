@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useTransition } from "react";
-import { Upload, X, FileSpreadsheet, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
+import { Upload, X, FileSpreadsheet, AlertTriangle, CheckCircle2, Loader2, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { importLeads } from "@/server/actions/leads";
@@ -80,6 +80,55 @@ function parseSheet(wb: XLSX.WorkBook): ParsedRow[] {
       _valid: title.length > 0,
     };
   });
+}
+
+function downloadTemplate() {
+  const template = [
+    {
+      "Nome": "Esempio Srl",
+      "Email": "info@esempio.it",
+      "Telefono": "+39 02 1234567",
+      "Sorgente": "LinkedIn",
+      "Stato": "Nuovo",
+      "Score": 75,
+      "Note": "Contattato alla fiera di Milano",
+      "Settore": "Produzione alimentare",
+      "Località": "Milano, MI",
+      "Sito Web": "www.esempio.it",
+      "P.IVA": "01234567890",
+      "ATECO": "10.51",
+      "Dipendenti": "11-50",
+      "Forma Giuridica": "S.R.L.",
+      "Anno Fondazione": "2010",
+    },
+    {
+      "Nome": "Mario Rossi Consulting",
+      "Email": "mario@rossi.it",
+      "Telefono": "+39 333 9876543",
+      "Sorgente": "Referral",
+      "Stato": "In lavorazione",
+      "Score": 60,
+      "Note": "",
+      "Settore": "Consulenza",
+      "Località": "Roma, RM",
+      "Sito Web": "",
+      "P.IVA": "",
+      "ATECO": "",
+      "Dipendenti": "1-10",
+      "Forma Giuridica": "",
+      "Anno Fondazione": "",
+    },
+  ];
+
+  const ws = XLSX.utils.json_to_sheet(template);
+  ws["!cols"] = [
+    { wch: 28 }, { wch: 26 }, { wch: 18 }, { wch: 14 }, { wch: 14 },
+    { wch: 7 },  { wch: 30 }, { wch: 24 }, { wch: 18 }, { wch: 24 },
+    { wch: 14 }, { wch: 8 },  { wch: 10 }, { wch: 16 }, { wch: 14 },
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Lead");
+  XLSX.writeFile(wb, "template_lead.xlsx", { bookType: "xlsx" });
 }
 
 type Props = {
@@ -194,10 +243,18 @@ export function LeadImportModal({ open, onClose, onImported }: Props) {
             </div>
           )}
 
-          {/* Istruzioni colonne */}
+          {/* Istruzioni colonne + scarica template */}
           {!rows.length && (
-            <div className="rounded-xl bg-[var(--crm-neutral-50)] dark:bg-white/5 border border-[var(--crm-neutral-100)] dark:border-white/10 px-4 py-3">
-              <p className="text-xs font-semibold text-[var(--crm-neutral-600)] dark:text-[var(--crm-neutral-300)] mb-2">Intestazioni colonne riconosciute automaticamente:</p>
+            <div className="rounded-xl bg-[var(--crm-neutral-50)] dark:bg-white/5 border border-[var(--crm-neutral-100)] dark:border-white/10 px-4 py-3 space-y-3">
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-xs font-semibold text-[var(--crm-neutral-600)] dark:text-[var(--crm-neutral-300)]">Intestazioni riconosciute automaticamente:</p>
+                <button
+                  onClick={downloadTemplate}
+                  className="flex items-center gap-1.5 rounded-lg border border-emerald-200 dark:border-emerald-700/40 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-800/30 transition-colors shrink-0"
+                >
+                  <Download className="h-3.5 w-3.5" /> Scarica template XLSX
+                </button>
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {["Nome*", "Email", "Telefono", "Sorgente", "Stato", "Score", "Note", "Settore", "Località", "Sito Web", "P.IVA", "ATECO", "Dipendenti"].map((col) => (
                   <span key={col} className="rounded-full bg-white dark:bg-white/10 border border-[var(--crm-neutral-200)] dark:border-white/10 px-2 py-0.5 text-xs text-[var(--crm-neutral-600)] dark:text-[var(--crm-neutral-300)]">
@@ -205,7 +262,7 @@ export function LeadImportModal({ open, onClose, onImported }: Props) {
                   </span>
                 ))}
               </div>
-              <p className="text-xs text-[var(--crm-neutral-400)] mt-2">* obbligatorio</p>
+              <p className="text-xs text-[var(--crm-neutral-400)]">* obbligatorio — il template include 2 righe di esempio</p>
             </div>
           )}
 
