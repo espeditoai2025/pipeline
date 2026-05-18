@@ -643,6 +643,69 @@ async function fetchFatturatoItalia(
   return [];
 }
 
+// ─── Python scraper service integration ──────────────────────────────────
+// Quando SCRAPER_SERVICE_URL è configurato, usa il microservizio Python
+// al posto dello scraper TypeScript interno per FatturatoItalia + INI-PEC.
+
+type ScraperServiceCompany = {
+  name: string;
+  piva?: string | null;
+  address?: string | null;
+  sector?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  n_dipendenti?: string | null;
+  forma_giuridica?: string | null;
+  anno_fondazione?: string | null;
+  score?: number;
+  motivation?: string | null;
+};
+
+async function fetchFromScraperService(
+  search: { location?: string | null; sector?: string | null; keywords?: string | null; idealCustomer?: string | null; maxResults: number },
+  geo?: GeoResult | null,
+): Promise<{ companies: ScraperServiceCompany[]; available: boolean }> {
+  const serviceUrl = process.env.SCRAPER_SERVICE_URL;
+  if (!serviceUrl) return { companies: [], available: false };
+
+  const loc = (search.location ?? "").split(",")[0]?.trim() ?? "";
+  const rawSlug = toSlug(loc);
+  if (!rawSlug) return { companies: [], available: false };
+
+  const locType = detectLocationType(loc);
+  // Risolvi location_slug con lo stesso fallback usato da fetchFatturatoItalia
+  let locationSlug = `${locType}/${rawSlug}`;
+  if (locType === "comune" && geo?.provinceSlug && geo.provinceSlug !== rawSlug) {
+    // Il Python service userà il primo slug; per i comuni non capoluogo usa la provincia
+    locationSlug = `provincia/${geo.provinceSlug}`;
+  }
+
+  try {
+    const res = await fetch(`${serviceUrl}/search`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(process.env.SCRAPER_SECRET_KEY ? { "x-scraper-key": process.env.SCRAPER_SECRET_KEY } : {}),
+      },
+      body: JSON.stringify({
+        location: loc,
+        location_slug: locationSlug,
+        max_results: search.maxResults,
+        sector: search.sector ?? null,
+        keywords: search.keywords ?? null,
+        ideal_customer: search.idealCustomer ?? null,
+      }),
+      signal: AbortSignal.timeout(120_000), // max 2 min
+    });
+    if (!res.ok) return { companies: [], available: true };
+    const data = await res.json() as { companies: ScraperServiceCompany[] };
+    return { companies: data.companies ?? [], available: true };
+  } catch {
+    return { companies: [], available: false };
+  }
+}
+
 // ─── JSON parsing helper ──────────────────────────────────────────────────
 
 function extractJsonArray(raw: string): Array<Record<string, unknown>> {
@@ -740,16 +803,35 @@ export async function runSearch(
     });
 
     // ── FASE 1b: FatturatoItalia → aziende CCIAA non su Google Maps ──────
-    // Aggiunge aziende registrate (comune/provincia/regione) con dati CCIAA verificati
-    // Passa geo per il fallback provincia da Nominatim (citta' non capoluogo)
+    // Preferisce il microservizio Python (BeautifulSoup + INI-PEC + AI scoring).
+    // Fallback allo scraper TypeScript interno se SCRAPER_SERVICE_URL non è configurato.
     let fatturatoResults: PlacesResult[] = [];
+    let scraperServiceResults: ScraperServiceCompany[] = [];
+
     if (search.location) {
       try {
-        fatturatoResults = await fetchFatturatoItalia(
-          search.location,
-          Math.max(search.maxResults, 30),
-          coords,
-        );
+        const { companies, available } = await fetchFromScraperService(search, coords);
+        if (available && companies.length > 0) {
+          scraperServiceResults = companies;
+          // Converti in PlacesResult per il merge successivo
+          fatturatoResults = companies.map((c) => ({
+            companyName: c.name,
+            website: c.website ?? null,
+            phone: c.phone ?? null,
+            location: c.address ?? search.location,
+            piva: c.piva ?? null,
+            address: c.address ?? null,
+            sector: c.sector ?? null,
+            email: c.email ?? null,
+          }));
+        } else if (!available) {
+          // Python service non configurato — usa scraper TypeScript
+          fatturatoResults = await fetchFatturatoItalia(
+            search.location,
+            Math.max(search.maxResults, 30),
+            coords,
+          );
+        }
       } catch {
         // non-fatal: procedi senza
       }
@@ -869,6 +951,11 @@ REGOLE FONDAMENTALI:
       // Merge Places/CCIAA + Sonar
       const genericSearch = !hasSpecificTerm && !search.idealCustomer;
       parsed = allPlacesResults.map((p) => {
+        // Se il Python service ha già calcolato score/motivation per questa azienda, usali
+        const fromService = scraperServiceResults.find(
+          (s) => s.name.toLowerCase().slice(0, 12) === p.companyName.toLowerCase().slice(0, 12)
+        );
+
         const match = enrichedAll.find(
           (e) => typeof e.companyName === "string" &&
             (e.companyName.toLowerCase().includes(p.companyName.toLowerCase().slice(0, 10)) ||
@@ -880,12 +967,15 @@ REGOLE FONDAMENTALI:
         const phone = sanitizePhone(p.phone ?? (match?.phone ? String(match.phone) : null));
         const contactName = match?.contactName ? String(match.contactName) : null;
         const website = p.website ?? null;
-        const score = genericSearch
-          ? completenessScore(!!email, !!phone, !!website, !!contactName)
-          : typeof match?.score === "number" ? Math.min(100, Math.max(0, Math.round(match.score))) : 60;
-        const motivation = genericSearch
-          ? `Azienda${search.location ? ` di ${search.location}` : ""} trovata su Google Maps${p.piva ? " e registro CCIAA" : ""}.`
-          : (match?.motivation ? String(match.motivation) : null);
+        const score = fromService?.score != null
+          ? fromService.score
+          : genericSearch
+            ? completenessScore(!!email, !!phone, !!website, !!contactName)
+            : typeof match?.score === "number" ? Math.min(100, Math.max(0, Math.round(match.score))) : 60;
+        const motivation = fromService?.motivation
+          ?? (genericSearch
+            ? `Azienda${search.location ? ` di ${search.location}` : ""} trovata su Google Maps${p.piva ? " e registro CCIAA" : ""}.`
+            : (match?.motivation ? String(match.motivation) : null));
         return {
           companyName: p.companyName,
           website,
