@@ -36,6 +36,61 @@ function completenessScore(hasEmail: boolean, hasPhone: boolean, hasWebsite: boo
   return Math.min(100, 65 + (hasEmail ? 15 : 0) + (hasPhone ? 10 : 0) + (hasWebsite ? 5 : 0) + (hasContact ? 5 : 0));
 }
 
+// ─── Normalizzazione nome azienda per deduplicazione ──────────────────────
+const COMPANY_SUFFIXES = /\b(s\.?r\.?l\.?s?|s\.?p\.?a\.?|s\.?n\.?c\.?|s\.?a\.?s\.?|s\.?s\.?|s\.?c\.?a\.?r\.?l\.?|ltd|soc\s+coop|cooperativa|onlus|aps|odv)\b\.?/gi;
+function dedupeKey(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(COMPANY_SUFFIXES, "")
+    .replace(/[^\wàèéìòùÀÈÉÌÒÙ\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// ─── INI-PEC: email PEC ufficiale da P.IVA (registro ministeriale) ────────
+async function fetchPecFromIniPec(piva: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://www.inipec.gov.it/cerca-pec/-/pec/codice-fiscale/${piva.trim()}`,
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Accept": "text/html,application/xhtml+xml",
+          "Accept-Language": "it-IT,it;q=0.9",
+        },
+        next: { revalidate: 86400 }, // cache 24h — i dati PEC cambiano raramente
+      }
+    );
+    if (!res.ok) return null;
+    const html = await res.text();
+    // INI-PEC mostra la PEC in formato email nell'HTML
+    const match = html.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+    if (!match) return null;
+    const email = match[0].toLowerCase();
+    // Escludiamo email del sito stesso (noreply@, contatti@ inipec...)
+    if (email.includes("inipec") || email.includes("infocamere") || email.includes("gov.it")) return null;
+    return email;
+  } catch {
+    return null;
+  }
+}
+
+// Esegui lookups INI-PEC in parallelo con concorrenza limitata
+async function enrichWithPec(
+  companies: Array<{ piva?: string | null; email?: string | null }>
+): Promise<(string | null)[]> {
+  const CONCURRENCY = 5;
+  const results: (string | null)[] = new Array(companies.length).fill(null);
+  for (let i = 0; i < companies.length; i += CONCURRENCY) {
+    const batch = companies.slice(i, i + CONCURRENCY);
+    const batchResults = await Promise.all(
+      batch.map((c) => (c.piva && !c.email) ? fetchPecFromIniPec(c.piva) : Promise.resolve(null))
+    );
+    batchResults.forEach((r, idx) => { results[i + idx] = r; });
+  }
+  return results;
+}
+
 function mapSearch(s: {
   id: string; organizationId: string; name: string; sector: string | null;
   location: string | null; companySize: string | null; keywords: string | null;
@@ -718,7 +773,37 @@ export async function runSearch(
 
     // Se la ricerca è specifica (keywords/settore), filtra FatturatoItalia con Sonar dopo
     // Se generica, aggiungi tutte fino al limite
-    const allPlacesResults = [...placesResults, ...newFromFatturato].slice(0, search.maxResults);
+    let allPlacesResults = [...placesResults, ...newFromFatturato].slice(0, search.maxResults);
+
+    // ── FASE 1c: INI-PEC — email PEC ufficiale per aziende con P.IVA ─────
+    // Solo per aziende da FatturatoItalia (hanno piva), che non hanno già email verificata
+    {
+      const pecEmails = await enrichWithPec(allPlacesResults.map((p) => ({ piva: (p as PlacesResult & { piva?: string }).piva, email: p.website ? null : null })));
+      allPlacesResults = allPlacesResults.map((p, i) => {
+        const pec = pecEmails[i];
+        if (!pec) return p;
+        return { ...p, email: sanitizeEmail(pec) } as PlacesResult;
+      });
+    }
+
+    // ── DEDUPLICAZIONE: salta aziende già presenti nel CRM ───────────────
+    const [existingCandidates, existingLeads] = await Promise.all([
+      db.leadCandidate.findMany({
+        where: { organizationId: orgId, status: "APPROVED" },
+        select: { companyName: true },
+      }),
+      db.lead.findMany({
+        where: { organizationId: orgId },
+        select: { title: true },
+      }),
+    ]);
+    const existingNames = new Set([
+      ...existingCandidates.map((c) => dedupeKey(c.companyName)),
+      ...existingLeads.map((l) => normalizeCompanyName(l.title)),
+    ]);
+    allPlacesResults = allPlacesResults.filter(
+      (p) => !existingNames.has(normalizeCompanyName(p.companyName))
+    );
 
     const hasPlacesData = allPlacesResults.length > 0;
 
@@ -1001,6 +1086,21 @@ export async function approveCandidate(
   });
   if (!candidate) return { leadId: null, error: "Candidato non trovato" };
   if (candidate.status === "APPROVED") return { leadId: candidate.leadId, error: null };
+
+  // Controlla se esiste già un lead con lo stesso nome azienda
+  const normalizedName = normalizeCompanyName(candidate.companyName);
+  const allOrgLeads = await db.lead.findMany({
+    where: { organizationId: orgId },
+    select: { id: true, title: true },
+  });
+  const duplicate = allOrgLeads.find((l) => normalizeCompanyName(l.title) === normalizedName);
+  if (duplicate) {
+    await db.leadCandidate.update({
+      where: { id: candidateId },
+      data: { status: "APPROVED", leadId: duplicate.id },
+    });
+    return { leadId: duplicate.id, error: null };
+  }
 
   const { data: newLead, error: leadError } = await createLead({
     title: candidate.companyName,
