@@ -903,8 +903,28 @@ export async function runSearch(
     // Se generica, aggiungi tutte fino al limite
     let allPlacesResults = [...placesResults, ...newFromFatturato].slice(0, search.maxResults);
 
-    // ── FASE 1c: INI-PEC — email PEC ufficiale per aziende con P.IVA ─────
-    // Solo per aziende da FatturatoItalia (hanno piva), che non hanno già email verificata
+    // ── FASE 1c: email dal sito aziendale per risultati senza email ──────
+    // Principalmente per i risultati del Python scraper (fa INI-PEC ma potrebbe
+    // essere bloccato su cloud). Cap a 25 per evitare timeout del server action.
+    {
+      const noEmail = allPlacesResults
+        .map((p, i) => ({ p, i }))
+        .filter(({ p }) => p.website && !(p as PlacesResult & { email?: string }).email)
+        .slice(0, 25);
+      for (let bi = 0; bi < noEmail.length; bi += 5) {
+        const batch = noEmail.slice(bi, bi + 5);
+        const emails = await Promise.all(batch.map(({ p }) => scrapeEmailFromWebsite(p.website!)));
+        emails.forEach((email, idx) => {
+          const item = batch[idx];
+          if (email && item) {
+            const sanitized = sanitizeEmail(email);
+            if (sanitized) (allPlacesResults[item.i] as PlacesResult & { email?: string }).email = sanitized;
+          }
+        });
+      }
+    }
+
+    // ── FASE 1d: INI-PEC — email PEC per aziende ancora senza email ──────
     {
       const pecEmails = await enrichWithPec(allPlacesResults.map((p) => ({ piva: (p as PlacesResult).piva, email: (p as PlacesResult).email ?? null })));
       allPlacesResults = allPlacesResults.map((p, i) => {

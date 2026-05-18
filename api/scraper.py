@@ -265,6 +265,46 @@ async def _get_pec(client: httpx.AsyncClient, piva: Optional[str]) -> Optional[s
         return None
 
 
+SKIP_EMAILS_RE = re.compile(
+    r"^(noreply|no-reply|donotreply|support|webmaster|admin|postmaster|privacy|cookie|dpo@)",
+    re.I,
+)
+EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
+
+
+async def _scrape_email_from_website(client: httpx.AsyncClient, website: Optional[str]) -> Optional[str]:
+    if not website:
+        return None
+    base = website.rstrip("/")
+    for path in ["", "/contatti", "/contact", "/chi-siamo"]:
+        try:
+            r = await client.get(
+                f"{base}{path}",
+                headers={**HEADERS, "Accept": "text/html"},
+                timeout=5,
+                follow_redirects=True,
+            )
+            if r.status_code != 200:
+                continue
+            text = r.text
+            # Priorità 1: mailto:
+            m = re.search(r"mailto:([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})", text, re.I)
+            if m:
+                email = m.group(1).lower()
+                if not SKIP_EMAILS_RE.match(email):
+                    return _sanitize_email(email)
+            # Priorità 2: pattern email nel testo
+            # Rimuovi script/style per evitare falsi positivi
+            text_clean = re.sub(r"<(script|style)[^>]*>[\s\S]*?</\1>", "", text, flags=re.I)
+            for em in EMAIL_RE.findall(text_clean):
+                em = em.lower()
+                if not SKIP_EMAILS_RE.match(em):
+                    return _sanitize_email(em)
+        except Exception:
+            continue
+    return None
+
+
 async def _scrape_all(location_slug: str, max_results: int, start_page: int = 1) -> list[dict]:
     base_url = f"https://www.fatturatoitalia.it/{location_slug}"
     max_pages = (max_results // 45) + 2
@@ -307,6 +347,18 @@ async def _scrape_all(location_slug: str, max_results: int, start_page: int = 1)
             for company, pec in zip(batch, pecs):
                 if pec:
                     company["email"] = pec
+
+        # Fase 4: email dal sito aziendale (per aziende con website ma senza email)
+        # Più affidabile di INI-PEC quando i server governativi bloccano le richieste cloud
+        no_email_with_site = [c for c in enriched if c.get("website") and not c.get("email")]
+        for i in range(0, min(len(no_email_with_site), 40), CONCURRENCY):
+            batch = no_email_with_site[i: i + CONCURRENCY]
+            emails = await asyncio.gather(*[
+                _scrape_email_from_website(client, c.get("website")) for c in batch
+            ])
+            for company, email in zip(batch, emails):
+                if email:
+                    company["email"] = email
 
     return enriched
 
