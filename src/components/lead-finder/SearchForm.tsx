@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { Telescope, Loader2, ChevronDown, MapPin } from "lucide-react";
 import { createSearch, runSearch } from "@/server/actions/lead-finder";
 
@@ -125,11 +124,10 @@ type SearchFormProps = {
 };
 
 export function SearchForm({ maxResultsLimit = 20, isStarter = false }: SearchFormProps) {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const defaultResults = Math.min(10, maxResultsLimit);
+  const defaultResults = isStarter ? Math.min(10, maxResultsLimit) : maxResultsLimit;
 
   const [form, setForm] = useState({
     name: "",
@@ -166,7 +164,7 @@ export function SearchForm({ maxResultsLimit = 20, isStarter = false }: SearchFo
       const { error: runErr } = await runSearch(search.id);
       if (runErr) { setError(runErr); return; }
 
-      router.push(`/lead-finder/${search.id}`);
+      window.location.href = `/lead-finder/${search.id}`;
     });
   }
 
