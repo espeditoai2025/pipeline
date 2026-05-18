@@ -10,7 +10,7 @@ import {
   createColumnHelper,
   type SortingState,
 } from "@tanstack/react-table";
-import { ArrowUpDown, Pencil, Trash2, Plus, ArrowRightCircle, Loader2 } from "lucide-react";
+import { ArrowUpDown, Pencil, Trash2, Plus, ArrowRightCircle, Loader2, Mail, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { deleteLead, updateLeadStatus } from "@/server/actions/leads";
@@ -69,15 +69,26 @@ export function LeadsTable({ initialLeads }: Props) {
         </button>
       ),
       cell: ({ row }) => (
-        <div>
-          <p className="font-medium text-sm">{row.original.title}</p>
-          {(row.original.email || row.original.phone) && (
-            <p className="text-xs text-[var(--crm-neutral-400)] mt-0.5">
-              {row.original.email}{row.original.email && row.original.phone ? " · " : ""}{row.original.phone}
-            </p>
-          )}
-        </div>
+        <p className="font-medium text-sm">{row.original.title}</p>
       ),
+    }),
+    col.accessor("email", {
+      header: () => <span className="flex items-center gap-1"><Mail className="h-3 w-3" />Email</span>,
+      cell: ({ getValue }) => {
+        const v = getValue();
+        return v
+          ? <a href={`mailto:${v}`} className="text-xs text-[var(--crm-primary)] hover:underline truncate max-w-[160px] block" title={v}>{v}</a>
+          : <span className="text-[var(--crm-neutral-400)] text-sm">—</span>;
+      },
+    }),
+    col.accessor("phone", {
+      header: () => <span className="flex items-center gap-1"><Phone className="h-3 w-3" />Telefono</span>,
+      cell: ({ getValue }) => {
+        const v = getValue();
+        return v
+          ? <a href={`tel:${v}`} className="text-xs text-[var(--crm-neutral-700)] dark:text-white hover:underline">{v}</a>
+          : <span className="text-[var(--crm-neutral-400)] text-sm">—</span>;
+      },
     }),
     col.accessor("source", {
       header: "Sorgente",

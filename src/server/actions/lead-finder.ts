@@ -15,6 +15,27 @@ function getIds(s: Session | null) {
   return { orgId: user?.organizationId ?? null, userId: user?.id ?? null };
 }
 
+const FAKE_EMAIL_PATTERNS = ["acme", "example", "test", "placeholder", "yourcompany", "nomeazienda", "company.it", "azienda.it", "dominio", "pippo", "prova"];
+function sanitizeEmail(email: string | null): string | null {
+  if (!email) return null;
+  const lower = email.toLowerCase().trim();
+  if (!lower.match(/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/)) return null;
+  if (FAKE_EMAIL_PATTERNS.some((p) => lower.includes(p))) return null;
+  return email.trim();
+}
+
+function sanitizePhone(phone: string | null): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 6 || digits.length > 13) return null;
+  if (/^(\d)\1{5,}$/.test(digits)) return null; // tutti uguali (es. 000000)
+  return phone.trim();
+}
+
+function completenessScore(hasEmail: boolean, hasPhone: boolean, hasWebsite: boolean, hasContact: boolean): number {
+  return Math.min(100, 65 + (hasEmail ? 15 : 0) + (hasPhone ? 10 : 0) + (hasWebsite ? 5 : 0) + (hasContact ? 5 : 0));
+}
+
 function mapSearch(s: {
   id: string; organizationId: string; name: string; sector: string | null;
   location: string | null; companySize: string | null; keywords: string | null;
@@ -768,27 +789,38 @@ REGOLE FONDAMENTALI:
       }
 
       // Merge Places/CCIAA + Sonar
+      const genericSearch = !hasSpecificTerm && !search.idealCustomer;
       parsed = allPlacesResults.map((p) => {
         const match = enrichedAll.find(
           (e) => typeof e.companyName === "string" &&
             (e.companyName.toLowerCase().includes(p.companyName.toLowerCase().slice(0, 10)) ||
              p.companyName.toLowerCase().includes((e.companyName as string).toLowerCase().slice(0, 10)))
         );
+        const email = sanitizeEmail(
+          (p as PlacesResult & { email?: string }).email ?? (match?.email ? String(match.email) : null)
+        );
+        const phone = sanitizePhone(p.phone ?? (match?.phone ? String(match.phone) : null));
+        const contactName = match?.contactName ? String(match.contactName) : null;
+        const website = p.website ?? null;
+        const score = genericSearch
+          ? completenessScore(!!email, !!phone, !!website, !!contactName)
+          : typeof match?.score === "number" ? Math.min(100, Math.max(0, Math.round(match.score))) : 60;
+        const motivation = genericSearch
+          ? `Azienda${search.location ? ` di ${search.location}` : ""} trovata su Google Maps${p.piva ? " e registro CCIAA" : ""}.`
+          : (match?.motivation ? String(match.motivation) : null);
         return {
           companyName: p.companyName,
-          website: p.website,
+          website,
           sector: p.sector ?? search.sector ?? null,
           location: p.address ?? p.location,
           companySize: search.companySize ?? null,
-          phone: p.phone,
-          contactName: match?.contactName ? String(match.contactName) : null,
+          phone,
+          contactName,
           contactRole: match?.contactRole ? String(match.contactRole) : null,
-          // Priorita': email scraped dal sito reale, poi da Sonar, poi null
-          email: (p as PlacesResult & { email?: string }).email
-            ?? (match?.email ? String(match.email) : null),
+          email,
           linkedinUrl: null,
-          score: typeof match?.score === "number" ? Math.min(100, Math.max(0, Math.round(match.score))) : 60,
-          motivation: match?.motivation ? String(match.motivation) : null,
+          score,
+          motivation,
         };
       });
 
@@ -846,9 +878,9 @@ Usa email generica (info@, commerciale@) solo se la trovi sul sito reale. Lascia
           companySize: c.companySize ? String(c.companySize) : null,
           contactName: c.contactName ? String(c.contactName) : null,
           contactRole: c.contactRole ? String(c.contactRole) : null,
-          email: c.email ? String(c.email) : null,
-          phone: c.phone ? String(c.phone) : null,
-          linkedinUrl: c.linkedinUrl ? String(c.linkedinUrl) : null,
+          email: sanitizeEmail(c.email ? String(c.email) : null),
+          phone: sanitizePhone(c.phone ? String(c.phone) : null),
+          linkedinUrl: null,
           score: typeof c.score === "number" ? Math.min(100, Math.max(0, Math.round(c.score))) : 50,
           motivation: c.motivation ? String(c.motivation) : null,
         }));
@@ -876,7 +908,7 @@ Usa email generica (info@, commerciale@) solo se la trovi sul sito reale. Lascia
           parsed = parsed.map((c) => {
             const found = enriched.find((e) => e.companyName?.toLowerCase().includes(c.companyName.toLowerCase().slice(0, 8)));
             if (!found) return c;
-            return { ...c, email: c.email ?? (found.email || null), phone: c.phone ?? (found.phone || null) };
+            return { ...c, email: c.email ?? sanitizeEmail(found.email || null), phone: c.phone ?? sanitizePhone(found.phone || null) };
           });
         }
       } catch {
