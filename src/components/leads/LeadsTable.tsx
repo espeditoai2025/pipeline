@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useTransition } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -9,11 +9,12 @@ import {
   flexRender,
   createColumnHelper,
   type SortingState,
+  type RowSelectionState,
 } from "@tanstack/react-table";
-import { ArrowUpDown, Pencil, Trash2, Plus, ArrowRightCircle, Loader2, Mail, Phone } from "lucide-react";
+import { ArrowUpDown, Pencil, Trash2, Plus, ArrowRightCircle, Loader2, Mail, Phone, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { deleteLead, updateLeadStatus } from "@/server/actions/leads";
+import { deleteLead, deleteLeads, updateLeadStatus } from "@/server/actions/leads";
 import { LeadForm } from "./LeadForm";
 import { ConvertLeadModal } from "./ConvertLeadModal";
 import type { Lead, LeadStatus } from "@/types/contacts";
@@ -44,6 +45,8 @@ export function LeadsTable({ initialLeads }: Props) {
   const [converting, setConverting] = useState<Lead | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [isBulkDeleting, startBulkDelete] = useTransition();
 
   const filteredLeads = useMemo(() =>
     leads.filter((l) =>
@@ -62,6 +65,28 @@ export function LeadsTable({ initialLeads }: Props) {
   }
 
   const columns = useMemo(() => [
+    col.display({
+      id: "select",
+      header: ({ table }) => (
+        <input
+          type="checkbox"
+          className="h-3.5 w-3.5 rounded border-[var(--crm-neutral-300)] accent-[var(--crm-primary)] cursor-pointer"
+          checked={table.getIsAllPageRowsSelected()}
+          ref={(el) => { if (el) el.indeterminate = table.getIsSomePageRowsSelected(); }}
+          onChange={table.getToggleAllPageRowsSelectedHandler()}
+          aria-label="Seleziona tutti"
+        />
+      ),
+      cell: ({ row }) => (
+        <input
+          type="checkbox"
+          className="h-3.5 w-3.5 rounded border-[var(--crm-neutral-300)] accent-[var(--crm-primary)] cursor-pointer"
+          checked={row.getIsSelected()}
+          onChange={row.getToggleSelectedHandler()}
+          aria-label="Seleziona"
+        />
+      ),
+    }),
     col.accessor("title", {
       header: ({ column }) => (
         <button className="flex items-center gap-1 hover:text-[var(--crm-primary)]" onClick={() => column.toggleSorting()}>
@@ -208,18 +233,57 @@ export function LeadsTable({ initialLeads }: Props) {
   const table = useReactTable({
     data: filteredLeads,
     columns,
-    state: { sorting, globalFilter },
+    state: { sorting, globalFilter, rowSelection },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
+    onRowSelectionChange: setRowSelection,
+    enableRowSelection: true,
+    getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
   });
 
+  const selectedIds = Object.keys(rowSelection).filter((k) => rowSelection[k]);
+
+  function handleBulkDelete() {
+    if (!confirm(`Eliminare definitivamente ${selectedIds.length} lead selezionati? L'operazione non è reversibile.`)) return;
+    startBulkDelete(async () => {
+      const { count, error } = await deleteLeads(selectedIds);
+      if (error) { toast.error(error); return; }
+      setLeads((prev) => prev.filter((l) => !selectedIds.includes(l.id)));
+      setRowSelection({});
+      toast.success(`${count} lead eliminat${count === 1 ? "o" : "i"}`);
+    });
+  }
+
   const activeFilters = [statusFilter, sourceFilter].filter(Boolean).length;
 
   return (
     <div className="space-y-4">
+      {/* Bulk action toolbar */}
+      {selectedIds.length > 0 && (
+        <div className="flex items-center gap-3 rounded-xl border border-red-200 dark:border-red-700/40 bg-red-50 dark:bg-red-900/20 px-4 py-2.5">
+          <span className="text-sm font-medium text-red-700 dark:text-red-300">
+            {selectedIds.length} lead selezionat{selectedIds.length === 1 ? "o" : "i"}
+          </span>
+          <button
+            onClick={handleBulkDelete}
+            disabled={isBulkDeleting}
+            className="flex items-center gap-1.5 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 px-3 py-1.5 text-xs font-medium text-white transition-colors"
+          >
+            {isBulkDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+            Elimina selezionati
+          </button>
+          <button
+            onClick={() => setRowSelection({})}
+            className="ml-auto flex items-center gap-1 text-xs text-red-600 dark:text-red-400 hover:underline"
+          >
+            <X className="h-3.5 w-3.5" /> Deseleziona
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex gap-2 flex-wrap items-center">
           <input

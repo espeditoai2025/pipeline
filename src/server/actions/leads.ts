@@ -192,6 +192,23 @@ export async function deleteLead(id: string): Promise<{ error: string | null }> 
   }
 }
 
+export async function deleteLeads(ids: string[]): Promise<{ count: number; error: string | null }> {
+  const session = await auth();
+  const { orgId } = getIds(session);
+  if (!orgId) return { count: 0, error: "Non autorizzato" };
+  if (!ids.length) return { count: 0, error: null };
+
+  try {
+    const result = await db.lead.deleteMany({
+      where: { id: { in: ids }, organizationId: orgId },
+    });
+    revalidatePath("/leads");
+    return { count: result.count, error: null };
+  } catch (e) {
+    return { count: 0, error: e instanceof Error ? e.message : "Errore durante l'eliminazione" };
+  }
+}
+
 const convertSchema = z.object({
   dealTitle: z.string().min(1),
   dealValue: z.number().min(0).default(0),
