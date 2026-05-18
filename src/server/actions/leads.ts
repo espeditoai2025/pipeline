@@ -238,6 +238,49 @@ export async function importLeads(
 
 // ─── Helpers arricchimento lead ──────────────────────────────────────────────
 
+async function _scrapeWithBrowserbase(
+  website: string,
+  piva?: string,
+): Promise<{ email: string | null; phone: string | null; found: boolean }> {
+  const apiKey = process.env.BROWSERBASE_API_KEY;
+  const projectId = process.env.BROWSERBASE_PROJECT_ID;
+  if (!apiKey || !projectId) return { email: null, phone: null, found: false };
+
+  let email: string | null = null;
+  let phone: string | null = null;
+
+  try {
+    const Browserbase = (await import("@browserbasehq/sdk")).default;
+    const { chromium } = await import("playwright-core");
+
+    const bb = new Browserbase({ apiKey });
+    const session = await bb.sessions.create({ projectId });
+    const connectUrl = `wss://connect.browserbase.com?apiKey=${apiKey}&sessionId=${session.id}`;
+
+    const browser = await chromium.connectOverCDP(connectUrl);
+    try {
+      const ctx = browser.contexts()[0] ?? await browser.newContext();
+      const page = ctx.pages()[0] ?? await ctx.newPage();
+      const base = website.replace(/\/$/, "");
+
+      for (const path of ["", "/contatti", "/contact", "/chi-siamo", "/about", "/contattaci"]) {
+        try {
+          await page.goto(`${base}${path}`, { waitUntil: "domcontentloaded", timeout: 12000 });
+          const html = await page.content();
+          const r = _extractEmailPhone(html, piva);
+          if (r.email && !email) email = r.email;
+          if (r.phone && !phone) phone = r.phone;
+          if (email && phone) break;
+        } catch { continue; }
+      }
+    } finally {
+      await browser.close();
+    }
+  } catch { /* graceful fallback */ }
+
+  return { email, phone, found: !!(email || phone) };
+}
+
 const _ENRICH_HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
   "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
@@ -361,15 +404,23 @@ export async function enrichLead(id: string): Promise<{
   const sources: string[] = [];
 
   try {
-    // 1. Scraping diretto del sito aziendale
-    if (website) {
-      const site = await _scrapeWebsite(website, piva);
-      if (site.email) email = site.email;
-      if (site.phone) phone = site.phone;
-      if (site.found) sources.push("sito web");
+    // 1. Browserbase — headless browser reale, bypassa anti-bot e JS
+    if (website && process.env.BROWSERBASE_API_KEY) {
+      const bb = await _scrapeWithBrowserbase(website, piva);
+      if (bb.email) email = bb.email;
+      if (bb.phone) phone = bb.phone;
+      if (bb.found) sources.push("sito web (browser)");
     }
 
-    // 2. DuckDuckGo per info ancora mancanti
+    // 2. Scraping diretto del sito aziendale (fallback httpx-style)
+    if (website && (!email || !phone)) {
+      const site = await _scrapeWebsite(website, piva);
+      if (site.email && !email) email = site.email;
+      if (site.phone && !phone) phone = site.phone;
+      if (site.found && !sources.includes("sito web")) sources.push("sito web");
+    }
+
+    // 3. DuckDuckGo per info ancora mancanti
     if (!email || !phone) {
       const ddg = await _duckduckgoSearch(lead.title, location, piva, !email, !phone);
       if (ddg.email && !email) { email = ddg.email; sources.push("ricerca web"); }
