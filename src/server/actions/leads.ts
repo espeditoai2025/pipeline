@@ -192,6 +192,50 @@ export async function deleteLead(id: string): Promise<{ error: string | null }> 
   }
 }
 
+export async function importLeads(
+  rows: Array<{
+    title: string;
+    email?: string | null;
+    phone?: string | null;
+    source?: string | null;
+    status?: string | null;
+    score?: number | null;
+    notes?: string | null;
+    data?: Record<string, unknown>;
+  }>
+): Promise<{ created: number; skipped: number; error: string | null }> {
+  const session = await auth();
+  const { orgId } = getIds(session);
+  if (!orgId) return { created: 0, skipped: 0, error: "Non autorizzato" };
+  if (!rows.length) return { created: 0, skipped: 0, error: null };
+
+  const valid = rows
+    .filter((r) => typeof r.title === "string" && r.title.trim())
+    .map((r) => ({
+      title: r.title.trim(),
+      email: r.email?.trim() || null,
+      phone: r.phone?.trim() || null,
+      source: r.source?.trim() || null,
+      status: (APP_TO_DB[r.status?.toUpperCase() ?? ""] ?? "NEW") as "NEW" | "CONTACTED" | "QUALIFIED" | "CONVERTED" | "DISQUALIFIED",
+      score: typeof r.score === "number" ? Math.min(100, Math.max(0, Math.round(r.score))) : 0,
+      notes: r.notes?.trim() || null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      data: (r.data ?? {}) as any,
+      organizationId: orgId,
+    }));
+
+  const skipped = rows.length - valid.length;
+  if (!valid.length) return { created: 0, skipped, error: "Nessuna riga valida (campo Nome obbligatorio)" };
+
+  try {
+    const result = await db.lead.createMany({ data: valid, skipDuplicates: false });
+    revalidatePath("/leads");
+    return { created: result.count, skipped, error: null };
+  } catch (e) {
+    return { created: 0, skipped, error: e instanceof Error ? e.message : "Errore durante l'importazione" };
+  }
+}
+
 export async function deleteLeads(ids: string[]): Promise<{ count: number; error: string | null }> {
   const session = await auth();
   const { orgId } = getIds(session);

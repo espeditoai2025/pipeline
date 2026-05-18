@@ -11,12 +11,14 @@ import {
   type SortingState,
   type RowSelectionState,
 } from "@tanstack/react-table";
-import { ArrowUpDown, Pencil, Trash2, Plus, ArrowRightCircle, Loader2, Mail, Phone, X } from "lucide-react";
+import { ArrowUpDown, Pencil, Trash2, Plus, ArrowRightCircle, Loader2, Mail, Phone, X, Download, Upload, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { deleteLead, deleteLeads, updateLeadStatus } from "@/server/actions/leads";
 import { LeadForm } from "./LeadForm";
 import { ConvertLeadModal } from "./ConvertLeadModal";
+import { LeadImportModal } from "./LeadImportModal";
 import type { Lead, LeadStatus } from "@/types/contacts";
 
 type Props = { initialLeads: Lead[] };
@@ -47,6 +49,8 @@ export function LeadsTable({ initialLeads }: Props) {
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [isBulkDeleting, startBulkDelete] = useTransition();
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const filteredLeads = useMemo(() =>
     leads.filter((l) =>
@@ -257,6 +261,38 @@ export function LeadsTable({ initialLeads }: Props) {
     });
   }
 
+  function exportLeads(format: "csv" | "xlsx") {
+    const toExport = selectedIds.length > 0
+      ? filteredLeads.filter((l) => selectedIds.includes(l.id))
+      : table.getFilteredRowModel().rows.map((r) => r.original);
+
+    const rows = toExport.map((l) => ({
+      "Nome": l.title,
+      "Email": l.email ?? "",
+      "Telefono": l.phone ?? "",
+      "Sorgente": l.source ?? "",
+      "Stato": STATUS_CONFIG[l.status]?.label ?? l.status,
+      "Score": l.score,
+      "Note": l.notes ?? "",
+      "Settore": (l.data as Record<string, unknown>)?.sector ?? "",
+      "Località": (l.data as Record<string, unknown>)?.location ?? "",
+      "Sito Web": (l.data as Record<string, unknown>)?.website ?? "",
+      "P.IVA": (l.data as Record<string, unknown>)?.piva ?? "",
+      "ATECO": (l.data as Record<string, unknown>)?.ateco ?? "",
+      "Dipendenti": (l.data as Record<string, unknown>)?.nDipendenti ?? "",
+      "Forma Giuridica": (l.data as Record<string, unknown>)?.formaGiuridica ?? "",
+      "Anno Fondazione": (l.data as Record<string, unknown>)?.annoFondazione ?? "",
+      "Data Creazione": new Date(l.createdAt).toLocaleDateString("it-IT"),
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Lead");
+    XLSX.writeFile(wb, format === "csv" ? "lead.csv" : "lead.xlsx", { bookType: format });
+    setExportMenuOpen(false);
+    toast.success(`${rows.length} lead esportati`);
+  }
+
   const activeFilters = [statusFilter, sourceFilter].filter(Boolean).length;
 
   return (
@@ -319,13 +355,55 @@ export function LeadsTable({ initialLeads }: Props) {
             </button>
           )}
         </div>
-        <Button
-          size="sm"
-          className="bg-[var(--crm-primary)] hover:bg-[var(--crm-primary-dark)] text-white"
-          onClick={() => { setEditing(null); setFormOpen(true); }}
-        >
-          <Plus className="h-4 w-4 mr-1.5" /> Nuovo lead
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Import */}
+          <button
+            onClick={() => setImportOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--crm-neutral-200)] dark:border-white/10 px-3 py-2 text-sm font-medium hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/5 transition-colors"
+          >
+            <Upload className="h-3.5 w-3.5" /> Importa
+          </button>
+
+          {/* Export dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setExportMenuOpen((v) => !v)}
+              className="flex items-center gap-1.5 rounded-lg border border-[var(--crm-neutral-200)] dark:border-white/10 px-3 py-2 text-sm font-medium hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/5 transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Esporta
+              {selectedIds.length > 0 && <span className="rounded-full bg-[var(--crm-primary)]/10 text-[var(--crm-primary)] px-1.5 text-xs font-semibold">{selectedIds.length}</span>}
+              <ChevronDown className="h-3.5 w-3.5 text-[var(--crm-neutral-400)]" />
+            </button>
+            {exportMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setExportMenuOpen(false)} />
+                <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 bg-white dark:bg-[#1a1a2e] shadow-lg overflow-hidden">
+                  <button
+                    onClick={() => exportLeads("csv")}
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-sm hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/5 transition-colors"
+                  >
+                    <Download className="h-3.5 w-3.5 text-[var(--crm-neutral-500)]" /> Esporta CSV
+                  </button>
+                  <button
+                    onClick={() => exportLeads("xlsx")}
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-sm hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/5 transition-colors border-t border-[var(--crm-neutral-100)] dark:border-white/10"
+                  >
+                    <Download className="h-3.5 w-3.5 text-emerald-500" /> Esporta XLSX
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          <Button
+            size="sm"
+            className="bg-[var(--crm-primary)] hover:bg-[var(--crm-primary-dark)] text-white"
+            onClick={() => { setEditing(null); setFormOpen(true); }}
+          >
+            <Plus className="h-4 w-4 mr-1.5" /> Nuovo lead
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-xl border border-[var(--crm-neutral-100)] overflow-hidden bg-white dark:bg-[#1a1a2e]">
@@ -385,6 +463,12 @@ export function LeadsTable({ initialLeads }: Props) {
         onConverted={(leadId, dealId) => {
           setLeads((prev) => prev.map((l) => l.id === leadId ? { ...l, status: "CONVERTED" as LeadStatus, convertedDealId: dealId } : l));
         }}
+      />
+
+      <LeadImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => { setImportOpen(false); window.location.reload(); }}
       />
     </div>
   );
