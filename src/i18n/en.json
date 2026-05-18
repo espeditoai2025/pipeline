@@ -12,7 +12,8 @@
     "automations": "Automations",
     "products": "Products",
     "settings": "Settings",
-    "guida": "Help"
+    "guida": "Help",
+    "billing": "Billing"
   },
   "dashboard": {
     "title": "Dashboard",

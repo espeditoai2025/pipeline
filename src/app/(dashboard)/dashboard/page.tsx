@@ -8,6 +8,9 @@ import { getCrmMode, isCrmModeSet } from "@/server/actions/crm-mode";
 import { AIInsightsStrip } from "@/components/ai/AIInsightsStrip";
 import { OnboardingWizard } from "@/components/dashboard/OnboardingWizard";
 import { CrmModeBadge } from "@/components/dashboard/CrmModeBadge";
+import { auth } from "@/lib/auth";
+import { UpgradeBanner } from "@/components/billing/UpgradeBanner";
+import { getOrgPlan } from "@/lib/plan";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("dashboard");
@@ -59,7 +62,13 @@ export default async function DashboardPage() {
   const modeSet = await isCrmModeSet();
   if (!modeSet) redirect("/setup");
 
-  const [data, onboarding, crmMode] = await Promise.all([getDashboardData(), getOnboardingStatus(), getCrmMode()]);
+  const [data, onboarding, crmMode, session] = await Promise.all([
+    getDashboardData(), getOnboardingStatus(), getCrmMode(), auth(),
+  ]);
+
+  const orgId = (session?.user as { organizationId?: string } | undefined)?.organizationId;
+  const orgPlan = orgId ? await getOrgPlan(orgId) : "STARTER";
+  const isStarter = orgPlan === "STARTER" || orgPlan === "FREE";
 
   const kpis = data?.kpis ?? {
     openDeals: 0, totalValue: 0, wonDeals: 0, wonValue: 0,
@@ -109,6 +118,8 @@ export default async function DashboardPage() {
         <h1 className="text-xl font-semibold text-[var(--crm-neutral-900)] dark:text-white">{t("title")}</h1>
         <p className="text-sm text-[var(--crm-neutral-500)] mt-0.5">{t("welcome")}</p>
       </div>
+
+      {isStarter && <UpgradeBanner />}
 
       <CrmModeBadge currentMode={crmMode} />
 

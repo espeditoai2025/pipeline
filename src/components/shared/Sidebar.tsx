@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Cog,
+  CreditCard,
   LayoutDashboard,
   Mail,
   Package,
@@ -42,6 +43,7 @@ const navItems = [
 
 const bottomItems = [
   { key: "guida", href: "/guida", icon: BookOpen },
+  { key: "billing", href: "/billing", icon: CreditCard },
   { key: "settings", href: "/settings", icon: Cog },
 ] as const;
 
