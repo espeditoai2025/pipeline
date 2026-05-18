@@ -497,13 +497,28 @@ async function fetchFatturatoDetail(slug: string): Promise<Partial<PlacesResult>
     const annoFondazione = extractDetailField(html, "Anno Fondazione");
 
     // Telefono: cerca link tel: oppure pattern numeri italiani
-    const SKIP_DOMAINS = /fatturatoitalia\.it|google\.|facebook\.|linkedin\.|twitter\.|instagram\.|youtube\.|googleapis\.|gstatic\.|cloudflare\.|amazonaws\.|cdn\.|numeroverde\.com|adcapital\.it/i;
+    // Esclude numeri di 11 cifre consecutive uguali alla P.IVA (estratta dallo slug URL)
+    const SKIP_DOMAINS = /fatturatoitalia\.it|google\.|facebook\.|linkedin\.|twitter\.|instagram\.|youtube\.|googleapis\.|gstatic\.|cloudflare\.|amazonaws\.|cdn\.|apple\.com|apps\.apple|play\.google|numeroverde\.com|adcapital\.it/i;
+    const pivaFromSlug = slug.match(/(\d{11})$/)?.[1] ?? "";
 
-    const phoneM =
-      html.match(/tel:([\d+][\d\s\-./()]{6,18})/i) ??
-      html.match(/\b((?:\+39[\s.-]?)?0\d{1,3}[\s.-]?\d{5,8})\b/) ??
-      html.match(/\b(3\d{9})\b/);
-    const phone = phoneM?.[1]?.trim() ?? null;
+    const telLink = html.match(/tel:([\d+][\d\s\-./()]{6,18})/i);
+    const telDigits = telLink ? telLink[1].replace(/\D/g, "") : "";
+    const telPhone = (telLink && telDigits !== pivaFromSlug && telDigits.length >= 6) ? telLink[1].trim() : null;
+
+    const fallbackPhone = (() => {
+      // Fisso con separatore (es. 0981 12345) — separatore obbligatorio
+      const m1 = html.match(/\b((?:\+39[\s.-]?)?0\d{1,3}[\s.-]\d{4,8})\b/);
+      if (m1 && m1[1].replace(/\D/g, "") !== pivaFromSlug) return m1[1].trim();
+      // Mobile con separatori
+      const m2 = html.match(/\b(3\d{2}[\s.-]\d{3}[\s.-]\d{4})\b/);
+      if (m2) return m2[1].trim();
+      // Mobile senza separatori
+      const m3 = html.match(/\b(3\d{9})\b/);
+      if (m3) return m3[1].trim();
+      return null;
+    })();
+
+    const phone = telPhone ?? fallbackPhone;
 
     // Sito web: link esterno non di navigazione
     const siteMatches = [...html.matchAll(/href="(https?:\/\/[^"]{6,100})"/gi)];

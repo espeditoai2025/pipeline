@@ -163,25 +163,44 @@ async def _fetch_detail(client: httpx.AsyncClient, slug: str) -> dict:
         anno = _field_from_detail(soup, "Anno Fondazione")
 
         # Telefono: link tel: oppure pattern numeri italiani
+        # Esclude numeri di 11 cifre consecutive senza separatori (probabile P.IVA)
+        piva_str = re.sub(r"\D", "", _slug_to_piva(slug) or "")
         phone: Optional[str] = None
         for a in soup.find_all("a", href=re.compile(r"^tel:", re.I)):
             raw = a["href"].replace("tel:", "").strip()
-            if 6 <= len(re.sub(r"\D", "", raw)) <= 15:
+            digits = re.sub(r"\D", "", raw)
+            if 6 <= len(digits) <= 13 and digits != piva_str:
                 phone = raw
                 break
         if not phone:
-            m = re.search(r"\b((?:\+39[\s.-]?)?0\d{1,3}[\s.-]?\d{5,8})\b", r.text)
-            if not m:
-                m = re.search(r"\b(3\d{9})\b", r.text)
-            phone = m.group(1).strip() if m else None
+            # Pattern fisso italiano: deve avere separatori oppure non essere 11 cifre bare
+            for pat in [
+                r"\b((?:\+39[\s.-]?)?0\d{1,3}[\s.-]\d{4,8})\b",  # con separatore obbligatorio
+                r"\b(\+39\s?0\d{1,3}[\s.-]?\d{4,8})\b",            # con +39
+                r"\b(3\d{2}[\s.-]\d{3}[\s.-]\d{4})\b",              # mobile con separatori
+                r"\b(3\d{9})\b",                                      # mobile senza separatori
+            ]:
+                m = re.search(pat, r.text)
+                if m:
+                    digits = re.sub(r"\D", "", m.group(1))
+                    if digits != piva_str:
+                        phone = m.group(1).strip()
+                        break
 
         # Sito web: primo link esterno non di navigazione
+        SKIP_WEBSITE = re.compile(
+            r"fatturatoitalia\.it|google\.|facebook\.|linkedin\.|twitter\.|"
+            r"instagram\.|youtube\.|googleapis\.|gstatic\.|cloudflare\.|"
+            r"amazonaws\.|cdn\.|apple\.com|apps\.apple|play\.google|"
+            r"numeroverde\.com|adcapital\.it|whatsapp\.",
+            re.I,
+        )
         website: Optional[str] = None
         for a in soup.find_all("a", href=True):
             href: str = a["href"]
             if not href.startswith("http"):
                 continue
-            if SKIP_DOMAINS.search(href) or "?" in href or href.count("/") > 4:
+            if SKIP_WEBSITE.search(href) or "?" in href or href.count("/") > 4:
                 continue
             website = href.rstrip("/")
             break
