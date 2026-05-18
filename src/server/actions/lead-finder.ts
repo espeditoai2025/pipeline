@@ -502,19 +502,19 @@ async function fetchFatturatoDetail(slug: string): Promise<Partial<PlacesResult>
     const pivaFromSlug = slug.match(/(\d{11})$/)?.[1] ?? "";
 
     const telLink = html.match(/tel:([\d+][\d\s\-./()]{6,18})/i);
-    const telDigits = telLink ? telLink[1].replace(/\D/g, "") : "";
-    const telPhone = (telLink && telDigits !== pivaFromSlug && telDigits.length >= 6) ? telLink[1].trim() : null;
+    const telDigits = telLink ? (telLink[1] ?? "").replace(/\D/g, "") : "";
+    const telPhone = (telLink && telDigits !== pivaFromSlug && telDigits.length >= 6) ? (telLink[1] ?? "").trim() : null;
 
     const fallbackPhone = (() => {
       // Fisso con separatore (es. 0981 12345) — separatore obbligatorio
       const m1 = html.match(/\b((?:\+39[\s.-]?)?0\d{1,3}[\s.-]\d{4,8})\b/);
-      if (m1 && m1[1].replace(/\D/g, "") !== pivaFromSlug) return m1[1].trim();
+      if (m1 && (m1[1] ?? "").replace(/\D/g, "") !== pivaFromSlug) return (m1[1] ?? "").trim();
       // Mobile con separatori
       const m2 = html.match(/\b(3\d{2}[\s.-]\d{3}[\s.-]\d{4})\b/);
-      if (m2) return m2[1].trim();
+      if (m2) return (m2[1] ?? "").trim();
       // Mobile senza separatori
       const m3 = html.match(/\b(3\d{9})\b/);
-      if (m3) return m3[1].trim();
+      if (m3) return (m3[1] ?? "").trim();
       return null;
     })();
 
