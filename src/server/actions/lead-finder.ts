@@ -395,6 +395,7 @@ async function scrapeFatturatoPages(
   baseUrl: string,
   labelLocation: string,
   maxResults: number,
+  startPage = 1,
 ): Promise<PlacesResult[]> {
   const results: PlacesResult[] = [];
   const seenSlugs = new Set<string>();
@@ -404,7 +405,7 @@ async function scrapeFatturatoPages(
   // URL format: /nome_azienda_srl-PIVA (underscore come separatore, PIVA = 11 cifre)
   const COMPANY_LINK = /href="https?:\/\/www\.fatturatoitalia\.it\/([a-z0-9][a-z0-9_-]*-\d{11})"[^>]*>([^<]{2,100})<\/a>/gi;
 
-  for (let page = 1; page <= maxPages; page++) {
+  for (let page = startPage; page < startPage + maxPages; page++) {
     try {
       const url = page === 1 ? baseUrl : `${baseUrl}/${page}`;
       const res = await fetch(url, {
@@ -623,6 +624,7 @@ async function fetchFatturatoItalia(
   location: string,
   maxResults: number,
   geo?: GeoResult | null,
+  startPage = 1,
 ): Promise<PlacesResult[]> {
   const rawName = (location.split(",")[0] ?? location)
     .replace(/\bprovincia\s+di\s*/i, "")
@@ -636,7 +638,7 @@ async function fetchFatturatoItalia(
   const BASE = "https://www.fatturatoitalia.it";
 
   async function tryUrl(url: string): Promise<PlacesResult[]> {
-    return scrapeFatturatoPages(url, locationLabel, maxResults).catch(() => []);
+    return scrapeFatturatoPages(url, locationLabel, maxResults, startPage).catch(() => []);
   }
 
   // Strategia principale basata sul tipo di localita'
@@ -694,6 +696,7 @@ type ScraperServiceCompany = {
 async function fetchFromScraperService(
   search: { location?: string | null; sector?: string | null; keywords?: string | null; idealCustomer?: string | null; maxResults: number },
   geo?: GeoResult | null,
+  pageOffset = 0,
 ): Promise<{ companies: ScraperServiceCompany[]; available: boolean }> {
   // URL base: SCRAPER_SERVICE_URL oppure URL del deployment Vercel corrente (funzione Python interna)
   const baseUrl =
@@ -729,6 +732,7 @@ async function fetchFromScraperService(
         sector: search.sector ?? null,
         keywords: search.keywords ?? null,
         ideal_customer: search.idealCustomer ?? null,
+        page_offset: pageOffset,
       }),
       signal: AbortSignal.timeout(240_000), // max 4 min
     });
@@ -839,12 +843,22 @@ export async function runSearch(
     // ── FASE 1b: FatturatoItalia → aziende CCIAA non su Google Maps ──────
     // Preferisce il microservizio Python (BeautifulSoup + INI-PEC + AI scoring).
     // Fallback allo scraper TypeScript interno se SCRAPER_SERVICE_URL non è configurato.
+    //
+    // Paginazione automatica: ricerche successive con la stessa location partono
+    // dalla pagina successiva (45 aziende/pagina su FatturatoItalia).
+    const alreadyFoundPiva = search.location
+      ? await db.leadCandidate.count({
+          where: { organizationId: orgId, piva: { not: null }, search: { location: search.location } },
+        })
+      : 0;
+    const fatturatoStartPage = Math.max(1, Math.floor(alreadyFoundPiva / 45) + 1);
+
     let fatturatoResults: PlacesResult[] = [];
     let scraperServiceResults: ScraperServiceCompany[] = [];
 
     if (search.location) {
       try {
-        const { companies, available } = await fetchFromScraperService(search, coords);
+        const { companies, available } = await fetchFromScraperService(search, coords, fatturatoStartPage - 1);
         if (available && companies.length > 0) {
           scraperServiceResults = companies;
           // Converti in PlacesResult per il merge successivo
@@ -868,6 +882,7 @@ export async function runSearch(
             search.location,
             Math.max(search.maxResults, 30),
             coords,
+            fatturatoStartPage,
           );
         }
       } catch {
@@ -891,7 +906,7 @@ export async function runSearch(
     // ── FASE 1c: INI-PEC — email PEC ufficiale per aziende con P.IVA ─────
     // Solo per aziende da FatturatoItalia (hanno piva), che non hanno già email verificata
     {
-      const pecEmails = await enrichWithPec(allPlacesResults.map((p) => ({ piva: (p as PlacesResult & { piva?: string }).piva, email: p.website ? null : null })));
+      const pecEmails = await enrichWithPec(allPlacesResults.map((p) => ({ piva: (p as PlacesResult).piva, email: (p as PlacesResult).email ?? null })));
       allPlacesResults = allPlacesResults.map((p, i) => {
         const pec = pecEmails[i];
         if (!pec) return p;
@@ -899,12 +914,19 @@ export async function runSearch(
       });
     }
 
-    // ── DEDUPLICAZIONE: salta aziende già presenti nel CRM ───────────────
+    // ── DEDUPLICAZIONE: salta aziende già trovate nella stessa location e nel CRM ──
+    // Se c'è una location, esclude TUTTI i candidati già trovati per quella location
+    // (non solo gli APPROVED) — così ricerche successive restituiscono aziende nuove.
     const [existingCandidates, existingLeads] = await Promise.all([
-      db.leadCandidate.findMany({
-        where: { organizationId: orgId, status: "APPROVED" },
-        select: { companyName: true },
-      }),
+      search.location
+        ? db.leadCandidate.findMany({
+            where: { organizationId: orgId, search: { location: search.location } },
+            select: { companyName: true },
+          })
+        : db.leadCandidate.findMany({
+            where: { organizationId: orgId, status: "APPROVED" },
+            select: { companyName: true },
+          }),
       db.lead.findMany({
         where: { organizationId: orgId },
         select: { title: true },
@@ -1270,6 +1292,85 @@ export async function approveCandidate(
 
   revalidatePath(`/lead-finder`);
   return { leadId: newLead.id, error: null };
+}
+
+// ─── approveAllCandidates ─────────────────────────────────────────────────
+
+export async function approveAllCandidates(
+  searchId: string
+): Promise<{ created: number; skipped: number; error: string | null }> {
+  const session = await auth();
+  const { orgId } = getIds(session);
+  if (!orgId) return { created: 0, skipped: 0, error: "Non autorizzato" };
+
+  const pending = await db.leadCandidate.findMany({
+    where: { searchId, organizationId: orgId, status: "PENDING" },
+    orderBy: { score: "desc" },
+  });
+  if (!pending.length) return { created: 0, skipped: 0, error: null };
+
+  const allOrgLeads = await db.lead.findMany({
+    where: { organizationId: orgId },
+    select: { id: true, title: true },
+  });
+  const existingLeadNames = new Map(allOrgLeads.map((l) => [normalizeCompanyName(l.title), l.id]));
+
+  let created = 0;
+  let skipped = 0;
+
+  for (const candidate of pending) {
+    const normalizedName = normalizeCompanyName(candidate.companyName);
+    const duplicateId = existingLeadNames.get(normalizedName);
+    if (duplicateId) {
+      await db.leadCandidate.update({
+        where: { id: candidate.id },
+        data: { status: "APPROVED", leadId: duplicateId },
+      });
+      skipped++;
+      continue;
+    }
+
+    const { data: newLead, error: leadError } = await createLead({
+      title: candidate.companyName,
+      source: "Lead Finder",
+      score: candidate.score,
+      email: candidate.email ?? undefined,
+      phone: candidate.phone ?? undefined,
+      notes: candidate.motivation ?? undefined,
+      status: "NEW",
+      data: {
+        website: candidate.website,
+        sector: candidate.sector,
+        location: candidate.location,
+        companySize: candidate.companySize,
+        contactName: candidate.contactName,
+        contactRole: candidate.contactRole,
+        linkedinUrl: candidate.linkedinUrl,
+        piva: candidate.piva,
+        ateco: candidate.ateco,
+        nDipendenti: candidate.nDipendenti,
+        formaGiuridica: candidate.formaGiuridica,
+        annoFondazione: candidate.annoFondazione,
+        source: "Lead Finder AI",
+      },
+    });
+
+    if (newLead) {
+      await db.leadCandidate.update({
+        where: { id: candidate.id },
+        data: { status: "APPROVED", leadId: newLead.id },
+      });
+      existingLeadNames.set(normalizedName, newLead.id);
+      created++;
+    } else {
+      console.error(`approveAllCandidates: failed for ${candidate.companyName}`, leadError);
+      skipped++;
+    }
+  }
+
+  revalidatePath(`/lead-finder/${searchId}`);
+  revalidatePath("/leads");
+  return { created, skipped, error: null };
 }
 
 // ─── rejectBelowScore ─────────────────────────────────────────────────────

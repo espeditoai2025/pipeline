@@ -47,6 +47,7 @@ class SearchRequest(BaseModel):
     sector: Optional[str] = None
     keywords: Optional[str] = None
     ideal_customer: Optional[str] = None
+    page_offset: int = 0
 
 
 class Company(BaseModel):
@@ -264,7 +265,7 @@ async def _get_pec(client: httpx.AsyncClient, piva: Optional[str]) -> Optional[s
         return None
 
 
-async def _scrape_all(location_slug: str, max_results: int) -> list[dict]:
+async def _scrape_all(location_slug: str, max_results: int, start_page: int = 1) -> list[dict]:
     base_url = f"https://www.fatturatoitalia.it/{location_slug}"
     max_pages = (max_results // 45) + 2
     CONCURRENCY = 8
@@ -273,7 +274,7 @@ async def _scrape_all(location_slug: str, max_results: int) -> list[dict]:
         # Fase 1: raccolta slug da listing pages
         entries: list[dict] = []
         seen_pivas: set[str] = set()
-        for page in range(1, max_pages + 1):
+        for page in range(start_page, start_page + max_pages):
             url = base_url if page == 1 else f"{base_url}/{page}"
             page_entries = await _scrape_listing(client, url)
             if not page_entries:
@@ -430,7 +431,7 @@ async def search(req: SearchRequest, request: Request):
         if key != secret:
             raise HTTPException(status_code=401, detail="Unauthorized")
 
-    raw = await _scrape_all(req.location_slug, req.max_results)
+    raw = await _scrape_all(req.location_slug, req.max_results, start_page=max(1, req.page_offset + 1))
     if not raw:
         return JSONResponse({"companies": [], "total": 0})
 

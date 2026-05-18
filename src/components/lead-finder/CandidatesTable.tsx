@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, XCircle, ExternalLink, Loader2, Building2, User, MapPin, Users, Trash2, Phone, Hash, Briefcase, Calendar } from "lucide-react";
-import { approveCandidate, rejectCandidate, rejectBelowScore } from "@/server/actions/lead-finder";
+import { CheckCircle2, XCircle, ExternalLink, Loader2, Building2, User, MapPin, Users, Trash2, Phone, Hash, Briefcase, Calendar, DownloadCloud } from "lucide-react";
+import { approveCandidate, rejectCandidate, rejectBelowScore, approveAllCandidates } from "@/server/actions/lead-finder";
 import type { LeadCandidate } from "@/types/lead-finder";
 
 function ScoreBar({ score }: { score: number }) {
@@ -194,7 +194,9 @@ type Props = {
 export function CandidatesTable({ candidates, searchId }: Props) {
   const router = useRouter();
   const [isBulkPending, startBulkTransition] = useTransition();
+  const [isImportAllPending, startImportAllTransition] = useTransition();
   const [bulkError, setBulkError] = useState<string | null>(null);
+  const [importAllResult, setImportAllResult] = useState<string | null>(null);
 
   const pending = candidates.filter((c) => c.status === "PENDING").length;
   const approved = candidates.filter((c) => c.status === "APPROVED").length;
@@ -207,6 +209,17 @@ export function CandidatesTable({ candidates, searchId }: Props) {
       const { count, error } = await rejectBelowScore(searchId, 70);
       if (error) { setBulkError(error); return; }
       if (count > 0) router.refresh();
+    });
+  }
+
+  function handleImportAll() {
+    startImportAllTransition(async () => {
+      setBulkError(null);
+      setImportAllResult(null);
+      const { created, skipped, error } = await approveAllCandidates(searchId);
+      if (error) { setBulkError(error); return; }
+      setImportAllResult(`${created} lead creati${skipped > 0 ? `, ${skipped} già presenti` : ""}`);
+      router.refresh();
     });
   }
 
@@ -235,27 +248,41 @@ export function CandidatesTable({ candidates, searchId }: Props) {
         ))}
       </div>
 
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center gap-2">
         {pending > 0 && (
-          <p className="text-xs text-[var(--crm-neutral-500)]">
+          <p className="text-xs text-[var(--crm-neutral-500)] mr-auto">
             {pending} candidat{pending === 1 ? "o" : "i"} in attesa di revisione
           </p>
+        )}
+        {pending > 0 && (
+          <button
+            onClick={handleImportAll}
+            disabled={isImportAllPending}
+            className="flex items-center gap-1.5 rounded-lg border border-emerald-200 dark:border-emerald-700/40 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-800/30 disabled:opacity-50 transition-colors"
+          >
+            {isImportAllPending
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              : <DownloadCloud className="h-3.5 w-3.5" />
+            }
+            Importa tutti ({pending})
+          </button>
         )}
         {lowScorePending > 0 && (
           <button
             onClick={handleRejectLowScore}
             disabled={isBulkPending}
-            className="ml-auto flex items-center gap-1.5 rounded-lg border border-red-200 dark:border-red-700/40 bg-red-50 dark:bg-red-900/20 px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-800/30 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-1.5 rounded-lg border border-red-200 dark:border-red-700/40 bg-red-50 dark:bg-red-900/20 px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-800/30 disabled:opacity-50 transition-colors"
           >
             {isBulkPending
               ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
               : <Trash2 className="h-3.5 w-3.5" />
             }
-            Elimina risultati non pertinenti (score minore di 70)
+            Elimina score &lt;70 ({lowScorePending})
           </button>
         )}
       </div>
       {bulkError && <p className="text-xs text-red-500">{bulkError}</p>}
+      {importAllResult && <p className="text-xs text-emerald-600 dark:text-emerald-400">{importAllResult}</p>}
 
       {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 bg-white dark:bg-[#1a1a2e]">
