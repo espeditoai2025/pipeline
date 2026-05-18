@@ -109,48 +109,48 @@ export function LeadForm({ open, onClose, lead, onSaved }: Props) {
                 <Building2 className="h-3.5 w-3.5" /> Dati azienda (Lead Finder)
               </p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                {lead.data.piva && (
+                {!!lead.data.piva && (
                   <span className="flex items-center gap-1 text-xs text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)]">
                     <Hash className="h-3 w-3 shrink-0 text-[var(--crm-neutral-400)]" /> P.IVA: <strong>{String(lead.data.piva)}</strong>
                   </span>
                 )}
-                {lead.data.ateco && (
+                {!!lead.data.ateco && (
                   <span className="flex items-center gap-1 text-xs text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)]">
                     <Briefcase className="h-3 w-3 shrink-0 text-[var(--crm-neutral-400)]" /> ATECO: <strong>{String(lead.data.ateco)}</strong>
                   </span>
                 )}
-                {lead.data.sector && (
+                {!!lead.data.sector && (
                   <span className="flex items-center gap-1 text-xs text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)] col-span-2">
                     <Briefcase className="h-3 w-3 shrink-0 text-[var(--crm-neutral-400)]" /> {String(lead.data.sector)}
                   </span>
                 )}
-                {lead.data.nDipendenti && (
+                {!!lead.data.nDipendenti && (
                   <span className="flex items-center gap-1 text-xs text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)]">
                     <Users className="h-3 w-3 shrink-0 text-[var(--crm-neutral-400)]" /> {String(lead.data.nDipendenti)} dip.
                   </span>
                 )}
-                {lead.data.formaGiuridica && (
+                {!!lead.data.formaGiuridica && (
                   <span className="flex items-center gap-1 text-xs text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)]">
                     <Calendar className="h-3 w-3 shrink-0 text-[var(--crm-neutral-400)]" /> {String(lead.data.formaGiuridica)}
-                    {lead.data.annoFondazione ? ` · est. ${String(lead.data.annoFondazione)}` : ""}
+                    {!!lead.data.annoFondazione ? ` · est. ${String(lead.data.annoFondazione)}` : ""}
                   </span>
                 )}
-                {lead.data.location && (
+                {!!lead.data.location && (
                   <span className="flex items-center gap-1 text-xs text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)] col-span-2">
                     <MapPin className="h-3 w-3 shrink-0 text-[var(--crm-neutral-400)]" /> {String(lead.data.location)}
                   </span>
                 )}
-                {lead.data.website && (
+                {!!lead.data.website && (
                   <a href={String(lead.data.website).startsWith("http") ? String(lead.data.website) : `https://${String(lead.data.website)}`}
                     target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-1 text-xs text-[var(--crm-primary)] hover:underline col-span-2 truncate">
                     <Globe className="h-3 w-3 shrink-0" /> {String(lead.data.website)}
                   </a>
                 )}
-                {lead.data.contactName && (
+                {!!lead.data.contactName && (
                   <span className="flex items-center gap-1 text-xs text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)] col-span-2">
                     <User className="h-3 w-3 shrink-0 text-[var(--crm-neutral-400)]" /> {String(lead.data.contactName)}
-                    {lead.data.contactRole ? ` — ${String(lead.data.contactRole)}` : ""}
+                    {!!lead.data.contactRole ? ` — ${String(lead.data.contactRole)}` : ""}
                   </span>
                 )}
               </div>
