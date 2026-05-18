@@ -717,7 +717,7 @@ async function fetchFromScraperService(
       }),
       signal: AbortSignal.timeout(240_000), // max 4 min
     });
-    if (!res.ok) return { companies: [], available: true };
+    if (!res.ok) return { companies: [], available: false };
     const data = await res.json() as { companies: ScraperServiceCompany[] };
     return { companies: data.companies ?? [], available: true };
   } catch {
@@ -847,8 +847,8 @@ export async function runSearch(
             annoFondazione: c.anno_fondazione ?? null,
             email: c.email ?? null,
           }));
-        } else if (!available) {
-          // Python service non configurato — usa scraper TypeScript
+        } else if (!available || companies.length === 0) {
+          // Python service non disponibile o 0 risultati — usa scraper TypeScript
           fatturatoResults = await fetchFatturatoItalia(
             search.location,
             Math.max(search.maxResults, 30),

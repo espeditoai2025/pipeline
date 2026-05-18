@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, Building2, Hash, Briefcase, Users, Calendar, MapPin, Globe, User } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -102,6 +102,61 @@ export function LeadForm({ open, onClose, lead, onSaved }: Props) {
         </SheetHeader>
 
         <SheetBody>
+          {/* Dati CCIAA / Lead Finder — read only */}
+          {lead?.data && Object.keys(lead.data).some(k => ["piva","ateco","nDipendenti","formaGiuridica","annoFondazione","website","sector","location","contactName","contactRole"].includes(k) && lead.data![k]) && (
+            <div className="mb-4 rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 bg-[var(--crm-neutral-50)] dark:bg-white/5 p-4 space-y-2">
+              <p className="text-xs font-semibold text-[var(--crm-neutral-500)] uppercase tracking-wide flex items-center gap-1.5">
+                <Building2 className="h-3.5 w-3.5" /> Dati azienda (Lead Finder)
+              </p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                {lead.data.piva && (
+                  <span className="flex items-center gap-1 text-xs text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)]">
+                    <Hash className="h-3 w-3 shrink-0 text-[var(--crm-neutral-400)]" /> P.IVA: <strong>{String(lead.data.piva)}</strong>
+                  </span>
+                )}
+                {lead.data.ateco && (
+                  <span className="flex items-center gap-1 text-xs text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)]">
+                    <Briefcase className="h-3 w-3 shrink-0 text-[var(--crm-neutral-400)]" /> ATECO: <strong>{String(lead.data.ateco)}</strong>
+                  </span>
+                )}
+                {lead.data.sector && (
+                  <span className="flex items-center gap-1 text-xs text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)] col-span-2">
+                    <Briefcase className="h-3 w-3 shrink-0 text-[var(--crm-neutral-400)]" /> {String(lead.data.sector)}
+                  </span>
+                )}
+                {lead.data.nDipendenti && (
+                  <span className="flex items-center gap-1 text-xs text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)]">
+                    <Users className="h-3 w-3 shrink-0 text-[var(--crm-neutral-400)]" /> {String(lead.data.nDipendenti)} dip.
+                  </span>
+                )}
+                {lead.data.formaGiuridica && (
+                  <span className="flex items-center gap-1 text-xs text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)]">
+                    <Calendar className="h-3 w-3 shrink-0 text-[var(--crm-neutral-400)]" /> {String(lead.data.formaGiuridica)}
+                    {lead.data.annoFondazione ? ` · est. ${String(lead.data.annoFondazione)}` : ""}
+                  </span>
+                )}
+                {lead.data.location && (
+                  <span className="flex items-center gap-1 text-xs text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)] col-span-2">
+                    <MapPin className="h-3 w-3 shrink-0 text-[var(--crm-neutral-400)]" /> {String(lead.data.location)}
+                  </span>
+                )}
+                {lead.data.website && (
+                  <a href={String(lead.data.website).startsWith("http") ? String(lead.data.website) : `https://${String(lead.data.website)}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-[var(--crm-primary)] hover:underline col-span-2 truncate">
+                    <Globe className="h-3 w-3 shrink-0" /> {String(lead.data.website)}
+                  </a>
+                )}
+                {lead.data.contactName && (
+                  <span className="flex items-center gap-1 text-xs text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)] col-span-2">
+                    <User className="h-3 w-3 shrink-0 text-[var(--crm-neutral-400)]" /> {String(lead.data.contactName)}
+                    {lead.data.contactRole ? ` — ${String(lead.data.contactRole)}` : ""}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
 
             {/* Titolo */}
