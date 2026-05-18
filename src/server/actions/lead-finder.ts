@@ -666,23 +666,28 @@ async function fetchFromScraperService(
   search: { location?: string | null; sector?: string | null; keywords?: string | null; idealCustomer?: string | null; maxResults: number },
   geo?: GeoResult | null,
 ): Promise<{ companies: ScraperServiceCompany[]; available: boolean }> {
-  const serviceUrl = process.env.SCRAPER_SERVICE_URL;
-  if (!serviceUrl) return { companies: [], available: false };
+  // URL base: SCRAPER_SERVICE_URL oppure URL del deployment Vercel corrente (funzione Python interna)
+  const baseUrl =
+    process.env.SCRAPER_SERVICE_URL ??
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ??
+    process.env.NEXT_PUBLIC_APP_URL ??
+    null;
+
+  if (!baseUrl) return { companies: [], available: false };
 
   const loc = (search.location ?? "").split(",")[0]?.trim() ?? "";
   const rawSlug = toSlug(loc);
   if (!rawSlug) return { companies: [], available: false };
 
   const locType = detectLocationType(loc);
-  // Risolvi location_slug con lo stesso fallback usato da fetchFatturatoItalia
   let locationSlug = `${locType}/${rawSlug}`;
+  // Per comuni non capoluogo usa la provincia ricavata da Nominatim
   if (locType === "comune" && geo?.provinceSlug && geo.provinceSlug !== rawSlug) {
-    // Il Python service userà il primo slug; per i comuni non capoluogo usa la provincia
     locationSlug = `provincia/${geo.provinceSlug}`;
   }
 
   try {
-    const res = await fetch(`${serviceUrl}/search`, {
+    const res = await fetch(`${baseUrl}/api/scraper`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -696,7 +701,7 @@ async function fetchFromScraperService(
         keywords: search.keywords ?? null,
         ideal_customer: search.idealCustomer ?? null,
       }),
-      signal: AbortSignal.timeout(120_000), // max 2 min
+      signal: AbortSignal.timeout(240_000), // max 4 min
     });
     if (!res.ok) return { companies: [], available: true };
     const data = await res.json() as { companies: ScraperServiceCompany[] };

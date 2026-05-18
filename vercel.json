@@ -6,6 +6,12 @@
   "env": {
     "NEXT_TELEMETRY_DISABLED": "1"
   },
+  "functions": {
+    "api/scraper.py": {
+      "runtime": "python3.12",
+      "maxDuration": 300
+    }
+  },
   "headers": [
     {
       "source": "/(.*)",
