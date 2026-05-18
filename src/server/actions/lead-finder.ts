@@ -186,7 +186,8 @@ type PlacesResult = {
   address?: string | null;
   sector?: string | null;
   fatturatoSlug?: string | null;
-  email?: string | null; // scraped dal sito aziendale
+  email?: string | null;
+  _inactive?: boolean; // flag interno — azienda cessata/non attiva, da scartare
 };
 
 // ─── Geocoding helper (Nominatim) ────────────────────────────────────────────
@@ -382,6 +383,8 @@ function extractVatFromSlug(slug: string): string | null {
 }
 
 // Scraping pagina listing FatturatoItalia → array di aziende con slug e P.IVA estratto dall'URL
+// HTML struttura: <td><a href="/nome_azienda_srl-PIVA" title="...">Nome Display</a></td>
+// Ogni link appare 2× per riga (colonna 1 e 2), ~45 aziende per pagina
 async function scrapeFatturatoPages(
   baseUrl: string,
   labelLocation: string,
@@ -389,20 +392,14 @@ async function scrapeFatturatoPages(
 ): Promise<PlacesResult[]> {
   const results: PlacesResult[] = [];
   const seenSlugs = new Set<string>();
-  // Stima: ~15 aziende per pagina, +2 pagine di buffer
-  const maxPages = Math.ceil(maxResults / 15) + 2;
+  const maxPages = Math.ceil(maxResults / 45) + 1;
 
-  // Pattern: href="https://www.fatturatoitalia.it/nome-azienda-12345678901"
-  // Il VAT (11 cifre) è sempre alla fine dello slug
-  const COMPANY_LINK = /href="https?:\/\/www\.fatturatoitalia\.it\/([a-z0-9][a-z0-9_-]*-\d{11})[/"]/gi;
-  // Fallback per link senza VAT esplicito (pagine piu' vecchie)
-  const COMPANY_LINK_FALLBACK = /href="https?:\/\/www\.fatturatoitalia\.it\/([a-z0-9][a-z0-9_-]+)"[^>]*title="([^"]+)"/gi;
-  // Pattern per il nome dell'azienda nel title o testo link
-  const NAME_FROM_TITLE = /title="(?:Fatturato\s+)?([^"]{2,80})"/i;
+  // Cattura slug (group 1) + testo link visibile (group 2) in un'unica regex
+  // URL format: /nome_azienda_srl-PIVA (underscore come separatore, PIVA = 11 cifre)
+  const COMPANY_LINK = /href="https?:\/\/www\.fatturatoitalia\.it\/([a-z0-9][a-z0-9_-]*-\d{11})"[^>]*>([^<]{2,100})<\/a>/gi;
 
   for (let page = 1; page <= maxPages; page++) {
     try {
-      // FatturatoItalia usa /2, /3, ecc. per la paginazione
       const url = page === 1 ? baseUrl : `${baseUrl}/${page}`;
       const res = await fetch(url, {
         headers: {
@@ -410,50 +407,25 @@ async function scrapeFatturatoPages(
           "Accept-Language": "it-IT,it;q=0.9",
           "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
-        next: { revalidate: 3600 }, // cache 1 ora
+        next: { revalidate: 3600 },
       });
       if (!res.ok) break;
       const html = await res.text();
 
       let foundOnPage = 0;
-
-      // Strategia 1: link con slug+VAT — VAT estratto dall'URL (affidabile)
       COMPANY_LINK.lastIndex = 0;
       let m: RegExpExecArray | null;
       while ((m = COMPANY_LINK.exec(html)) !== null) {
         const slug = m[1] ?? "";
+        const rawName = (m[2] ?? "").trim();
+        if (!slug || !rawName || rawName.length < 2) continue;
         if (seenSlugs.has(slug)) continue;
-
-        // Estrai il nome dal title attribute nella stessa zona HTML
-        const context = html.slice(Math.max(0, m.index - 10), m.index + m[0].length + 100);
-        const titleM = context.match(NAME_FROM_TITLE);
-        const rawName = titleM?.[1]?.replace(/^Fatturato\s+/i, "").trim() ?? "";
-        if (!rawName || rawName.length < 2) continue;
-
         seenSlugs.add(slug);
         const piva = extractVatFromSlug(slug);
-        const companyName = normalizeCompanyName(rawName);
-        results.push({ companyName, website: null, phone: null, location: labelLocation, fatturatoSlug: slug, piva });
+        // Il testo del link è già formattato correttamente (es. "Dical Srl", "Bustraser Italia S.r.l.")
+        results.push({ companyName: rawName, website: null, phone: null, location: labelLocation, fatturatoSlug: slug, piva });
         foundOnPage++;
         if (results.length >= maxResults) break;
-      }
-
-      // Strategia 2 (fallback): link con title ma slug senza VAT
-      if (foundOnPage === 0) {
-        COMPANY_LINK_FALLBACK.lastIndex = 0;
-        while ((m = COMPANY_LINK_FALLBACK.exec(html)) !== null) {
-          const slug = m[1] ?? "";
-          const rawName = (m[2] ?? "").replace(/^Fatturato\s+/i, "").trim();
-          // Escludi pagine di navigazione
-          if (/^(comune|provincia|regione|settore|analisi|catasto|servizi|listino)/.test(slug)) continue;
-          if (seenSlugs.has(slug) || !rawName || rawName.length < 2) continue;
-          seenSlugs.add(slug);
-          const piva = extractVatFromSlug(slug);
-          const companyName = normalizeCompanyName(rawName);
-          results.push({ companyName, website: null, phone: null, location: labelLocation, fatturatoSlug: slug, piva });
-          foundOnPage++;
-          if (results.length >= maxResults) break;
-        }
       }
 
       if (foundOnPage === 0 || results.length >= maxResults) break;
@@ -471,8 +443,21 @@ function normalizeCompanyName(raw: string): string {
     .replace(/\bDi\b|\bDel\b|\bDella\b|\bDei\b|\bDegli\b|\bDelle\b|\bDa\b|\bIn\b|\bE\b/g, (m) => m.toLowerCase());
 }
 
-// Scraping pagina dettaglio azienda → indirizzo, settore ATECO, sito, telefono
-// Nota: P.IVA viene gia' estratta dallo slug URL (extractVatFromSlug) — piu' affidabile
+// Estrae il valore di un campo dalla pagina dettaglio FatturatoItalia.
+// Pattern HTML: <b>LABEL</b></p></div><div class="col-xs-7"><p>[<a ...>]VALUE[</a>]</p>
+function extractDetailField(html: string, label: string): string | null {
+  const esc = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const m = html.match(
+    new RegExp(
+      `<b>${esc}</b></p></div>\\s*<div class="col-xs-7"><p>(?:<a[^>]*>)?([^<]{1,200})(?:</a>)?`,
+      "i"
+    )
+  );
+  return m?.[1]?.trim().replace(/\s+/g, " ") ?? null;
+}
+
+// Scraping pagina dettaglio azienda → indirizzo completo, settore/ATECO, telefono, sito
+// Filtra automaticamente le aziende con Stato Attività != Attiva
 async function fetchFatturatoDetail(slug: string): Promise<Partial<PlacesResult>> {
   try {
     const res = await fetch(`https://www.fatturatoitalia.it/${slug}`, {
@@ -486,31 +471,35 @@ async function fetchFatturatoDetail(slug: string): Promise<Partial<PlacesResult>
     if (!res.ok) return {};
     const html = await res.text();
 
-    // Indirizzo sede legale
-    const addrM = html.match(
-      /(?:Indirizzo|Sede\s+legale|Sede\s+operativa|Via|Viale|Corso|Piazza|Largo|Strada|Loc\.?)[:\s]+([^<\n]{5,100})/i
-    );
-    const address = addrM?.[1]?.trim().replace(/\s+/g, " ") ?? null;
+    // Scarta aziende cessate/non attive
+    const stato = extractDetailField(html, "Stato Attività");
+    if (stato && !/attiv/i.test(stato)) return { _inactive: true };
 
-    // Settore / ATECO (descrizione attivita')
-    const sectorM = html.match(
-      /(?:Attivit[àa]\s+economica|Settore|Descrizione\s+ATECO|ATECO|Codice\s+attivit)[:\s]+([^<\n]{4,120})/i
-    );
-    const sector = sectorM?.[1]?.trim().replace(/\s+/g, " ") ?? null;
+    // Indirizzo: via + città + provincia
+    const via = extractDetailField(html, "Indirizzo");
+    const citta = extractDetailField(html, "Città");
+    const provincia = extractDetailField(html, "Provincia");
+    const addressParts = [via, citta, provincia].filter(Boolean);
+    const address = addressParts.length > 0 ? addressParts.join(", ") : null;
 
-    // Telefono — fisso italiano (0xx...) o mobile (3xx...)
+    // Settore: usa la descrizione attività prevalente (più leggibile del codice ATECO)
+    const ateco = extractDetailField(html, "ATECO");
+    const attivita = extractDetailField(html, "Attività prevalente");
+    const sector = attivita ?? (ateco ? `ATECO ${ateco}` : null);
+
+    // Telefono: cerca link tel: oppure pattern numeri italiani
+    const SKIP_DOMAINS = /fatturatoitalia\.it|google\.|facebook\.|linkedin\.|twitter\.|instagram\.|youtube\.|googleapis\.|gstatic\.|cloudflare\.|amazonaws\.|cdn\.|numeroverde\.com|adcapital\.it/i;
+
     const phoneM =
-      html.match(/(?:Tel(?:efono)?|Telefono\s+fisso|Phone)[:\s]*(\+?[\d\s\-.()/]{8,20})/i) ??
+      html.match(/tel:([\d+][\d\s\-./()]{6,18})/i) ??
       html.match(/\b((?:\+39[\s.-]?)?0\d{1,3}[\s.-]?\d{5,8})\b/) ??
       html.match(/\b(3\d{9})\b/);
     const phone = phoneM?.[1]?.trim() ?? null;
 
-    // Sito web aziendale — link esterno non FatturatoItalia, non analytics/CDN
-    // Cerca specificamente link con testo tipo "Sito web", "www.", o href significativo
-    const SKIP_DOMAINS = /fatturatoitalia\.it|google\.|facebook\.|linkedin\.|twitter\.|instagram\.|youtube\.|googleapis\.|gstatic\.|cloudflare\.|amazonaws\.|cdn\./i;
+    // Sito web: link esterno non di navigazione
     const siteMatches = [...html.matchAll(/href="(https?:\/\/[^"]{6,100})"/gi)];
     const website = siteMatches
-      .map((m) => m[1] ?? "")
+      .map((sm) => sm[1] ?? "")
       .find((u) => u && !SKIP_DOMAINS.test(u) && !u.includes("?") && u.split("/").length <= 4)
       ?? null;
 
@@ -558,9 +547,11 @@ async function scrapeEmailFromWebsite(website: string): Promise<string | null> {
 }
 
 // Arricchisce un batch di aziende con dati dal dettaglio CCIAA + email dal sito
+// Filtra le aziende non attive (Stato Attività != Attiva)
 async function enrichWithFatturatoDetails(companies: PlacesResult[]): Promise<PlacesResult[]> {
   const CONCURRENCY = 8;
   const enriched = [...companies];
+  const inactiveIdxs = new Set<number>();
 
   // Fase 1: dati CCIAA dalla pagina FatturatoItalia
   for (let i = 0; i < enriched.length; i += CONCURRENCY) {
@@ -571,7 +562,7 @@ async function enrichWithFatturatoDetails(companies: PlacesResult[]): Promise<Pl
     details.forEach((d, idx) => {
       const c = enriched[i + idx];
       if (!c) return;
-      // piva: non sovrascrivere se gia' estratto dallo slug (piu' affidabile)
+      if (d._inactive) { inactiveIdxs.add(i + idx); return; }
       if (d.address) c.address = d.address;
       if (d.sector && !c.sector) c.sector = d.sector;
       if (d.phone && !c.phone) c.phone = d.phone;
@@ -579,8 +570,10 @@ async function enrichWithFatturatoDetails(companies: PlacesResult[]): Promise<Pl
     });
   }
 
+  const active = enriched.filter((_, idx) => !inactiveIdxs.has(idx));
+
   // Fase 2: scraping email dal sito aziendale (solo per chi ha website)
-  const withWebsite = enriched.filter((c) => c.website);
+  const withWebsite = active.filter((c) => c.website);
   for (let i = 0; i < withWebsite.length; i += CONCURRENCY) {
     const batch = withWebsite.slice(i, i + CONCURRENCY);
     const emails = await Promise.all(batch.map((c) => scrapeEmailFromWebsite(c.website!)));
@@ -590,7 +583,7 @@ async function enrichWithFatturatoDetails(companies: PlacesResult[]): Promise<Pl
     });
   }
 
-  return enriched;
+  return active;
 }
 
 // Tenta di fare scraping su FatturatoItalia con catena di fallback geografica:
