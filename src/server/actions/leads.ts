@@ -236,6 +236,64 @@ export async function importLeads(
   }
 }
 
+export async function enrichLead(id: string): Promise<{
+  email: string | null;
+  phone: string | null;
+  source: string | null;
+  error: string | null;
+}> {
+  const session = await auth();
+  const { orgId } = getIds(session);
+  if (!orgId) return { email: null, phone: null, source: null, error: "Non autorizzato" };
+
+  const lead = await db.lead.findUnique({
+    where: { id, organizationId: orgId },
+    select: { id: true, title: true, email: true, phone: true, data: true },
+  });
+  if (!lead) return { email: null, phone: null, source: null, error: "Lead non trovato" };
+
+  const data = (lead.data ?? {}) as Record<string, unknown>;
+  const body = {
+    name: lead.title,
+    website: typeof data.website === "string" ? data.website : null,
+    piva: typeof data.piva === "string" ? data.piva : null,
+    location: typeof data.location === "string" ? data.location : null,
+  };
+
+  try {
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+
+    const res = await fetch(`${baseUrl}/api/enrich`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) return { email: null, phone: null, source: null, error: `Errore scraping: ${res.status}` };
+
+    const result = (await res.json()) as { email?: string | null; phone?: string | null; source?: string | null };
+
+    const updates: { email?: string; phone?: string } = {};
+    if (result.email && !lead.email) updates.email = result.email;
+    if (result.phone && !lead.phone) updates.phone = result.phone;
+
+    if (Object.keys(updates).length > 0) {
+      await db.lead.update({ where: { id }, data: updates });
+      revalidatePath("/leads");
+    }
+
+    return {
+      email: result.email ?? null,
+      phone: result.phone ?? null,
+      source: result.source ?? null,
+      error: null,
+    };
+  } catch (e) {
+    return { email: null, phone: null, source: null, error: e instanceof Error ? e.message : "Errore di rete" };
+  }
+}
+
 export async function deleteLeads(ids: string[]): Promise<{ count: number; error: string | null }> {
   const session = await auth();
   const { orgId } = getIds(session);

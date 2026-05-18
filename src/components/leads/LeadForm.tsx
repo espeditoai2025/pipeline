@@ -4,11 +4,11 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, Building2, Hash, Briefcase, Users, Calendar, MapPin, Globe, User } from "lucide-react";
+import { Loader2, Building2, Hash, Briefcase, Users, Calendar, MapPin, Globe, User, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { createLead, updateLead } from "@/server/actions/leads";
+import { createLead, updateLead, enrichLead } from "@/server/actions/leads";
 import { getContacts } from "@/server/actions/contacts";
 import { getTeamMembers } from "@/server/actions/settings";
 import type { Lead } from "@/types/contacts";
@@ -53,6 +53,8 @@ export function LeadForm({ open, onClose, lead, onSaved }: Props) {
   const [contacts, setContacts] = useState<ContactOption[]>([]);
   const [members, setMembers] = useState<MemberOption[]>([]);
   const [scoreVal, setScoreVal] = useState(lead?.score ?? 50);
+  const [isEnriching, setIsEnriching] = useState(false);
+  const [enrichMsg, setEnrichMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -76,6 +78,23 @@ export function LeadForm({ open, onClose, lead, onSaved }: Props) {
 
   const watchedScore = watch("score");
   useEffect(() => { setScoreVal(watchedScore); }, [watchedScore]);
+
+  async function handleEnrich() {
+    if (!lead?.id) return;
+    setIsEnriching(true);
+    setEnrichMsg(null);
+    const result = await enrichLead(lead.id);
+    setIsEnriching(false);
+    if (result.error) {
+      setEnrichMsg(`Errore: ${result.error}`);
+      return;
+    }
+    const found: string[] = [];
+    if (result.email) found.push(`email: ${result.email}`);
+    if (result.phone) found.push(`tel: ${result.phone}`);
+    setEnrichMsg(found.length > 0 ? `Trovato — ${found.join(", ")}` : "Nessuna info aggiuntiva trovata");
+    if (found.length > 0) onClose();
+  }
 
   async function onSubmit(data: FormValues) {
     const result = isEditing
@@ -249,6 +268,25 @@ export function LeadForm({ open, onClose, lead, onSaved }: Props) {
                 placeholder="Informazioni aggiuntive sul lead..."
               />
             </div>
+
+            {isEditing && (
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={handleEnrich}
+                  disabled={isEnriching}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--crm-neutral-200)] dark:border-white/10 bg-[var(--crm-neutral-50)] dark:bg-white/5 px-3 py-2 text-sm font-medium text-[var(--crm-neutral-700)] dark:text-[var(--crm-neutral-300)] hover:bg-[var(--crm-neutral-100)] dark:hover:bg-white/10 disabled:opacity-50 transition-colors"
+                >
+                  {isEnriching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  Aggiorna info (cerca email e telefono)
+                </button>
+                {enrichMsg && (
+                  <p className={`mt-1.5 text-xs text-center ${enrichMsg.startsWith("Errore") ? "text-red-500" : enrichMsg.startsWith("Nessuna") ? "text-[var(--crm-neutral-500)]" : "text-emerald-600 dark:text-emerald-400"}`}>
+                    {enrichMsg}
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="flex gap-3 pt-2">
               <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Annulla</Button>

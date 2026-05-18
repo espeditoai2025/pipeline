@@ -9,6 +9,9 @@
   "functions": {
     "api/scraper.py": {
       "maxDuration": 300
+    },
+    "api/enrich.py": {
+      "maxDuration": 60
     }
   },
   "headers": [
