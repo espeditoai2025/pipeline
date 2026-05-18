@@ -29,18 +29,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly",
       priority: 1.0,
     },
-    {
-      url: `${BASE}/login`,
-      lastModified: now,
-      changeFrequency: "yearly",
-      priority: 0.4,
-    },
-    {
-      url: `${BASE}/register`,
-      lastModified: now,
-      changeFrequency: "yearly",
-      priority: 0.7,
-    },
+    // NOTA: /login e /register esclusi dalla sitemap — pagine auth senza valore SEO
     {
       url: `${BASE}/chi-siamo`,
       lastModified: now,
