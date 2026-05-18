@@ -236,6 +236,105 @@ export async function importLeads(
   }
 }
 
+// ─── Helpers arricchimento lead ──────────────────────────────────────────────
+
+const _ENRICH_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
+  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+};
+const _SKIP_EMAIL_PREFIX = /^(noreply|no-reply|donotreply|support|webmaster|admin|postmaster|privacy|cookie|dpo|seo|marketing|newsletter)@/i;
+const _SKIP_EMAIL_DOMAIN = /@(example|test|acme|placeholder|duckduckgo|google|facebook|linkedin|twitter|instagram|w3\.org|schema\.org|adobe|microsoft|apple|cloudflare)\./i;
+const _EMAIL_RE = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
+const _MAILTO_RE = /mailto:([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/i;
+const _TEL_RE = /tel:([\+\d][\d\s\-./()]{5,18})/i;
+const _PHONE_RE = /(?:\b(?:\+39[\s.\-]?)?0\d{1,3}[\s.\-]\d{3,8}\b|\b\+39\s?0\d{1,3}[\s.\-]?\d{4,8}\b|\b3\d{2}[\s.\-]\d{3}[\s.\-]\d{4}\b|\b3\d{9}\b)/;
+
+function _sanitizeEmail(raw: string): string | null {
+  const e = raw.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(e)) return null;
+  if (_SKIP_EMAIL_PREFIX.test(e) || _SKIP_EMAIL_DOMAIN.test(e)) return null;
+  return e;
+}
+
+function _sanitizePhone(raw: string, piva?: string): string | null {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length < 6 || digits.length > 13) return null;
+  if (/^(\d)\1{5,}$/.test(digits)) return null;
+  if (piva && digits === piva.replace(/\D/g, "")) return null;
+  return raw.trim();
+}
+
+function _extractEmailPhone(html: string, piva?: string): { email: string | null; phone: string | null } {
+  const clean = html.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, "");
+
+  let email: string | null = null;
+  const mailto = _MAILTO_RE.exec(html);
+  if (mailto?.[1]) email = _sanitizeEmail(mailto[1]);
+  if (!email) {
+    for (const m of clean.matchAll(_EMAIL_RE)) {
+      const s = _sanitizeEmail(m[0]);
+      if (s) { email = s; break; }
+    }
+  }
+
+  let phone: string | null = null;
+  const telLink = _TEL_RE.exec(html);
+  if (telLink?.[1]) phone = _sanitizePhone(telLink[1], piva);
+  if (!phone) {
+    const pm = _PHONE_RE.exec(clean);
+    if (pm?.[0]) phone = _sanitizePhone(pm[0], piva);
+  }
+
+  return { email, phone };
+}
+
+async function _scrapeWebsite(website: string, piva?: string): Promise<{ email: string | null; phone: string | null; found: boolean }> {
+  const base = website.replace(/\/$/, "");
+  const paths = ["", "/contatti", "/contact", "/chi-siamo", "/about", "/contattaci"];
+  let email: string | null = null;
+  let phone: string | null = null;
+
+  for (const path of paths) {
+    try {
+      const res = await fetch(`${base}${path}`, {
+        headers: _ENRICH_HEADERS,
+        signal: AbortSignal.timeout(8000),
+        redirect: "follow",
+      });
+      if (!res.ok) continue;
+      const html = await res.text();
+      const r = _extractEmailPhone(html, piva);
+      if (r.email && !email) email = r.email;
+      if (r.phone && !phone) phone = r.phone;
+      if (email && phone) break;
+    } catch { continue; }
+  }
+
+  return { email, phone, found: !!(email || phone) };
+}
+
+async function _duckduckgoSearch(name: string, location?: string, piva?: string, needEmail = true, needPhone = true): Promise<{ email: string | null; phone: string | null }> {
+  const parts = [name, location, needEmail && needPhone ? "email telefono contatti" : needEmail ? "email contatti" : "telefono contatti"].filter(Boolean);
+  try {
+    const url = new URL("https://html.duckduckgo.com/html/");
+    url.searchParams.set("q", parts.join(" "));
+    const res = await fetch(url.toString(), {
+      headers: { ..._ENRICH_HEADERS, Accept: "text/html" },
+      signal: AbortSignal.timeout(12000),
+      redirect: "follow",
+    });
+    if (!res.ok) return { email: null, phone: null };
+    const html = await res.text();
+    const clean = html.replace(/<[^>]+>/g, " ");
+    const r = _extractEmailPhone(clean, piva);
+    const email = r.email && !r.email.includes("duckduckgo") ? r.email : null;
+    return { email, phone: r.phone };
+  } catch { return { email: null, phone: null }; }
+}
+
+// ─── Action ──────────────────────────────────────────────────────────────────
+
 export async function enrichLead(id: string): Promise<{
   email: string | null;
   phone: string | null;
@@ -253,42 +352,40 @@ export async function enrichLead(id: string): Promise<{
   if (!lead) return { email: null, phone: null, source: null, error: "Lead non trovato" };
 
   const data = (lead.data ?? {}) as Record<string, unknown>;
-  const body = {
-    name: lead.title,
-    website: typeof data.website === "string" ? data.website : null,
-    piva: typeof data.piva === "string" ? data.piva : null,
-    location: typeof data.location === "string" ? data.location : null,
-  };
+  const website = typeof data.website === "string" ? data.website : null;
+  const piva = typeof data.piva === "string" ? data.piva : undefined;
+  const location = typeof data.location === "string" ? data.location : undefined;
+
+  let email: string | null = null;
+  let phone: string | null = null;
+  const sources: string[] = [];
 
   try {
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+    // 1. Scraping diretto del sito aziendale
+    if (website) {
+      const site = await _scrapeWebsite(website, piva);
+      if (site.email) email = site.email;
+      if (site.phone) phone = site.phone;
+      if (site.found) sources.push("sito web");
+    }
 
-    const res = await fetch(`${baseUrl}/api/enrich`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) return { email: null, phone: null, source: null, error: `Errore scraping: ${res.status}` };
+    // 2. DuckDuckGo per info ancora mancanti
+    if (!email || !phone) {
+      const ddg = await _duckduckgoSearch(lead.title, location, piva, !email, !phone);
+      if (ddg.email && !email) { email = ddg.email; sources.push("ricerca web"); }
+      if (ddg.phone && !phone) { phone = ddg.phone; if (!sources.includes("ricerca web")) sources.push("ricerca web"); }
+    }
 
-    const result = (await res.json()) as { email?: string | null; phone?: string | null; source?: string | null };
-
+    // Salva nel DB solo i campi che prima erano vuoti
     const updates: { email?: string; phone?: string } = {};
-    if (result.email && !lead.email) updates.email = result.email;
-    if (result.phone && !lead.phone) updates.phone = result.phone;
-
+    if (email && !lead.email) updates.email = email;
+    if (phone && !lead.phone) updates.phone = phone;
     if (Object.keys(updates).length > 0) {
       await db.lead.update({ where: { id }, data: updates });
       revalidatePath("/leads");
     }
 
-    return {
-      email: result.email ?? null,
-      phone: result.phone ?? null,
-      source: result.source ?? null,
-      error: null,
-    };
+    return { email, phone, source: sources.length > 0 ? sources.join(", ") : null, error: null };
   } catch (e) {
     return { email: null, phone: null, source: null, error: e instanceof Error ? e.message : "Errore di rete" };
   }
