@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Users, Briefcase, Workflow, BarChart3 } from "lucide-react";
 import { LandingPage } from "@/components/marketing/LandingPage";
 
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     title: "CRM per Agenzie e Studi Professionali — Pipely",
     description: "CRM italiano per agenzie e studi professionali. Pipeline Kanban, gestione multi-cliente, automazioni e AI. Inizia gratis.",
     url: "https://www.pipely.it/crm-per-agenzie",
-    images: [{ url: "https://www.pipely.it/og-image.png", width: 1200, height: 630 }],
+    images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Il CRM italiano con AI e automazioni" }],
   },
 };
 

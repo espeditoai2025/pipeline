@@ -1,7 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
-import { NextIntlClientProvider } from "next-intl";
-import { getLocale, getMessages } from "next-intl/server";
 import { Providers } from "@/components/shared/Providers";
 import { PWARegister } from "@/components/shared/PWARegister";
 import { CookieBanner } from "@/components/shared/CookieBanner";
@@ -49,9 +47,11 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
+    site: "@pipelyit",
+    creator: "@pipelyit",
     title: "Pipely — CRM italiano con AI e automazioni",
     description: "Pipeline Kanban, contatti, campagne email, automazioni e AI Assistant. Gratis nel piano Starter.",
-    images: ["https://www.pipely.it/opengraph-image"],
+    images: [{ url: "https://www.pipely.it/opengraph-image", alt: "Pipely CRM — Il CRM italiano con AI e automazioni" }],
   },
   alternates: {
     canonical: BASE_URL,
@@ -72,16 +72,11 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const locale = await getLocale();
-  const messages = await getMessages();
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang={locale} className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}>
+    <html lang="it" className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}>
       <body className="min-h-full">
-        <NextIntlClientProvider locale={locale} messages={messages}>
-          <Providers>{children}</Providers>
-        </NextIntlClientProvider>
+        <Providers>{children}</Providers>
         <PWARegister />
         <CookieBanner />
       </body>

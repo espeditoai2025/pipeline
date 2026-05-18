@@ -5,14 +5,33 @@ export const metadata: Metadata = {
   title: "Cookie Policy — Pipely CRM",
   description: "Informativa sull'uso dei cookie di Pipely ai sensi dell'art. 122 del Codice Privacy e del GDPR. Quali cookie usiamo e come gestirli.",
   alternates: { canonical: "https://www.pipely.it/cookie" },
-  openGraph: { title: "Cookie Policy — Pipely CRM", url: "https://www.pipely.it/cookie" },
+  openGraph: {
+    title: "Cookie Policy — Pipely CRM",
+    description: "Informativa sull'uso dei cookie di Pipely ai sensi del GDPR.",
+    url: "https://www.pipely.it/cookie",
+    images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Cookie Policy" }],
+  },
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  name: "Cookie Policy — Pipely CRM",
+  description: "Informativa sull'uso dei cookie di Pipely ai sensi del GDPR.",
+  url: "https://www.pipely.it/cookie",
+  isPartOf: { "@id": "https://www.pipely.it/#website" },
 };
 
 const LAST_UPDATED = "14 maggio 2026";
 
 export default function CookiePage() {
   return (
-    <article className="prose prose-slate max-w-none">
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <article className="prose prose-slate max-w-none">
       <h1 className="text-3xl font-bold text-slate-900 mb-2">Cookie Policy</h1>
       <p className="text-sm text-slate-400 mb-8">
         Ultimo aggiornamento: {LAST_UPDATED} · ai sensi dell&apos;art. 122 del D.Lgs. 196/2003 (Codice Privacy) e del Provvedimento del Garante dell&apos;8 maggio 2014
@@ -164,6 +183,7 @@ export default function CookiePage() {
         <a href="mailto:privacy@pipely.it" className="text-blue-600 hover:underline">privacy@pipely.it</a>.
       </div>
     </article>
+    </>
   );
 }
 

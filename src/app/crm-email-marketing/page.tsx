@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Megaphone, Mail, MousePointerClick, Workflow } from "lucide-react";
 import { LandingPage } from "@/components/marketing/LandingPage";
 
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     title: "CRM con Email Marketing Integrato — Pipely",
     description: "CRM italiano con campagne email, tracking aperture e click, SMTP personalizzato e automazioni. Tutto integrato, zero integrazioni esterne.",
     url: "https://www.pipely.it/crm-email-marketing",
-    images: [{ url: "https://www.pipely.it/og-image.png", width: 1200, height: 630 }],
+    images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Il CRM italiano con AI e automazioni" }],
   },
 };
 

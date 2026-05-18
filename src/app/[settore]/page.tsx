@@ -33,7 +33,7 @@ export async function generateMetadata({
       title: data.h1,
       description: data.description,
       url: `https://www.pipely.it/${data.slug}`,
-      images: [{ url: "https://www.pipely.it/og-image.png", width: 1200, height: 630 }],
+      images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Il CRM italiano con AI e automazioni" }],
     },
   };
 }

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Home, Users, Bell, BarChart3 } from "lucide-react";
 import { LandingPage } from "@/components/marketing/LandingPage";
 
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     title: "CRM per Agenzie Immobiliari — Gestisci Immobili e Clienti | Pipely",
     description: "Il CRM pensato per agenti e agenzie immobiliari italiane. Pipeline compravendite, contatti e automazioni. Inizia gratis.",
     url: "https://www.pipely.it/crm-per-agenzie-immobiliari",
-    images: [{ url: "https://www.pipely.it/og-image.png", width: 1200, height: 630 }],
+    images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Il CRM italiano con AI e automazioni" }],
   },
 };
 

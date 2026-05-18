@@ -10,7 +10,17 @@ export const metadata: Metadata = {
     title: "Contattaci — Supporto Pipely CRM",
     description: "Hai domande su Pipely? Scrivici — rispondiamo entro 1 giorno lavorativo.",
     url: "https://www.pipely.it/contatti",
+    images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Contattaci" }],
   },
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "ContactPage",
+  name: "Contattaci — Supporto Pipely CRM",
+  description: "Supporto Pipely: rispondiamo entro 1 giorno lavorativo, dal lunedì al venerdì.",
+  url: "https://www.pipely.it/contatti",
+  isPartOf: { "@id": "https://www.pipely.it/#website" },
 };
 
 const contacts = [
@@ -39,7 +49,12 @@ const contacts = [
 
 export default function ContattiPage() {
   return (
-    <div>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <div>
       {/* Hero */}
       <div className="mb-12">
         <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-medium text-blue-600 mb-4">
@@ -104,5 +119,6 @@ export default function ContattiPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

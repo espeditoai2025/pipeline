@@ -5,14 +5,33 @@ export const metadata: Metadata = {
   title: "Privacy Policy — Pipely CRM",
   description: "Informativa sul trattamento dei dati personali di Pipely ai sensi del GDPR (Reg. UE 2016/679). Come raccogliamo, usiamo e proteggiamo i tuoi dati.",
   alternates: { canonical: "https://www.pipely.it/privacy" },
-  openGraph: { title: "Privacy Policy — Pipely CRM", url: "https://www.pipely.it/privacy" },
+  openGraph: {
+    title: "Privacy Policy — Pipely CRM",
+    description: "Informativa sul trattamento dei dati personali di Pipely ai sensi del GDPR (Reg. UE 2016/679).",
+    url: "https://www.pipely.it/privacy",
+    images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Privacy Policy" }],
+  },
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  name: "Privacy Policy — Pipely CRM",
+  description: "Informativa sul trattamento dei dati personali ai sensi del GDPR.",
+  url: "https://www.pipely.it/privacy",
+  isPartOf: { "@id": "https://www.pipely.it/#website" },
 };
 
 const LAST_UPDATED = "14 maggio 2026";
 
 export default function PrivacyPage() {
   return (
-    <article className="prose prose-slate max-w-none">
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <article className="prose prose-slate max-w-none">
       <h1 className="text-3xl font-bold text-slate-900 mb-2">Informativa sulla Privacy</h1>
       <p className="text-sm text-slate-400 mb-8">
         Ultimo aggiornamento: {LAST_UPDATED} · ai sensi del Regolamento UE 2016/679 (GDPR)
@@ -215,6 +234,7 @@ export default function PrivacyPage() {
         <a href="mailto:privacy@pipely.it" className="text-blue-600 hover:underline">privacy@pipely.it</a>.
       </div>
     </article>
+    </>
   );
 }
 

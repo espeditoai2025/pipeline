@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { ComparisonPage } from "@/components/marketing/ComparisonPage";
 
 export const metadata: Metadata = {
@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     title: "Alternativa a HubSpot — CRM Italiano Pipely",
     description: "Pipely vs HubSpot: confronto completo tra il CRM italiano e HubSpot. Funzionalità simili, costo 10x inferiore, 100% in italiano.",
     url: "https://www.pipely.it/alternativa-hubspot",
-    images: [{ url: "https://www.pipely.it/og-image.png", width: 1200, height: 630 }],
+    images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Il CRM italiano con AI e automazioni" }],
   },
 };
 

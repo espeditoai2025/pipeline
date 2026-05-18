@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { ComparisonPage } from "@/components/marketing/ComparisonPage";
 
 export const metadata: Metadata = {
@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     title: "Alternativa a Pipedrive — CRM Italiano con AI | Pipely",
     description: "Pipely vs Pipedrive: AI integrata, email marketing nativo e supporto italiano a 29€/mese. Il confronto completo.",
     url: "https://www.pipely.it/alternativa-pipedrive",
-    images: [{ url: "https://www.pipely.it/og-image.png", width: 1200, height: 630 }],
+    images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Il CRM italiano con AI e automazioni" }],
   },
 };
 

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Shield, RefreshCw, Bell, Users } from "lucide-react";
 import { LandingPage } from "@/components/marketing/LandingPage";
 
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     title: "CRM per Agenti Assicurativi — Rinnovi, Lead e Follow-up | Pipely",
     description: "Il CRM pensato per agenti e broker assicurativi italiani. Rinnovi automatici, pipeline polizze e follow-up. Inizia gratis.",
     url: "https://www.pipely.it/crm-per-assicuratori",
-    images: [{ url: "https://www.pipely.it/og-image.png", width: 1200, height: 630 }],
+    images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Il CRM italiano con AI e automazioni" }],
   },
 };
 

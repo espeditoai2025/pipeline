@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Briefcase, Users, Workflow, Zap } from "lucide-react";
 import { LandingPage } from "@/components/marketing/LandingPage";
 
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     title: "CRM per PMI Italiane — Semplice, Completo, in Italiano | Pipely",
     description: "Il CRM pensato per le piccole e medie imprese italiane. Pipeline Kanban, automazioni reali e AI integrata. Inizia gratis, nessuna carta di credito.",
     url: "https://www.pipely.it/crm-per-pmi",
-    images: [{ url: "https://www.pipely.it/og-image.png", width: 1200, height: 630 }],
+    images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Il CRM italiano con AI e automazioni" }],
   },
 };
 

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Briefcase, TrendingUp, Workflow, Sparkles } from "lucide-react";
 import { LandingPage } from "@/components/marketing/LandingPage";
 
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     title: "CRM Commerciale per Reti di Vendita — Pipely",
     description: "CRM commerciale italiano con pipeline Kanban, forecast AI, automazioni e tracking. Ottimizza la tua rete di vendita.",
     url: "https://www.pipely.it/crm-commerciale",
-    images: [{ url: "https://www.pipely.it/og-image.png", width: 1200, height: 630 }],
+    images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Il CRM italiano con AI e automazioni" }],
   },
 };
 

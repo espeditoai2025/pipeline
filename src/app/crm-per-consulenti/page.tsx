@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Users, Calendar, Briefcase, Package } from "lucide-react";
 import { LandingPage } from "@/components/marketing/LandingPage";
 
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     title: "CRM per Consulenti e Liberi Professionisti — Pipely",
     description: "CRM semplice per consulenti e freelance italiani. Gestisci clienti, trattative e attività. Inizia gratis, nessuna carta di credito.",
     url: "https://www.pipely.it/crm-per-consulenti",
-    images: [{ url: "https://www.pipely.it/og-image.png", width: 1200, height: 630 }],
+    images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Il CRM italiano con AI e automazioni" }],
   },
 };
 

@@ -5,14 +5,33 @@ export const metadata: Metadata = {
   title: "Termini di Servizio — Pipely CRM",
   description: "Condizioni generali di utilizzo di Pipely CRM. Leggi i termini che regolano l'accesso e l'utilizzo della piattaforma.",
   alternates: { canonical: "https://www.pipely.it/termini" },
-  openGraph: { title: "Termini di Servizio — Pipely CRM", url: "https://www.pipely.it/termini" },
+  openGraph: {
+    title: "Termini di Servizio — Pipely CRM",
+    description: "Condizioni generali di utilizzo di Pipely CRM.",
+    url: "https://www.pipely.it/termini",
+    images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Termini di Servizio" }],
+  },
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  name: "Termini di Servizio — Pipely CRM",
+  description: "Condizioni generali di utilizzo di Pipely CRM.",
+  url: "https://www.pipely.it/termini",
+  isPartOf: { "@id": "https://www.pipely.it/#website" },
 };
 
 const LAST_UPDATED = "14 maggio 2026";
 
 export default function TerminiPage() {
   return (
-    <article className="prose prose-slate max-w-none">
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <article className="prose prose-slate max-w-none">
       <h1 className="text-3xl font-bold text-slate-900 mb-2">Termini di Servizio</h1>
       <p className="text-sm text-slate-400 mb-8">
         Ultimo aggiornamento: {LAST_UPDATED} · Leggere attentamente prima di utilizzare il servizio.
@@ -227,6 +246,7 @@ export default function TerminiPage() {
         </p>
       </Section>
     </article>
+    </>
   );
 }
 

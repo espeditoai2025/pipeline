@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Shield, Users, Zap, Globe } from "lucide-react";
 import { MarketingShell } from "@/components/marketing/MarketingShell";
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     title: "Chi Siamo — Pipely, il CRM Made in Italy",
     description: "Il CRM italiano con AI per PMI. La nostra missione è rendere la gestione commerciale semplice e accessibile per le aziende italiane.",
     url: "https://www.pipely.it/chi-siamo",
-    images: [{ url: "https://www.pipely.it/og-image.png", width: 1200, height: 630 }],
+    images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Il CRM italiano con AI e automazioni" }],
   },
 };
 

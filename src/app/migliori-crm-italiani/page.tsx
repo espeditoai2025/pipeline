@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 import { CheckCircle2, ArrowRight, ChevronDown, Star } from "lucide-react";
 import { MarketingShell } from "@/components/marketing/MarketingShell";
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     title: "I Migliori CRM Italiani del 2026 — Guida Completa",
     description: "Confronto tra i migliori CRM italiani del 2026. Prezzi, funzionalità e consigli per scegliere il CRM giusto per la tua PMI.",
     url: "https://www.pipely.it/migliori-crm-italiani",
-    images: [{ url: "https://www.pipely.it/og-image.png", width: 1200, height: 630 }],
+    images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Il CRM italiano con AI e automazioni" }],
   },
 };
 

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { ShoppingCart, Mail, Users, BarChart3 } from "lucide-react";
 import { LandingPage } from "@/components/marketing/LandingPage";
 
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     title: "CRM per E-commerce — Clienti, Ordini e Campagne Email | Pipely",
     description: "CRM per e-commerce italiani: clienti B2B, email marketing con tracking e pipeline vendite. Inizia gratis.",
     url: "https://www.pipely.it/crm-per-ecommerce",
-    images: [{ url: "https://www.pipely.it/og-image.png", width: 1200, height: 630 }],
+    images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Il CRM italiano con AI e automazioni" }],
   },
 };
 

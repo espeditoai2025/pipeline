@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Clock, Calendar, Tag } from "lucide-react";
 import { BLOG_POSTS, BLOG_CATEGORIES } from "@/lib/blog-data";
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     title: "Blog Pipely — Guide CRM per Team di Vendita",
     description: "Guide pratiche su CRM, pipeline vendite, follow-up automatici e gestione clienti per PMI italiane.",
     url: "https://www.pipely.it/blog",
-    images: [{ url: "https://www.pipely.it/og-image.png", width: 1200, height: 630 }],
+    images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Il CRM italiano con AI e automazioni" }],
   },
 };
 
