@@ -2,3 +2,5 @@ fastapi==0.115.6
 httpx==0.28.1
 beautifulsoup4==4.12.3
 pydantic==2.10.4
+browserbase==1.2.1
+playwright==1.49.1
