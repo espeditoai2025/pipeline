@@ -6,7 +6,7 @@ import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { chatCompletion } from "@/lib/openrouter";
-import { getOrgPlan, getLimits, checkFeature } from "@/lib/plan";
+import { getOrgPlan, getLimits } from "@/lib/plan";
 import { createLead } from "@/server/actions/leads";
 import type { LeadFinderSearch, LeadCandidate } from "@/types/lead-finder";
 

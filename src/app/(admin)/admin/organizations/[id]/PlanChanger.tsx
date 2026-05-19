@@ -26,11 +26,6 @@ const PLANS: { value: AdminPlan; label: string; description: string; color: stri
   },
 ];
 
-const BADGE: Record<AdminPlan, string> = {
-  STARTER: "bg-slate-700 text-slate-300",
-  PRO: "bg-emerald-900/50 text-emerald-300",
-  ENTERPRISE: "bg-amber-900/50 text-amber-300",
-};
 
 export function PlanChanger({ orgId, currentPlan }: { orgId: string; currentPlan: string }) {
   const canonical = (["STARTER", "PRO", "ENTERPRISE"].includes(currentPlan)

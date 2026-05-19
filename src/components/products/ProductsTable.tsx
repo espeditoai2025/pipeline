@@ -6,7 +6,7 @@ import { ArrowUpDown, Pencil, Trash2, ToggleLeft, ToggleRight, Package } from "l
 import { toast } from "sonner";
 import { deleteProduct, toggleProductActive } from "@/server/actions/products";
 import { PREDEFINED_BILLING_TYPES } from "@/types/billing-types";
-import type { Product, ProductCategory } from "@/types/products";
+import type { Product } from "@/types/products";
 
 const CATEGORY_LABELS: Record<string, string> = {
   SOFTWARE: "Software", HARDWARE: "Hardware", SERVICE: "Servizio",

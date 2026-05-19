@@ -88,7 +88,7 @@ export default async function LeadFinderPage() {
                 : <span className="rounded-full bg-[var(--crm-primary)]/10 px-2 py-0.5 text-xs font-medium text-[var(--crm-primary)]">PRO</span>
               }
             </div>
-            <p className="text-xs text-[var(--crm-neutral-500)]">Trova nuovi clienti con l'intelligenza artificiale</p>
+            <p className="text-xs text-[var(--crm-neutral-500)]">Trova nuovi clienti con l&apos;intelligenza artificiale</p>
           </div>
         </div>
 
@@ -136,7 +136,7 @@ export default async function LeadFinderPage() {
           <Telescope className="h-10 w-10 text-[var(--crm-neutral-300)] mx-auto mb-4" />
           <h3 className="text-sm font-semibold text-[var(--crm-neutral-700)] dark:text-white mb-1">Nessuna ricerca ancora</h3>
           <p className="text-xs text-[var(--crm-neutral-500)] mb-6 max-w-xs mx-auto">
-            Crea la tua prima ricerca: definisci il cliente ideale e l'AI genererà un elenco di aziende candidate da valutare.
+            Crea la tua prima ricerca: definisci il cliente ideale e l&apos;AI genererà un elenco di aziende candidate da valutare.
           </p>
           {!dailyLimitReached && (
             <Link href="/lead-finder/new"

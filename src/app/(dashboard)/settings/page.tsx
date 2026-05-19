@@ -73,29 +73,6 @@ function timeAgo(iso: string) {
   return `${Math.floor(diff / 86400_000)}g fa`;
 }
 
-function UsageMeter({ label, used, limit, unit, icon: Icon }: {
-  label: string; used: number; limit: number; unit?: string; icon: React.ElementType;
-}) {
-  const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
-  const color = pct >= 90 ? "bg-[var(--crm-danger)]" : pct >= 70 ? "bg-[var(--crm-warning)]" : "bg-[var(--crm-primary)]";
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <span className="flex items-center gap-1.5 text-sm">
-          <Icon className="h-3.5 w-3.5 text-[var(--crm-neutral-400)]" /> {label}
-        </span>
-        <span className="text-xs text-[var(--crm-neutral-500)]">
-          {used}{unit ?? ""}{limit > 0 ? ` / ${limit}${unit ?? ""}` : ""}
-        </span>
-      </div>
-      {limit > 0 && (
-        <div className="h-2 w-full rounded-full bg-[var(--crm-neutral-100)]">
-          <div className={`h-2 rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
-        </div>
-      )}
-    </div>
-  );
-}
 
 const inputCls = "w-full rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] bg-transparent";
 

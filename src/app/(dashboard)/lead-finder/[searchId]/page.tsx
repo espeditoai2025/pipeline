@@ -57,7 +57,7 @@ export default async function SearchResultsPage({ params }: Props) {
       <div className="flex items-start gap-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/40 px-4 py-3">
         <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
         <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
-          <strong>Candidati generati dall'AI.</strong> I dati (email, sito, referente) sono suggerimenti basati sui criteri di ricerca — possono contenere imprecisioni.
+          <strong>Candidati generati dall&apos;AI.</strong> I dati (email, sito, referente) sono suggerimenti basati sui criteri di ricerca — possono contenere imprecisioni.
           Verifica sempre le informazioni prima di approvare un candidato e importarlo nella tua pipeline.
         </p>
       </div>

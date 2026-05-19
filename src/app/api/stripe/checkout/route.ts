@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { stripe, STRIPE_PRO_PRICE_ID, APP_URL } from "@/lib/stripe";
+import { getStripe, STRIPE_PRO_PRICE_ID, APP_URL } from "@/lib/stripe";
 
 export async function POST() {
   const session = await auth();
@@ -25,7 +25,7 @@ export async function POST() {
 
   let customerId = org.stripeCustomerId;
   if (!customerId) {
-    const customer = await stripe.customers.create({
+    const customer = await getStripe().customers.create({
       email: session.user.email ?? undefined,
       name: org.name,
       metadata: { organizationId: org.id },
@@ -37,7 +37,7 @@ export async function POST() {
     });
   }
 
-  const checkoutSession = await stripe.checkout.sessions.create({
+  const checkoutSession = await getStripe().checkout.sessions.create({
     customer: customerId,
     mode: "subscription",
     payment_method_types: ["card"],

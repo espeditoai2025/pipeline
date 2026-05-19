@@ -249,6 +249,7 @@ function _cdpConnect(wsUrl: string): Promise<{
     const initTimer = setTimeout(() => reject(new Error("CDP connect timeout")), 15000);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ws = new (globalThis as any).WebSocket(wsUrl) as {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       addEventListener(ev: string, fn: (e: any) => void): void;
       send(d: string): void;
       close(): void;
@@ -261,6 +262,7 @@ function _cdpConnect(wsUrl: string): Promise<{
         const msg = JSON.parse(ev.data) as { id?: number; result?: unknown; error?: unknown };
         if (msg.id !== undefined) {
           const p = pending.get(msg.id);
+          // eslint-disable-next-line @typescript-eslint/no-unused-expressions
           if (p) { pending.delete(msg.id); msg.error ? p.rej(new Error(String(msg.error))) : p.res(msg.result); }
         }
       } catch { /* ignore */ }
@@ -322,6 +324,7 @@ async function _enrichWithBrowserbase(
   const projectId = process.env.BROWSERBASE_PROJECT_ID;
   if (!apiKey || !projectId) return { email: null, phone: null, found: false };
 
+  // eslint-disable-next-line no-console
   console.log("[enrichBB] starting for:", name, "piva:", piva ?? "—");
   let email: string | null = null;
   let phone: string | null = null;
@@ -332,11 +335,13 @@ async function _enrichWithBrowserbase(
     const bb = new Browserbase({ apiKey });
     const session = await bb.sessions.create({ projectId });
     sessionId = session.id;
+    // eslint-disable-next-line no-console
     console.log("[enrichBB] session ok:", sessionId);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const connectUrl = (session as any).connectUrl ?? `wss://connect.browserbase.com?apiKey=${apiKey}&sessionId=${sessionId}`;
     const cdp = await _cdpConnect(connectUrl);
+    // eslint-disable-next-line no-console
     console.log("[enrichBB] CDP connected");
 
     try {
@@ -358,6 +363,7 @@ async function _enrichWithBrowserbase(
             try { resolvedSite = new URL(href).origin; break; } catch { continue; }
           }
         }
+        // eslint-disable-next-line no-console
         console.log("[enrichBB] site found:", resolvedSite ?? "none");
       }
 

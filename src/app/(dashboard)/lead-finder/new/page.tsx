@@ -24,7 +24,7 @@ export default async function NewLeadFinderPage() {
         </div>
         <div>
           <h1 className="text-xl font-bold text-[var(--crm-neutral-900)] dark:text-white">Nuova ricerca lead</h1>
-          <p className="text-xs text-[var(--crm-neutral-500)]">Definisci il target e l'AI genererà una lista di candidati</p>
+          <p className="text-xs text-[var(--crm-neutral-500)]">Definisci il target e l&apos;AI genererà una lista di candidati</p>
         </div>
       </div>
 
@@ -32,7 +32,7 @@ export default async function NewLeadFinderPage() {
       <div className="flex items-start gap-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 px-4 py-3">
         <Lightbulb className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
         <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
-          Più dettagliata è la descrizione del cliente ideale, più precisi saranno i candidati generati dall'AI.
+          Più dettagliata è la descrizione del cliente ideale, più precisi saranno i candidati generati dall&apos;AI.
           I risultati sono suggerimenti AI — verifica sempre i dati prima di approvare un candidato.
         </p>
       </div>

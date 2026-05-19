@@ -52,7 +52,7 @@ export function ContactForm() {
         <h2 className="text-xl font-semibold text-slate-900">Messaggio inviato!</h2>
         <p className="max-w-sm text-sm leading-relaxed text-slate-500">
           Grazie per averci contattato. Ti risponderemo entro 1 giorno lavorativo
-          all'indirizzo email che hai fornito.
+          all&apos;indirizzo email che hai fornito.
         </p>
       </div>
     );

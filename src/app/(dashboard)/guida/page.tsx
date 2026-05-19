@@ -10,7 +10,7 @@ import {
   Clock, CheckCircle2, X, ExternalLink, Lightbulb, AlertTriangle, ListChecks,
   Layers,
 } from "lucide-react";
-import { GUIDE_SECTIONS, type GuideArticle, type GuideBlock, type GuideSection, type CrmModeId } from "@/lib/guide-data";
+import { GUIDE_SECTIONS, type GuideArticle, type GuideSection, type CrmModeId } from "@/lib/guide-data";
 import { getCrmMode } from "@/server/actions/crm-mode";
 import { CRM_MODES } from "@/types/crm-modes";
 
@@ -23,7 +23,6 @@ type Category = GuideSection & {
 };
 
 type Article = GuideArticle;
-type Block = GuideBlock;
 
 // Map section id → icon + tailwind classes
 const SECTION_META: Record<string, { icon: React.ElementType; color: string; bgColor: string }> = {

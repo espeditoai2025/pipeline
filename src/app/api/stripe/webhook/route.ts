@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 import { db } from "@/lib/db";
 import type Stripe from "stripe";
 
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(body, sig, WEBHOOK_SECRET);
+    event = getStripe().webhooks.constructEvent(body, sig, WEBHOOK_SECRET);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Invalid signature";
     return NextResponse.json({ error: msg }, { status: 400 });
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice & { subscription?: string };
         if (invoice.subscription) {
-          const sub = await stripe.subscriptions.retrieve(invoice.subscription);
+          const sub = await getStripe().subscriptions.retrieve(invoice.subscription);
           if (sub.status === "past_due" || sub.status === "unpaid") {
             await handleSubscriptionUpsert(sub);
           }

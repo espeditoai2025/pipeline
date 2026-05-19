@@ -60,6 +60,7 @@ export function CommandPalette() {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
+        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
         commandPaletteOpen ? closeCommandPalette() : openCommandPalette();
       }
     }

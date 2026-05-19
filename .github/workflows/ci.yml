@@ -46,14 +46,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate Prisma client
+        run: npm run db:generate
+
       - name: Type check
         run: npx tsc --noEmit
 
       - name: Lint
         run: npm run lint
-
-      - name: Generate Prisma client
-        run: npm run db:generate
 
       - name: Run unit tests
         run: npm run test:unit

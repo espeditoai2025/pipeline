@@ -3,6 +3,7 @@ import { test as base, expect } from "@playwright/test";
 // Extend test with authenticated page fixture
 export const test = base.extend({
   // Use saved session state if available
+  /* eslint-disable react-hooks/rules-of-hooks */
   page: async ({ browser }, use) => {
     let context;
     try {
@@ -16,6 +17,7 @@ export const test = base.extend({
     await use(page);
     await context.close();
   },
+  /* eslint-enable react-hooks/rules-of-hooks */
 });
 
 export { expect };

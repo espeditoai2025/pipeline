@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import Link from "next/link";
 import { ArrowUpRight, ArrowDownRight, Briefcase, CheckCircle, Euro, TrendingUp, Target } from "lucide-react";
 import type { Metadata } from "next";
 import { PipelineOverviewChart } from "@/components/charts/PipelineOverviewChart";
@@ -148,7 +149,7 @@ export default async function DashboardPage() {
           <p className="text-lg font-bold">{kpis.openDeals}</p>
         </div>
         <p className="text-xs text-[var(--crm-neutral-400)] ml-auto hidden sm:block">
-          Vai a <a href="/reports" className="text-[var(--crm-primary)] hover:underline">Report</a> per l&apos;analisi completa
+          Vai a <Link href="/reports" className="text-[var(--crm-primary)] hover:underline">Report</Link> per l&apos;analisi completa
         </p>
       </div>
 

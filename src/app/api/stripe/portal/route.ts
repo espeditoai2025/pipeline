@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { stripe, APP_URL } from "@/lib/stripe";
+import { getStripe, APP_URL } from "@/lib/stripe";
 
 export async function POST() {
   const session = await auth();
@@ -21,7 +21,7 @@ export async function POST() {
     return NextResponse.json({ error: "Nessun abbonamento attivo" }, { status: 400 });
   }
 
-  const portalSession = await stripe.billingPortal.sessions.create({
+  const portalSession = await getStripe().billingPortal.sessions.create({
     customer: org.stripeCustomerId,
     return_url: `${APP_URL}/dashboard/billing`,
   });

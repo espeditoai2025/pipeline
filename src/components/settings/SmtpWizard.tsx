@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -423,7 +423,7 @@ export function SmtpWizard({ initial }: Props) {
       {!config.isVerified && (
         <p className="text-xs text-[var(--crm-neutral-400)] flex items-center gap-1.5">
           <AlertCircle className="h-3.5 w-3.5 text-yellow-500" />
-          Clicca "Testa connessione" per verificare che le credenziali funzionino prima di usare il provider.
+          Clicca &quot;Testa connessione&quot; per verificare che le credenziali funzionino prima di usare il provider.
         </p>
       )}
     </div>
