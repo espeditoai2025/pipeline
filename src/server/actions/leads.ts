@@ -238,9 +238,13 @@ export async function importLeads(
 
 // ─── Helpers arricchimento lead ──────────────────────────────────────────────
 
-async function _scrapeWithBrowserbase(
-  website: string,
+const _SKIP_SITE_DOMAINS = /duckduckgo|google\.|facebook|linkedin|twitter|instagram|yelp|paginegialle|mappa|openstreet|registro\.it|infocamere|cciaa|ateco|wikipedia/i;
+
+async function _enrichWithBrowserbase(
+  name: string,
+  website: string | null,
   piva?: string,
+  location?: string,
 ): Promise<{ email: string | null; phone: string | null; found: boolean }> {
   const apiKey = process.env.BROWSERBASE_API_KEY;
   const projectId = process.env.BROWSERBASE_PROJECT_ID;
@@ -261,22 +265,52 @@ async function _scrapeWithBrowserbase(
     try {
       const ctx = browser.contexts()[0] ?? await browser.newContext();
       const page = ctx.pages()[0] ?? await ctx.newPage();
-      const base = website.replace(/\/$/, "");
 
-      for (const path of ["", "/contatti", "/contact", "/chi-siamo", "/about", "/contattaci"]) {
-        try {
-          await page.goto(`${base}${path}`, { waitUntil: "domcontentloaded", timeout: 20000 });
-          const html = await page.content();
-          const r = _extractEmailPhone(html, piva);
-          if (r.email && !email) email = r.email;
-          if (r.phone && !phone) phone = r.phone;
-          if (email && phone) break;
-        } catch { continue; }
+      // Step A: se non abbiamo il sito, cercalo su DuckDuckGo con P.IVA o nome
+      let resolvedSite = website;
+      if (!resolvedSite) {
+        const query = piva
+          ? `"${piva}" sito ufficiale`
+          : `"${name}" ${location ?? ""} sito ufficiale contatti`;
+        await page.goto(
+          `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
+          { waitUntil: "domcontentloaded", timeout: 20000 },
+        );
+        const ddgHtml = await page.content();
+        // Estrai primo risultato che non sia un aggregatore
+        const hrefRe = /href="(https?:\/\/[^"]+)"/gi;
+        let m: RegExpExecArray | null;
+        while ((m = hrefRe.exec(ddgHtml)) !== null) {
+          const href = m[1]!;
+          if (!_SKIP_SITE_DOMAINS.test(href)) {
+            try { resolvedSite = new URL(href).origin; break; } catch { continue; }
+          }
+        }
+        // Prova anche a estrarre email/phone dai risultati DDG stessi
+        const ddgClean = ddgHtml.replace(/<[^>]+>/g, " ");
+        const ddgR = _extractEmailPhone(ddgClean, piva);
+        if (ddgR.email) email = ddgR.email;
+        if (ddgR.phone) phone = ddgR.phone;
+      }
+
+      // Step B: scrapa il sito aziendale con browser reale
+      if (resolvedSite && (!email || !phone)) {
+        const base = resolvedSite.replace(/\/$/, "");
+        for (const path of ["", "/contatti", "/contact", "/chi-siamo", "/about", "/contattaci"]) {
+          try {
+            await page.goto(`${base}${path}`, { waitUntil: "domcontentloaded", timeout: 20000 });
+            const html = await page.content();
+            const r = _extractEmailPhone(html, piva);
+            if (r.email && !email) email = r.email;
+            if (r.phone && !phone) phone = r.phone;
+            if (email && phone) break;
+          } catch { continue; }
+        }
       }
     } finally {
       await browser.close();
     }
-  } catch { /* graceful fallback */ }
+  } catch { /* graceful fallback to plain fetch */ }
 
   return { email, phone, found: !!(email || phone) };
 }
@@ -433,32 +467,33 @@ export async function enrichLead(id: string): Promise<{
   let resolvedWebsite = website;
 
   try {
-    // 0. Se il lead non ha un sito, cercalo su DuckDuckGo (P.IVA = chiave univoca)
-    if (!resolvedWebsite) {
-      resolvedWebsite = await _findWebsite(lead.title, location, piva);
-    }
-
-    // 1. Browserbase — headless browser reale, bypassa anti-bot e JS
-    if (resolvedWebsite && process.env.BROWSERBASE_API_KEY) {
-      const bb = await _scrapeWithBrowserbase(resolvedWebsite, piva);
+    // 1. Browserbase — browser reale: trova sito (se manca) + scrapa tutto
+    if (process.env.BROWSERBASE_API_KEY) {
+      const bb = await _enrichWithBrowserbase(lead.title, resolvedWebsite, piva, location);
       if (bb.email) email = bb.email;
       if (bb.phone) phone = bb.phone;
       if (bb.found) sources.push("sito web (browser)");
     }
 
-    // 2. Scraping fetch del sito aziendale (fallback)
-    if (resolvedWebsite && (!email || !phone)) {
-      const site = await _scrapeWebsite(resolvedWebsite, piva);
-      if (site.email && !email) email = site.email;
-      if (site.phone && !phone) phone = site.phone;
-      if (site.found && !sources.some(s => s.startsWith("sito web"))) sources.push("sito web");
-    }
-
-    // 3. DuckDuckGo per info ancora mancanti
+    // 2. Fallback fetch plain — solo se Browserbase non configurato o non ha trovato nulla
     if (!email || !phone) {
-      const ddg = await _duckduckgoSearch(lead.title, location, piva, !email, !phone);
-      if (ddg.email && !email) { email = ddg.email; sources.push("ricerca web"); }
-      if (ddg.phone && !phone) { phone = ddg.phone; if (!sources.includes("ricerca web")) sources.push("ricerca web"); }
+      // 2a. Trova il sito se ancora non ce l'abbiamo
+      if (!resolvedWebsite) {
+        resolvedWebsite = await _findWebsite(lead.title, location, piva);
+      }
+      // 2b. Scrapa il sito
+      if (resolvedWebsite) {
+        const site = await _scrapeWebsite(resolvedWebsite, piva);
+        if (site.email && !email) email = site.email;
+        if (site.phone && !phone) phone = site.phone;
+        if (site.found && !sources.some(s => s.startsWith("sito web"))) sources.push("sito web");
+      }
+      // 2c. DuckDuckGo come ultimo tentativo
+      if (!email || !phone) {
+        const ddg = await _duckduckgoSearch(lead.title, location, piva, !email, !phone);
+        if (ddg.email && !email) { email = ddg.email; sources.push("ricerca web"); }
+        if (ddg.phone && !phone) { phone = ddg.phone; if (!sources.includes("ricerca web")) sources.push("ricerca web"); }
+      }
     }
 
     // Salva nel DB solo i campi che prima erano vuoti
