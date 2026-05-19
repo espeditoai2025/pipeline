@@ -11,11 +11,11 @@ import {
   type SortingState,
   type RowSelectionState,
 } from "@tanstack/react-table";
-import { ArrowUpDown, Pencil, Trash2, Plus, ArrowRightCircle, Loader2, Mail, Phone, X, Download, Upload, ChevronDown } from "lucide-react";
+import { ArrowUpDown, Pencil, Trash2, Plus, ArrowRightCircle, Loader2, Mail, Phone, X, Download, Upload, ChevronDown, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
-import { deleteLead, deleteLeads, updateLeadStatus } from "@/server/actions/leads";
+import { deleteLead, deleteLeads, updateLeadStatus, enrichLead } from "@/server/actions/leads";
 import { LeadForm } from "./LeadForm";
 import { ConvertLeadModal } from "./ConvertLeadModal";
 import { LeadImportModal } from "./LeadImportModal";
@@ -49,6 +49,8 @@ export function LeadsTable({ initialLeads }: Props) {
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [isBulkDeleting, startBulkDelete] = useTransition();
+  const [isEnriching, setIsEnriching] = useState(false);
+  const [enrichProgress, setEnrichProgress] = useState<{ done: number; total: number; found: number } | null>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
@@ -250,6 +252,31 @@ export function LeadsTable({ initialLeads }: Props) {
 
   const selectedIds = Object.keys(rowSelection).filter((k) => rowSelection[k]);
 
+  async function handleBulkEnrich() {
+    if (isEnriching) return;
+    const ids = [...selectedIds];
+    setIsEnriching(true);
+    setEnrichProgress({ done: 0, total: ids.length, found: 0 });
+    let found = 0;
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i]!;
+      const result = await enrichLead(id);
+      if (!result.error && (result.email || result.phone)) {
+        found++;
+        setLeads((prev) => prev.map((l) => l.id === id ? {
+          ...l,
+          email: result.email ?? l.email,
+          phone: result.phone ?? l.phone,
+        } : l));
+      }
+      setEnrichProgress({ done: i + 1, total: ids.length, found });
+    }
+    setIsEnriching(false);
+    setEnrichProgress(null);
+    setRowSelection({});
+    toast.success(`Aggiornamento completato: ${found}/${ids.length} lead arricchit${found === 1 ? "o" : "i"}`);
+  }
+
   function handleBulkDelete() {
     if (!confirm(`Eliminare definitivamente ${selectedIds.length} lead selezionati? L'operazione non è reversibile.`)) return;
     startBulkDelete(async () => {
@@ -299,21 +326,37 @@ export function LeadsTable({ initialLeads }: Props) {
     <div className="space-y-4">
       {/* Bulk action toolbar */}
       {selectedIds.length > 0 && (
-        <div className="flex items-center gap-3 rounded-xl border border-red-200 dark:border-red-700/40 bg-red-50 dark:bg-red-900/20 px-4 py-2.5">
-          <span className="text-sm font-medium text-red-700 dark:text-red-300">
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--crm-neutral-200)] dark:border-white/10 bg-[var(--crm-neutral-50)] dark:bg-white/5 px-4 py-2.5">
+          <span className="text-sm font-medium text-[var(--crm-neutral-700)] dark:text-white">
             {selectedIds.length} lead selezionat{selectedIds.length === 1 ? "o" : "i"}
           </span>
+
+          {/* Aggiorna info bulk */}
+          <button
+            onClick={handleBulkEnrich}
+            disabled={isEnriching || isBulkDeleting}
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--crm-primary)]/30 bg-[var(--crm-primary)]/10 hover:bg-[var(--crm-primary)]/20 disabled:opacity-50 px-3 py-1.5 text-xs font-medium text-[var(--crm-primary)] transition-colors"
+          >
+            {isEnriching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            {enrichProgress
+              ? `${enrichProgress.done}/${enrichProgress.total} — ${enrichProgress.found} trovati`
+              : "Aggiorna info"}
+          </button>
+
+          {/* Elimina */}
           <button
             onClick={handleBulkDelete}
-            disabled={isBulkDeleting}
+            disabled={isBulkDeleting || isEnriching}
             className="flex items-center gap-1.5 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 px-3 py-1.5 text-xs font-medium text-white transition-colors"
           >
             {isBulkDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
             Elimina selezionati
           </button>
+
           <button
             onClick={() => setRowSelection({})}
-            className="ml-auto flex items-center gap-1 text-xs text-red-600 dark:text-red-400 hover:underline"
+            disabled={isEnriching}
+            className="ml-auto flex items-center gap-1 text-xs text-[var(--crm-neutral-500)] hover:text-[var(--crm-danger)] hover:underline disabled:opacity-40"
           >
             <X className="h-3.5 w-3.5" /> Deseleziona
           </button>
