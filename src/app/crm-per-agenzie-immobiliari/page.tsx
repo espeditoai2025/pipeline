@@ -16,11 +16,22 @@ export const metadata: Metadata = {
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "WebPage",
-  name: "CRM per Agenzie Immobiliari — Pipely",
-  description: "Il CRM per agenti immobiliari italiani. Pipeline, clienti e follow-up.",
-  url: "https://www.pipely.it/crm-per-agenzie-immobiliari",
-  isPartOf: { "@id": "https://www.pipely.it/#website" },
+  "@graph": [
+    {
+      "@type": "WebPage",
+      name: "CRM per Agenzie Immobiliari — Pipely",
+      description: "Il CRM per agenti immobiliari italiani. Pipeline, clienti e follow-up.",
+      url: "https://www.pipely.it/crm-per-agenzie-immobiliari",
+      isPartOf: { "@id": "https://www.pipely.it/#website" },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pipely.it" },
+        { "@type": "ListItem", position: 2, name: "CRM per Agenzie Immobiliari", item: "https://www.pipely.it/crm-per-agenzie-immobiliari" },
+      ],
+    },
+  ],
 };
 
 export default function CrmAgenzeImmobiliariPage() {

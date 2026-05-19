@@ -58,11 +58,22 @@ export default async function SettorePage({
 
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "WebPage",
-    name: data.h1,
-    description: data.description,
-    url: `https://www.pipely.it/${data.slug}`,
-    isPartOf: { "@id": "https://www.pipely.it/#website" },
+    "@graph": [
+      {
+        "@type": "WebPage",
+        name: data.h1,
+        description: data.description,
+        url: `https://www.pipely.it/${data.slug}`,
+        isPartOf: { "@id": "https://www.pipely.it/#website" },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pipely.it" },
+          { "@type": "ListItem", position: 2, name: data.h1, item: `https://www.pipely.it/${data.slug}` },
+        ],
+      },
+    ],
   };
 
   return (

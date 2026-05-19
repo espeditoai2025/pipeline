@@ -16,11 +16,22 @@ export const metadata: Metadata = {
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "WebPage",
-  name: "CRM per Agenti Assicurativi — Pipely",
-  description: "Il CRM per agenti assicurativi italiani. Rinnovi, pipeline polizze e follow-up.",
-  url: "https://www.pipely.it/crm-per-assicuratori",
-  isPartOf: { "@id": "https://www.pipely.it/#website" },
+  "@graph": [
+    {
+      "@type": "WebPage",
+      name: "CRM per Agenti Assicurativi — Pipely",
+      description: "Il CRM per agenti assicurativi italiani. Rinnovi, pipeline polizze e follow-up.",
+      url: "https://www.pipely.it/crm-per-assicuratori",
+      isPartOf: { "@id": "https://www.pipely.it/#website" },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pipely.it" },
+        { "@type": "ListItem", position: 2, name: "CRM per Assicuratori", item: "https://www.pipely.it/crm-per-assicuratori" },
+      ],
+    },
+  ],
 };
 
 export default function CrmAssicuratoriPage() {

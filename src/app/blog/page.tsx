@@ -57,12 +57,13 @@ export default function BlogPage() {
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-slate-500">Categorie:</span>
           {BLOG_CATEGORIES.map((cat) => (
-            <span
+            <Link
               key={cat}
-              className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600"
+              href={`/blog/categoria/${cat.toLowerCase().replace(/\s+/g, "-")}`}
+              className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
             >
               {cat}
-            </span>
+            </Link>
           ))}
         </div>
       </div>

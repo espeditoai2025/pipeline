@@ -16,10 +16,21 @@ export const metadata: Metadata = {
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "WebPage",
-  name: "CRM Commerciale per Reti di Vendita — Pipely",
-  url: "https://www.pipely.it/crm-commerciale",
-  isPartOf: { "@id": "https://www.pipely.it/#website" },
+  "@graph": [
+    {
+      "@type": "WebPage",
+      name: "CRM Commerciale per Reti di Vendita — Pipely",
+      url: "https://www.pipely.it/crm-commerciale",
+      isPartOf: { "@id": "https://www.pipely.it/#website" },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pipely.it" },
+        { "@type": "ListItem", position: 2, name: "CRM Commerciale", item: "https://www.pipely.it/crm-commerciale" },
+      ],
+    },
+  ],
 };
 
 export default function CrmCommercialePage() {

@@ -282,6 +282,17 @@ const jsonLd = {
       inLanguage: "it-IT",
     },
     {
+      "@type": "LocalBusiness",
+      "@id": "https://www.pipely.it/#localbusiness",
+      name: "Pipely",
+      url: "https://www.pipely.it",
+      email: "support@pipely.it",
+      areaServed: { "@type": "Country", "name": "Italia" },
+      knowsLanguage: "it",
+      priceRange: "€–€€",
+      sameAs: ["https://www.pipely.it"],
+    },
+    {
       "@type": "FAQPage",
       mainEntity: faqs.map((f) => ({
         "@type": "Question",

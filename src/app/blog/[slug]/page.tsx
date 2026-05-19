@@ -3,6 +3,10 @@ import { notFound } from "next/navigation";
 import { BLOG_POSTS, getBlogPost } from "@/lib/blog-data";
 import { BlogArticle } from "@/components/marketing/BlogArticle";
 
+function getRelatedPosts(currentSlug: string, category: string, limit = 3) {
+  return BLOG_POSTS.filter((p) => p.slug !== currentSlug && p.category === category).slice(0, limit);
+}
+
 export const dynamicParams = false;
 
 export function generateStaticParams() {
@@ -27,7 +31,6 @@ export async function generateMetadata({
       url: `https://www.pipely.it/blog/${post.slug}`,
       type: "article",
       publishedTime: post.publishedAt,
-      images: [{ url: "https://www.pipely.it/opengraph-image", width: 1200, height: 630, alt: "Pipely CRM — Il CRM italiano con AI e automazioni" }],
     },
   };
 }
@@ -40,6 +43,8 @@ export default async function BlogPostPage({
   const { slug } = await params;
   const post = getBlogPost(slug);
   if (!post) notFound();
+
+  const relatedPosts = getRelatedPosts(slug, post.category);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -66,6 +71,14 @@ export default async function BlogPostPage({
           "@id": `https://www.pipely.it/blog/${post.slug}`,
         },
       },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pipely.it" },
+          { "@type": "ListItem", position: 2, name: "Blog", item: "https://www.pipely.it/blog" },
+          { "@type": "ListItem", position: 3, name: post.title, item: `https://www.pipely.it/blog/${post.slug}` },
+        ],
+      },
       ...(post.faqs && post.faqs.length > 0
         ? [
             {
@@ -87,7 +100,7 @@ export default async function BlogPostPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <BlogArticle post={post} />
+      <BlogArticle post={post} relatedPosts={relatedPosts} />
     </>
   );
 }

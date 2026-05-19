@@ -16,10 +16,21 @@ export const metadata: Metadata = {
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "WebPage",
-  name: "CRM con Email Marketing Integrato — Pipely",
-  url: "https://www.pipely.it/crm-email-marketing",
-  isPartOf: { "@id": "https://www.pipely.it/#website" },
+  "@graph": [
+    {
+      "@type": "WebPage",
+      name: "CRM con Email Marketing Integrato — Pipely",
+      url: "https://www.pipely.it/crm-email-marketing",
+      isPartOf: { "@id": "https://www.pipely.it/#website" },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pipely.it" },
+        { "@type": "ListItem", position: 2, name: "CRM Email Marketing", item: "https://www.pipely.it/crm-email-marketing" },
+      ],
+    },
+  ],
 };
 
 export default function CrmEmailMarketingPage() {

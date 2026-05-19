@@ -16,11 +16,22 @@ export const metadata: Metadata = {
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "WebPage",
-  name: "CRM per Startup Italiane — Pipely",
-  description: "Pipeline vendite, automazioni e AI per startup che vogliono crescere velocemente.",
-  url: "https://www.pipely.it/crm-per-startup",
-  isPartOf: { "@id": "https://www.pipely.it/#website" },
+  "@graph": [
+    {
+      "@type": "WebPage",
+      name: "CRM per Startup Italiane — Pipely",
+      description: "Pipeline vendite, automazioni e AI per startup che vogliono crescere velocemente.",
+      url: "https://www.pipely.it/crm-per-startup",
+      isPartOf: { "@id": "https://www.pipely.it/#website" },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pipely.it" },
+        { "@type": "ListItem", position: 2, name: "CRM per Startup", item: "https://www.pipely.it/crm-per-startup" },
+      ],
+    },
+  ],
 };
 
 export default function CrmStartupPage() {

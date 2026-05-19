@@ -15,10 +15,21 @@ export const metadata: Metadata = {
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "WebPage",
-  name: "Alternativa a Pipedrive — Pipely CRM Italiano",
-  url: "https://www.pipely.it/alternativa-pipedrive",
-  isPartOf: { "@id": "https://www.pipely.it/#website" },
+  "@graph": [
+    {
+      "@type": "WebPage",
+      name: "Alternativa a Pipedrive — Pipely CRM Italiano",
+      url: "https://www.pipely.it/alternativa-pipedrive",
+      isPartOf: { "@id": "https://www.pipely.it/#website" },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pipely.it" },
+        { "@type": "ListItem", position: 2, name: "Alternativa a Pipedrive", item: "https://www.pipely.it/alternativa-pipedrive" },
+      ],
+    },
+  ],
 };
 
 export default function AlternativaPipedrivePage() {

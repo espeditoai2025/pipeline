@@ -5,9 +5,10 @@ import type { BlogPost } from "@/lib/blog-data";
 
 type Props = {
   post: BlogPost;
+  relatedPosts?: BlogPost[];
 };
 
-export function BlogArticle({ post }: Props) {
+export function BlogArticle({ post, relatedPosts }: Props) {
   const publishDate = new Date(post.publishedAt).toLocaleDateString("it-IT", {
     year: "numeric",
     month: "long",
@@ -76,6 +77,42 @@ export function BlogArticle({ post }: Props) {
                       <p className="mt-3 text-sm leading-relaxed text-slate-600">{faq.a}</p>
                     </details>
                   ))}
+                </div>
+              </section>
+            )}
+
+            {/* Related posts */}
+            {relatedPosts && relatedPosts.length > 0 && (
+              <section className="mt-14">
+                <h2 className="mb-6 text-xl font-semibold text-slate-900">Articoli correlati</h2>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {relatedPosts.map((related) => {
+                    const relDate = new Date(related.publishedAt).toLocaleDateString("it-IT", {
+                      year: "numeric", month: "short", day: "numeric",
+                    });
+                    return (
+                      <Link
+                        key={related.slug}
+                        href={`/blog/${related.slug}`}
+                        className="group flex flex-col rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:border-blue-100 hover:shadow-md"
+                      >
+                        <span className="mb-2 inline-block rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                          {related.category}
+                        </span>
+                        <h3 className="mb-2 text-sm font-semibold leading-snug text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-3">
+                          {related.title}
+                        </h3>
+                        <div className="mt-auto flex items-center gap-3 pt-3 text-xs text-slate-400">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />{relDate}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />{related.readingMinutes} min
+                          </span>
+                        </div>
+                      </Link>
+                    );
+                  })}
                 </div>
               </section>
             )}

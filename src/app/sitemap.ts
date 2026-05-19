@@ -1,12 +1,14 @@
 import type { MetadataRoute } from "next";
-import { BLOG_POSTS } from "@/lib/blog-data";
+import { BLOG_POSTS, BLOG_CATEGORIES } from "@/lib/blog-data";
 import { SETTORI } from "@/lib/settori-data";
 
 const BASE = "https://www.pipely.it";
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const now = new Date();
+// Data dell'ultimo aggiornamento significativo dei contenuti statici.
+// Aggiornare manualmente quando si modifica contenuto rilevante per SEO.
+const LAST_UPDATED = new Date("2026-05-13");
 
+export default function sitemap(): MetadataRoute.Sitemap {
   const blogPosts: MetadataRoute.Sitemap = BLOG_POSTS.map((post) => ({
     url: `${BASE}/blog/${post.slug}`,
     lastModified: new Date(post.publishedAt),
@@ -16,55 +18,62 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const settori: MetadataRoute.Sitemap = SETTORI.map((s) => ({
     url: `${BASE}/${s.slug}`,
-    lastModified: now,
+    lastModified: LAST_UPDATED,
     changeFrequency: "monthly",
     priority: 0.7,
+  }));
+
+  const blogCategories: MetadataRoute.Sitemap = BLOG_CATEGORIES.map((cat) => ({
+    url: `${BASE}/blog/categoria/${cat.toLowerCase().replace(/\s+/g, "-")}`,
+    lastModified: LAST_UPDATED,
+    changeFrequency: "weekly",
+    priority: 0.6,
   }));
 
   return [
     // Core pages
     {
       url: BASE,
-      lastModified: now,
+      lastModified: LAST_UPDATED,
       changeFrequency: "weekly",
       priority: 1.0,
     },
     // NOTA: /login e /register esclusi dalla sitemap — pagine auth senza valore SEO
     {
       url: `${BASE}/chi-siamo`,
-      lastModified: now,
+      lastModified: LAST_UPDATED,
       changeFrequency: "yearly",
       priority: 0.5,
     },
     {
       url: `${BASE}/contatti`,
-      lastModified: now,
+      lastModified: LAST_UPDATED,
       changeFrequency: "monthly",
       priority: 0.6,
     },
     // Legal
     {
       url: `${BASE}/privacy`,
-      lastModified: now,
+      lastModified: LAST_UPDATED,
       changeFrequency: "yearly",
       priority: 0.3,
     },
     {
       url: `${BASE}/termini`,
-      lastModified: now,
+      lastModified: LAST_UPDATED,
       changeFrequency: "yearly",
       priority: 0.3,
     },
     {
       url: `${BASE}/cookie`,
-      lastModified: now,
+      lastModified: LAST_UPDATED,
       changeFrequency: "yearly",
       priority: 0.2,
     },
     // Blog
     {
       url: `${BASE}/blog`,
-      lastModified: now,
+      lastModified: LAST_UPDATED,
       changeFrequency: "weekly",
       priority: 0.9,
     },
@@ -72,84 +81,86 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // Vertical landing pages (explicit)
     {
       url: `${BASE}/crm-per-pmi`,
-      lastModified: now,
+      lastModified: LAST_UPDATED,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     {
       url: `${BASE}/crm-per-agenzie`,
-      lastModified: now,
+      lastModified: LAST_UPDATED,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     {
       url: `${BASE}/crm-commerciale`,
-      lastModified: now,
+      lastModified: LAST_UPDATED,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     {
       url: `${BASE}/crm-per-consulenti`,
-      lastModified: now,
+      lastModified: LAST_UPDATED,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     {
       url: `${BASE}/crm-email-marketing`,
-      lastModified: now,
+      lastModified: LAST_UPDATED,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     {
       url: `${BASE}/crm-per-agenzie-immobiliari`,
-      lastModified: now,
+      lastModified: LAST_UPDATED,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     {
       url: `${BASE}/crm-per-assicuratori`,
-      lastModified: now,
+      lastModified: LAST_UPDATED,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     {
       url: `${BASE}/crm-per-freelance`,
-      lastModified: now,
+      lastModified: LAST_UPDATED,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     {
       url: `${BASE}/crm-per-startup`,
-      lastModified: now,
+      lastModified: LAST_UPDATED,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     {
       url: `${BASE}/crm-per-ecommerce`,
-      lastModified: now,
+      lastModified: LAST_UPDATED,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     // Comparison pages
     {
       url: `${BASE}/alternativa-hubspot`,
-      lastModified: now,
+      lastModified: LAST_UPDATED,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     {
       url: `${BASE}/alternativa-pipedrive`,
-      lastModified: now,
+      lastModified: LAST_UPDATED,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     {
       url: `${BASE}/migliori-crm-italiani`,
-      lastModified: now,
+      lastModified: LAST_UPDATED,
       changeFrequency: "monthly",
       priority: 0.7,
     },
     // Programmatic SEO — settori (15 pages)
     ...settori,
+    // Blog category pages
+    ...blogCategories,
   ];
 }

@@ -16,11 +16,22 @@ export const metadata: Metadata = {
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "WebPage",
-  name: "CRM per E-commerce — Pipely",
-  description: "CRM per e-commerce: clienti B2B, email marketing e pipeline vendite.",
-  url: "https://www.pipely.it/crm-per-ecommerce",
-  isPartOf: { "@id": "https://www.pipely.it/#website" },
+  "@graph": [
+    {
+      "@type": "WebPage",
+      name: "CRM per E-commerce — Pipely",
+      description: "CRM per e-commerce: clienti B2B, email marketing e pipeline vendite.",
+      url: "https://www.pipely.it/crm-per-ecommerce",
+      isPartOf: { "@id": "https://www.pipely.it/#website" },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pipely.it" },
+        { "@type": "ListItem", position: 2, name: "CRM per E-commerce", item: "https://www.pipely.it/crm-per-ecommerce" },
+      ],
+    },
+  ],
 };
 
 export default function CrmEcommercePage() {

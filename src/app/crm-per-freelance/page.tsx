@@ -16,11 +16,22 @@ export const metadata: Metadata = {
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "WebPage",
-  name: "CRM per Freelance — Pipely",
-  description: "Il CRM semplice per freelance italiani. Clienti, preventivi e follow-up.",
-  url: "https://www.pipely.it/crm-per-freelance",
-  isPartOf: { "@id": "https://www.pipely.it/#website" },
+  "@graph": [
+    {
+      "@type": "WebPage",
+      name: "CRM per Freelance — Pipely",
+      description: "Il CRM semplice per freelance italiani. Clienti, preventivi e follow-up.",
+      url: "https://www.pipely.it/crm-per-freelance",
+      isPartOf: { "@id": "https://www.pipely.it/#website" },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pipely.it" },
+        { "@type": "ListItem", position: 2, name: "CRM per Freelance", item: "https://www.pipely.it/crm-per-freelance" },
+      ],
+    },
+  ],
 };
 
 export default function CrmFreelancePage() {

@@ -40,6 +40,13 @@ const jsonLd = {
         { "@type": "Question", name: "Quanto costa un CRM per PMI italiane?", acceptedAnswer: { "@type": "Answer", text: "I prezzi variano: Pipely Pro costa 29€/mese per tutto il team. HubSpot Professional parte da €890/mese. Pipedrive parte da €14,90 per utente al mese." } },
       ],
     },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pipely.it" },
+        { "@type": "ListItem", position: 2, name: "Migliori CRM Italiani", item: "https://www.pipely.it/migliori-crm-italiani" },
+      ],
+    },
   ],
 };
 

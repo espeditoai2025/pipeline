@@ -15,10 +15,21 @@ export const metadata: Metadata = {
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "WebPage",
-  name: "Alternativa a HubSpot — Pipely CRM Italiano",
-  url: "https://www.pipely.it/alternativa-hubspot",
-  isPartOf: { "@id": "https://www.pipely.it/#website" },
+  "@graph": [
+    {
+      "@type": "WebPage",
+      name: "Alternativa a HubSpot — Pipely CRM Italiano",
+      url: "https://www.pipely.it/alternativa-hubspot",
+      isPartOf: { "@id": "https://www.pipely.it/#website" },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pipely.it" },
+        { "@type": "ListItem", position: 2, name: "Alternativa a HubSpot", item: "https://www.pipely.it/alternativa-hubspot" },
+      ],
+    },
+  ],
 };
 
 export default function AlternativaHubspotPage() {

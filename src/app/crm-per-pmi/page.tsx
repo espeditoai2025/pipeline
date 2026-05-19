@@ -17,11 +17,22 @@ export const metadata: Metadata = {
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "WebPage",
-  name: "CRM per PMI Italiane — Pipely",
-  description: "Il CRM pensato per le piccole e medie imprese italiane.",
-  url: "https://www.pipely.it/crm-per-pmi",
-  isPartOf: { "@id": "https://www.pipely.it/#website" },
+  "@graph": [
+    {
+      "@type": "WebPage",
+      name: "CRM per PMI Italiane — Pipely",
+      description: "Il CRM pensato per le piccole e medie imprese italiane.",
+      url: "https://www.pipely.it/crm-per-pmi",
+      isPartOf: { "@id": "https://www.pipely.it/#website" },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pipely.it" },
+        { "@type": "ListItem", position: 2, name: "CRM per PMI", item: "https://www.pipely.it/crm-per-pmi" },
+      ],
+    },
+  ],
 };
 
 export default function CrmPerPmiPage() {
