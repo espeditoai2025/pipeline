@@ -265,7 +265,7 @@ async function _scrapeWithBrowserbase(
 
       for (const path of ["", "/contatti", "/contact", "/chi-siamo", "/about", "/contattaci"]) {
         try {
-          await page.goto(`${base}${path}`, { waitUntil: "domcontentloaded", timeout: 12000 });
+          await page.goto(`${base}${path}`, { waitUntil: "domcontentloaded", timeout: 20000 });
           const html = await page.content();
           const r = _extractEmailPhone(html, piva);
           if (r.email && !email) email = r.email;
@@ -342,7 +342,7 @@ async function _scrapeWebsite(website: string, piva?: string): Promise<{ email: 
     try {
       const res = await fetch(`${base}${path}`, {
         headers: _ENRICH_HEADERS,
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(20000),
         redirect: "follow",
       });
       if (!res.ok) continue;
@@ -362,7 +362,7 @@ async function _duckduckgoRaw(query: string): Promise<string> {
   url.searchParams.set("q", query);
   const res = await fetch(url.toString(), {
     headers: { ..._ENRICH_HEADERS, Accept: "text/html" },
-    signal: AbortSignal.timeout(12000),
+    signal: AbortSignal.timeout(25000),
     redirect: "follow",
   });
   if (!res.ok) return "";

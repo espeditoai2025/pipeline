@@ -2,6 +2,8 @@ import { Zap } from "lucide-react";
 import { getLeads } from "@/server/actions/leads";
 import { LeadsTable } from "@/components/leads/LeadsTable";
 
+export const maxDuration = 60;
+
 export default async function LeadsPage() {
   const leads = await getLeads();
   const newCount = leads.filter((l) => l.status === "NEW").length;
