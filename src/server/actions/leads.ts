@@ -357,18 +357,46 @@ async function _scrapeWebsite(website: string, piva?: string): Promise<{ email: 
   return { email, phone, found: !!(email || phone) };
 }
 
-async function _duckduckgoSearch(name: string, location?: string, piva?: string, needEmail = true, needPhone = true): Promise<{ email: string | null; phone: string | null }> {
-  const parts = [name, location, needEmail && needPhone ? "email telefono contatti" : needEmail ? "email contatti" : "telefono contatti"].filter(Boolean);
+async function _duckduckgoRaw(query: string): Promise<string> {
+  const url = new URL("https://html.duckduckgo.com/html/");
+  url.searchParams.set("q", query);
+  const res = await fetch(url.toString(), {
+    headers: { ..._ENRICH_HEADERS, Accept: "text/html" },
+    signal: AbortSignal.timeout(12000),
+    redirect: "follow",
+  });
+  if (!res.ok) return "";
+  return res.text();
+}
+
+async function _findWebsite(name: string, location?: string, piva?: string): Promise<string | null> {
+  // Con P.IVA la ricerca è molto più precisa
+  const query = piva
+    ? `"${piva}" sito ufficiale`
+    : `"${name}" ${location ?? ""} sito ufficiale`;
   try {
-    const url = new URL("https://html.duckduckgo.com/html/");
-    url.searchParams.set("q", parts.join(" "));
-    const res = await fetch(url.toString(), {
-      headers: { ..._ENRICH_HEADERS, Accept: "text/html" },
-      signal: AbortSignal.timeout(12000),
-      redirect: "follow",
-    });
-    if (!res.ok) return { email: null, phone: null };
-    const html = await res.text();
+    const html = await _duckduckgoRaw(query);
+    const hrefRe = /href="(https?:\/\/(?!.*duckduckgo)[^"]+)"/gi;
+    const skipDomains = /duckduckgo|google|facebook|linkedin|twitter|instagram|yelp|paginegialle|mappa|openstreet|registro\.it|cciaa|ateco/i;
+    let m: RegExpExecArray | null;
+    while ((m = hrefRe.exec(html)) !== null) {
+      const href = m[1];
+      if (href && !skipDomains.test(href)) {
+        try { return new URL(href).origin; } catch { continue; }
+      }
+    }
+  } catch { /* noop */ }
+  return null;
+}
+
+async function _duckduckgoSearch(name: string, location?: string, piva?: string, needEmail = true, needPhone = true): Promise<{ email: string | null; phone: string | null }> {
+  const suffix = needEmail && needPhone ? "email telefono contatti" : needEmail ? "email contatti" : "telefono contatti";
+  // P.IVA come anchor di ricerca se disponibile
+  const query = piva
+    ? `"${piva}" ${suffix}`
+    : [name, location, suffix].filter(Boolean).join(" ");
+  try {
+    const html = await _duckduckgoRaw(query);
     const clean = html.replace(/<[^>]+>/g, " ");
     const r = _extractEmailPhone(clean, piva);
     const email = r.email && !r.email.includes("duckduckgo") ? r.email : null;
@@ -402,22 +430,28 @@ export async function enrichLead(id: string): Promise<{
   let email: string | null = null;
   let phone: string | null = null;
   const sources: string[] = [];
+  let resolvedWebsite = website;
 
   try {
+    // 0. Se il lead non ha un sito, cercalo su DuckDuckGo (P.IVA = chiave univoca)
+    if (!resolvedWebsite) {
+      resolvedWebsite = await _findWebsite(lead.title, location, piva);
+    }
+
     // 1. Browserbase — headless browser reale, bypassa anti-bot e JS
-    if (website && process.env.BROWSERBASE_API_KEY) {
-      const bb = await _scrapeWithBrowserbase(website, piva);
+    if (resolvedWebsite && process.env.BROWSERBASE_API_KEY) {
+      const bb = await _scrapeWithBrowserbase(resolvedWebsite, piva);
       if (bb.email) email = bb.email;
       if (bb.phone) phone = bb.phone;
       if (bb.found) sources.push("sito web (browser)");
     }
 
-    // 2. Scraping diretto del sito aziendale (fallback httpx-style)
-    if (website && (!email || !phone)) {
-      const site = await _scrapeWebsite(website, piva);
+    // 2. Scraping fetch del sito aziendale (fallback)
+    if (resolvedWebsite && (!email || !phone)) {
+      const site = await _scrapeWebsite(resolvedWebsite, piva);
       if (site.email && !email) email = site.email;
       if (site.phone && !phone) phone = site.phone;
-      if (site.found && !sources.includes("sito web")) sources.push("sito web");
+      if (site.found && !sources.some(s => s.startsWith("sito web"))) sources.push("sito web");
     }
 
     // 3. DuckDuckGo per info ancora mancanti
