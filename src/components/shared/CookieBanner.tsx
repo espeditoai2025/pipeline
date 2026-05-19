@@ -1,22 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { Cookie, X, Check } from "lucide-react";
 
 const STORAGE_KEY = "pipely_cookie_consent";
 
-export function CookieBanner() {
-  const [visible, setVisible] = useState(false);
+function subscribe(callback: () => void) {
+  window.addEventListener("storage", callback);
+  return () => window.removeEventListener("storage", callback);
+}
+function getConsentSnapshot(): string | null {
+  try { return localStorage.getItem(STORAGE_KEY); } catch { return null; }
+}
+function getServerSnapshot(): string | null {
+  return "ssr"; // sentinel: hide banner during SSR to avoid hydration mismatch
+}
 
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (!stored) setVisible(true);
-    } catch {
-      // localStorage non disponibile (SSR o privacy mode)
-    }
-  }, []);
+export function CookieBanner() {
+  const consent = useSyncExternalStore(subscribe, getConsentSnapshot, getServerSnapshot);
+  const [dismissed, setDismissed] = useState(false);
 
   function saveChoice(accepted: boolean) {
     try {
@@ -24,10 +27,10 @@ export function CookieBanner() {
     } catch {
       // ignore
     }
-    setVisible(false);
+    setDismissed(true);
   }
 
-  if (!visible) return null;
+  if (consent || dismissed) return null;
 
   return (
     <div

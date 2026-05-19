@@ -24,6 +24,12 @@ const eslintConfig = defineConfig([
       "react-hooks/purity": "warn",
     },
   },
+  {
+    files: ["prisma/seed.ts", "scripts/**/*.{ts,js}"],
+    rules: {
+      "no-console": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

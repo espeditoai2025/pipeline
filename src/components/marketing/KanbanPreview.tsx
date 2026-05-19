@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+
+const noopSubscribe = () => () => {};
+const useIsMounted = () => useSyncExternalStore(noopSubscribe, () => true, () => false);
 
 const COLUMNS = [
   { label: "Lead",       color: "bg-slate-500",  dot: "bg-slate-500",   deals: [85, 60, 75] },
@@ -18,11 +21,10 @@ const HIGHLIGHT_SEQUENCE = [
 ];
 
 export function KanbanPreview() {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useIsMounted();
   const [step, setStep] = useState(0);
 
   useEffect(() => {
-    setMounted(true);
     const id = setInterval(() => setStep(s => (s + 1) % HIGHLIGHT_SEQUENCE.length), 2500);
     return () => clearInterval(id);
   }, []);

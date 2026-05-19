@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -47,6 +47,8 @@ export function WorkflowBuilder({ open, onClose, workflow, onSaved }: Props) {
   const [steps, setSteps] = useState<WorkflowStep[]>(workflow?.steps ?? []);
   const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const stepIdRef = useRef(0);
+  const nextStepId = () => `step-${++stepIdRef.current}`;
 
   useEffect(() => {
     if (open) getTemplates().then(setTemplates);
@@ -69,7 +71,7 @@ export function WorkflowBuilder({ open, onClose, workflow, onSaved }: Props) {
 
   function addStep(type: ActionType) {
     const step: WorkflowStep = {
-      id: `step-${Date.now()}`,
+      id: nextStepId(),
       action: DEFAULT_ACTIONS[type] as WorkflowStep["action"],
     };
     setSteps((prev) => [...prev, step]);

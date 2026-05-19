@@ -36,6 +36,8 @@ export function AIAssistant() {
   const [loading, setLoading] = useState(false);
   const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const msgIdRef = useRef(0);
+  const nextMsgId = (prefix: string) => `${prefix}-${++msgIdRef.current}`;
 
   useEffect(() => {
     if (open && !minimized) {
@@ -49,7 +51,7 @@ export function AIAssistant() {
     setInput("");
 
     const userMsg: AIMessage = {
-      id: `u-${Date.now()}`,
+      id: nextMsgId("u"),
       role: "user",
       content: msg,
       createdAt: new Date().toISOString(),
@@ -66,7 +68,7 @@ export function AIAssistant() {
     }
 
     const assistantMsg: AIMessage = {
-      id: `a-${Date.now()}`,
+      id: nextMsgId("a"),
       role: "assistant",
       content: res.error ? `❌ Errore: ${res.error}` : (res.data ?? ""),
       createdAt: new Date().toISOString(),

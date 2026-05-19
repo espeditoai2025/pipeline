@@ -233,7 +233,6 @@ export function LeadsTable({ initialLeads }: Props) {
         </div>
       ),
     }),
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   ], [deletingId, updatingStatusId]);
 
   const table = useReactTable({
