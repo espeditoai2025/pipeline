@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Sparkles, AlertTriangle, TrendingUp, Info, CheckCircle2, ChevronRight, X, Loader2 } from "lucide-react";
+import { Sparkles, AlertTriangle, TrendingUp, CheckCircle2, ChevronRight, X, Loader2 } from "lucide-react";
 import { fetchAIInsights } from "@/server/actions/ai";
 import type { AIInsight, AIInsightSeverity } from "@/types/ai";
 import Link from "next/link";

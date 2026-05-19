@@ -20,6 +20,8 @@ const eslintConfig = defineConfig([
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
       "prefer-const": "error",
       "no-console": ["warn", { allow: ["warn", "error"] }],
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/purity": "warn",
     },
   },
 ]);

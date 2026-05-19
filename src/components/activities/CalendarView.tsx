@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActivityForm } from "./ActivityForm";
-import { ActivityTypeIcon, ACTIVITY_CONFIG } from "./ActivityTypeIcon";
+import { ACTIVITY_CONFIG } from "./ActivityTypeIcon";
 import type { Activity, ActivityType } from "@/types/activities";
 
 type Props = {

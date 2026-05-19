@@ -237,7 +237,7 @@ export function SearchForm({ maxResultsLimit = 20, isStarter = false }: SearchFo
       <div>
         <label className="block text-sm font-medium text-[var(--crm-neutral-700)] dark:text-white mb-1.5">
           Descrizione cliente ideale
-          <span className="ml-1 text-xs font-normal text-[var(--crm-neutral-400)]">(opzionale — aiuta l'AI a essere più precisa)</span>
+          <span className="ml-1 text-xs font-normal text-[var(--crm-neutral-400)]">(opzionale — aiuta l&apos;AI a essere più precisa)</span>
         </label>
         <textarea
           value={form.idealCustomer}

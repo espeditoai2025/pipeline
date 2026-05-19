@@ -1,6 +1,6 @@
 ﻿import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Clock, Calendar, Tag } from "lucide-react";
+import { ArrowRight, Clock, Calendar } from "lucide-react";
 import { BLOG_POSTS, BLOG_CATEGORIES } from "@/lib/blog-data";
 import { MarketingShell } from "@/components/marketing/MarketingShell";
 

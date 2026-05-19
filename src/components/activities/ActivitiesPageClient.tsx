@@ -15,7 +15,7 @@ type Props = {
 };
 
 export function ActivitiesPageClient({ initialActivities, gcalConnected: initialGcalConnected, gcalConfigured }: Props) {
-  const [activities, setActivities] = useState(initialActivities);
+  const [activities] = useState(initialActivities);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [gcalConnected, setGcalConnected] = useState(initialGcalConnected);
   const searchParams = useSearchParams();
@@ -72,6 +72,7 @@ export function ActivitiesPageClient({ initialActivities, gcalConnected: initial
                 </button>
               </div>
             ) : (
+              // eslint-disable-next-line @next/next/no-html-link-for-pages
               <a
                 href="/api/google-calendar/connect"
                 className="flex items-center gap-2 rounded-lg border border-[var(--crm-neutral-200)] dark:border-white/10 bg-white dark:bg-white/5 px-3 py-1.5 text-xs font-medium text-[var(--crm-neutral-700)] dark:text-white/70 hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/10 transition-colors"

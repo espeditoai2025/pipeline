@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useRef } from "react";
-import { Plus, Trash2, Users, ChevronRight, Upload, X, UserPlus, ArrowLeft, FileSpreadsheet, Download } from "lucide-react";
+import { Plus, Trash2, Users, ChevronRight, X, UserPlus, ArrowLeft, FileSpreadsheet, Download } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
