@@ -240,6 +240,78 @@ export async function importLeads(
 
 const _SKIP_SITE_DOMAINS = /duckduckgo|google\.|facebook|linkedin|twitter|instagram|yelp|paginegialle|mappa|openstreet|registro\.it|infocamere|cciaa|ateco|wikipedia/i;
 
+// Minimal CDP client via Node.js 24 built-in WebSocket — no playwright-core needed
+function _cdpConnect(wsUrl: string): Promise<{
+  navigate(url: string): Promise<string>;
+  close(): void;
+}> {
+  return new Promise((resolve, reject) => {
+    const initTimer = setTimeout(() => reject(new Error("CDP connect timeout")), 15000);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ws = new (globalThis as any).WebSocket(wsUrl) as {
+      addEventListener(ev: string, fn: (e: any) => void): void;
+      send(d: string): void;
+      close(): void;
+    };
+    let msgId = 0;
+    const pending = new Map<number, { res: (v: unknown) => void; rej: (e: unknown) => void }>();
+
+    ws.addEventListener("message", (ev: { data: string }) => {
+      try {
+        const msg = JSON.parse(ev.data) as { id?: number; result?: unknown; error?: unknown };
+        if (msg.id !== undefined) {
+          const p = pending.get(msg.id);
+          if (p) { pending.delete(msg.id); msg.error ? p.rej(new Error(String(msg.error))) : p.res(msg.result); }
+        }
+      } catch { /* ignore */ }
+    });
+
+    ws.addEventListener("error", (e: unknown) => { clearTimeout(initTimer); reject(e); });
+
+    ws.addEventListener("open", async () => {
+      clearTimeout(initTimer);
+
+      function cdpSend(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
+        return new Promise((res, rej) => {
+          const id = ++msgId;
+          pending.set(id, { res, rej });
+          ws.send(JSON.stringify({ id, method, params }));
+          setTimeout(() => { if (pending.has(id)) { pending.delete(id); rej(new Error(`${method} timeout`)); } }, 18000);
+        });
+      }
+
+      try {
+        await cdpSend("Page.enable");
+        resolve({
+          async navigate(url: string): Promise<string> {
+            await cdpSend("Page.navigate", { url });
+            // Poll readyState max 12s
+            let html = "";
+            for (let i = 0; i < 8; i++) {
+              await new Promise(r => setTimeout(r, 1500));
+              try {
+                const res = await cdpSend("Runtime.evaluate", {
+                  expression: "document.readyState + '|||' + document.documentElement.outerHTML",
+                  returnByValue: true,
+                }) as { value?: string } | undefined;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const val = (res as any)?.value ?? "";
+                const sep = val.indexOf("|||");
+                if (sep >= 0) {
+                  html = val.slice(sep + 3) as string;
+                  if (val.slice(0, sep) === "complete" && html.length > 200) break;
+                }
+              } catch { break; }
+            }
+            return html;
+          },
+          close() { try { ws.close(); } catch { /* */ } },
+        });
+      } catch (e) { reject(e); }
+    });
+  });
+}
+
 async function _enrichWithBrowserbase(
   name: string,
   website: string | null,
@@ -250,39 +322,34 @@ async function _enrichWithBrowserbase(
   const projectId = process.env.BROWSERBASE_PROJECT_ID;
   if (!apiKey || !projectId) return { email: null, phone: null, found: false };
 
+  console.log("[enrichBB] starting for:", name, "piva:", piva ?? "—");
   let email: string | null = null;
   let phone: string | null = null;
+  let sessionId: string | null = null;
 
-  console.log("[enrichBB] starting session for:", name, "| piva:", piva ?? "—");
   try {
-    // Dynamic imports: playwright-core non può stare a top-level su Vercel
-    // (tenta di caricare binari browser al cold start e crasha la funzione)
     const { default: Browserbase } = await import("@browserbasehq/sdk");
-    const { chromium } = await import("playwright-core");
-    console.log("[enrichBB] imports ok, creating session…");
-
     const bb = new Browserbase({ apiKey });
     const session = await bb.sessions.create({ projectId });
-    console.log("[enrichBB] session created:", session.id);
-    const connectUrl = `wss://connect.browserbase.com?apiKey=${apiKey}&sessionId=${session.id}`;
+    sessionId = session.id;
+    console.log("[enrichBB] session ok:", sessionId);
 
-    const browser = await chromium.connectOverCDP(connectUrl);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const connectUrl = (session as any).connectUrl ?? `wss://connect.browserbase.com?apiKey=${apiKey}&sessionId=${sessionId}`;
+    const cdp = await _cdpConnect(connectUrl);
+    console.log("[enrichBB] CDP connected");
+
     try {
-      const ctx = browser.contexts()[0] ?? await browser.newContext();
-      const page = ctx.pages()[0] ?? await ctx.newPage();
-
-      // Step A: se non abbiamo il sito, cercalo su DuckDuckGo con P.IVA o nome
       let resolvedSite = website;
+
+      // Step A: trova sito via DuckDuckGo
       if (!resolvedSite) {
-        const query = piva
-          ? `"${piva}" sito ufficiale`
-          : `"${name}" ${location ?? ""} sito ufficiale contatti`;
-        await page.goto(
-          `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
-          { waitUntil: "domcontentloaded", timeout: 20000 },
-        );
-        const ddgHtml = await page.content();
-        // Estrai primo risultato che non sia un aggregatore
+        const q = piva ? `"${piva}" sito ufficiale` : `"${name}" ${location ?? ""} sito ufficiale contatti`;
+        const ddgHtml = await cdp.navigate(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`);
+        const ddgClean = ddgHtml.replace(/<[^>]+>/g, " ");
+        const ddgR = _extractEmailPhone(ddgClean, piva);
+        if (ddgR.email) email = ddgR.email;
+        if (ddgR.phone) phone = ddgR.phone;
         const hrefRe = /href="(https?:\/\/[^"]+)"/gi;
         let m: RegExpExecArray | null;
         while ((m = hrefRe.exec(ddgHtml)) !== null) {
@@ -291,31 +358,36 @@ async function _enrichWithBrowserbase(
             try { resolvedSite = new URL(href).origin; break; } catch { continue; }
           }
         }
-        // Prova anche a estrarre email/phone dai risultati DDG stessi
-        const ddgClean = ddgHtml.replace(/<[^>]+>/g, " ");
-        const ddgR = _extractEmailPhone(ddgClean, piva);
-        if (ddgR.email) email = ddgR.email;
-        if (ddgR.phone) phone = ddgR.phone;
+        console.log("[enrichBB] site found:", resolvedSite ?? "none");
       }
 
-      // Step B: scrapa il sito aziendale con browser reale
+      // Step B: scrapa il sito aziendale
       if (resolvedSite && (!email || !phone)) {
         const base = resolvedSite.replace(/\/$/, "");
         for (const path of ["", "/contatti", "/contact", "/chi-siamo", "/about", "/contattaci"]) {
           try {
-            await page.goto(`${base}${path}`, { waitUntil: "domcontentloaded", timeout: 20000 });
-            const html = await page.content();
+            const html = await cdp.navigate(`${base}${path}`);
             const r = _extractEmailPhone(html, piva);
             if (r.email && !email) email = r.email;
             if (r.phone && !phone) phone = r.phone;
             if (email && phone) break;
-          } catch (pageErr) { console.error("[enrichBB] page nav error:", pageErr); continue; }
+          } catch { continue; }
         }
       }
     } finally {
-      await browser.close();
+      cdp.close();
     }
-  } catch (e) { console.error("[enrichBB] Browserbase error:", e); }
+  } catch (e) {
+    console.error("[enrichBB] error:", e instanceof Error ? e.message : String(e));
+  } finally {
+    if (sessionId) {
+      fetch(`https://api.browserbase.com/v1/sessions/${sessionId}`, {
+        method: "POST",
+        headers: { "x-bb-api-key": apiKey!, "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "REQUEST_RELEASE" }),
+      }).catch(() => { /* ignore */ });
+    }
+  }
 
   return { email, phone, found: !!(email || phone) };
 }

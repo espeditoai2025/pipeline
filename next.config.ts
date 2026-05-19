@@ -15,7 +15,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   compress: true,
-  serverExternalPackages: ["pg", "@prisma/adapter-pg", "playwright-core", "@browserbasehq/sdk"],
+  serverExternalPackages: ["pg", "@prisma/adapter-pg", "@browserbasehq/sdk"],
   images: {
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
