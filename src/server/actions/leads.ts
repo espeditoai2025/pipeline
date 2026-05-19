@@ -3,8 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { Session } from "next-auth";
-import Browserbase from "@browserbasehq/sdk";
-import { chromium } from "playwright-core";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { Lead, LeadStatus } from "@/types/contacts";
@@ -257,6 +255,12 @@ async function _enrichWithBrowserbase(
 
   console.log("[enrichBB] starting session for:", name, "| piva:", piva ?? "—");
   try {
+    // Dynamic imports: playwright-core non può stare a top-level su Vercel
+    // (tenta di caricare binari browser al cold start e crasha la funzione)
+    const { default: Browserbase } = await import("@browserbasehq/sdk");
+    const { chromium } = await import("playwright-core");
+    console.log("[enrichBB] imports ok, creating session…");
+
     const bb = new Browserbase({ apiKey });
     const session = await bb.sessions.create({ projectId });
     console.log("[enrichBB] session created:", session.id);
