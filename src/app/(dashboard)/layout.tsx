@@ -1,9 +1,14 @@
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
+import type { Metadata } from "next";
 import { Sidebar } from "@/components/shared/Sidebar";
 import { Topbar } from "@/components/shared/Topbar";
 import { CommandPalette } from "@/components/shared/CommandPalette";
 import { AIAssistant } from "@/components/ai/AIAssistant";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const locale = await getLocale();
