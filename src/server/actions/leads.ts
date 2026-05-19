@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { Session } from "next-auth";
+import Browserbase from "@browserbasehq/sdk";
+import { chromium } from "playwright-core";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { Lead, LeadStatus } from "@/types/contacts";
@@ -253,12 +255,11 @@ async function _enrichWithBrowserbase(
   let email: string | null = null;
   let phone: string | null = null;
 
+  console.log("[enrichBB] starting session for:", name, "| piva:", piva ?? "—");
   try {
-    const Browserbase = (await import("@browserbasehq/sdk")).default;
-    const { chromium } = await import("playwright-core");
-
     const bb = new Browserbase({ apiKey });
     const session = await bb.sessions.create({ projectId });
+    console.log("[enrichBB] session created:", session.id);
     const connectUrl = `wss://connect.browserbase.com?apiKey=${apiKey}&sessionId=${session.id}`;
 
     const browser = await chromium.connectOverCDP(connectUrl);
@@ -304,13 +305,13 @@ async function _enrichWithBrowserbase(
             if (r.email && !email) email = r.email;
             if (r.phone && !phone) phone = r.phone;
             if (email && phone) break;
-          } catch { continue; }
+          } catch (pageErr) { console.error("[enrichBB] page nav error:", pageErr); continue; }
         }
       }
     } finally {
       await browser.close();
     }
-  } catch { /* graceful fallback to plain fetch */ }
+  } catch (e) { console.error("[enrichBB] Browserbase error:", e); }
 
   return { email, phone, found: !!(email || phone) };
 }
@@ -419,7 +420,7 @@ async function _findWebsite(name: string, location?: string, piva?: string): Pro
         try { return new URL(href).origin; } catch { continue; }
       }
     }
-  } catch { /* noop */ }
+  } catch (e) { console.error("[findWebsite] error:", e); }
   return null;
 }
 
