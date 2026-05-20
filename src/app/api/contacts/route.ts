@@ -1,28 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { MOCK_CONTACTS } from "@/lib/mock-contacts";
-import type { ApiResponse } from "@/types";
-import type { Contact } from "@/types/contacts";
+import { db } from "@/lib/db";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
-  if (!session) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
+  const orgId = (session.user as { organizationId?: string }).organizationId;
+  if (!orgId) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
 
   const { searchParams } = req.nextUrl;
   const search = searchParams.get("search")?.toLowerCase();
-  const companyId = searchParams.get("companyId");
-  const ownerId = searchParams.get("ownerId");
+  const companyId = searchParams.get("companyId") ?? undefined;
+  const ownerId = searchParams.get("ownerId") ?? undefined;
 
-  const filtered = MOCK_CONTACTS.filter((c) => {
-    if (search) {
-      const fullName = `${c.firstName} ${c.lastName ?? ""}`.toLowerCase();
-      if (!fullName.includes(search) && !c.email?.toLowerCase().includes(search)) return false;
-    }
-    if (companyId && c.companyId !== companyId) return false;
-    if (ownerId && c.ownerId !== ownerId) return false;
-    return true;
+  const rows = await db.contact.findMany({
+    where: {
+      organizationId: orgId,
+      ...(companyId ? { companyId } : {}),
+      ...(ownerId ? { ownerId } : {}),
+      ...(search
+        ? {
+            OR: [
+              { firstName: { contains: search, mode: "insensitive" } },
+              { lastName: { contains: search, mode: "insensitive" } },
+              { email: { contains: search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    include: {
+      owner: { select: { id: true, name: true, email: true } },
+      company: { select: { id: true, name: true } },
+      _count: { select: { deals: true } },
+    },
   });
 
-  const response: ApiResponse<Contact[]> = { data: filtered, error: null };
-  return NextResponse.json(response);
+  return NextResponse.json({ data: rows, error: null });
 }

@@ -15,8 +15,9 @@ import { Button } from "@/components/ui/button";
 import {
   getOrgData, updateOrgDetails, getTeamMembers, getUsageStats,
   inviteTeamMember, getInvitations, revokeInvitation, removeMember, updateMemberRole,
-  deleteAccount, changePassword,
+  deleteAccount, changePassword, getApiKeys, createApiKey, revokeApiKey,
 } from "@/server/actions/settings";
+import type { ApiKeyPublic } from "@/server/actions/settings";
 import { getSmtpConfig } from "@/server/actions/smtp";
 import { SmtpWizard } from "@/components/settings/SmtpWizard";
 import { CustomFieldsManager } from "@/components/settings/CustomFieldsManager";
@@ -107,7 +108,9 @@ export default function SettingsPage() {
   const [twoFAEnabled, setTwoFAEnabled] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
-  const [apiKeys, setApiKeys] = useState<{ id: string; name: string; prefix: string; createdAt: string }[]>([]);
+  const [apiKeys, setApiKeys] = useState<ApiKeyPublic[]>([]);
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [revokingKeyId, setRevokingKeyId] = useState<string | null>(null);
 
   // Preferences
   const [prefs, setPrefs] = useState({ language: "it", emailNotif: true, pushNotif: false, weeklyReport: true, theme: "system" });
@@ -161,6 +164,7 @@ export default function SettingsPage() {
     getUsageStats().then(setUsage);
     getInvitations().then(setInvitations);
     getSmtpConfig().then((c) => { setSmtpConfig(c); setSmtpLoaded(true); });
+    getApiKeys().then(setApiKeys);
   }, []);
 
   async function handleSaveProfile() {
@@ -256,13 +260,25 @@ export default function SettingsPage() {
     }
   }
 
-  function handleGenerateKey() {
+  async function handleGenerateKey() {
     if (!newKeyName.trim()) { toast.error("Inserisci un nome per la chiave"); return; }
-    const raw = `pip_live_${Math.random().toString(36).slice(2, 14)}`;
-    setGeneratedKey(raw);
-    setApiKeys((k) => [{ id: `key-${Date.now()}`, name: newKeyName, prefix: raw.slice(0, 12), createdAt: new Date().toISOString() }, ...k]);
+    setCreatingKey(true);
+    const res = await createApiKey(newKeyName.trim());
+    setCreatingKey(false);
+    if (res.error) { toast.error(res.error); return; }
+    setGeneratedKey(res.key);
     setNewKeyName("");
     toast.success("Chiave API generata — copiala ora!");
+    getApiKeys().then(setApiKeys);
+  }
+
+  async function handleRevokeKey(id: string) {
+    setRevokingKeyId(id);
+    const res = await revokeApiKey(id);
+    setRevokingKeyId(null);
+    if (res.error) { toast.error(res.error); return; }
+    setApiKeys((arr) => arr.filter((k) => k.id !== id));
+    toast.success("Chiave revocata");
   }
 
   return (
@@ -444,8 +460,10 @@ export default function SettingsPage() {
                 )}
 
                 <div className="flex gap-2">
-                  <input value={newKeyName} onChange={(e) => setNewKeyName(e.target.value)} placeholder="Nome chiave (es. Zapier)" className={`${inputCls} flex-1`} />
-                  <Button variant="outline" onClick={handleGenerateKey}><Plus className="h-4 w-4 mr-1.5" /> Genera</Button>
+                  <input value={newKeyName} onChange={(e) => setNewKeyName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleGenerateKey()} placeholder="Nome chiave (es. Zapier)" className={`${inputCls} flex-1`} />
+                  <Button variant="outline" onClick={handleGenerateKey} disabled={creatingKey}>
+                    {creatingKey ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Plus className="h-4 w-4 mr-1.5" />} Genera
+                  </Button>
                 </div>
 
                 {apiKeys.length === 0 ? (
@@ -460,8 +478,8 @@ export default function SettingsPage() {
                           <p className="text-xs font-mono text-[var(--crm-neutral-500)]">{k.prefix}••••••••</p>
                           <p className="text-xs text-[var(--crm-neutral-400)]">Creata {timeAgo(k.createdAt)}</p>
                         </div>
-                        <button onClick={() => { setApiKeys((arr) => arr.filter((x) => x.id !== k.id)); toast.success("Chiave revocata"); }} className="text-[var(--crm-neutral-400)] hover:text-[var(--crm-danger)]">
-                          <Trash2 className="h-3.5 w-3.5" />
+                        <button onClick={() => handleRevokeKey(k.id)} disabled={revokingKeyId === k.id} className="text-[var(--crm-neutral-400)] hover:text-[var(--crm-danger)]">
+                          {revokingKeyId === k.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                         </button>
                       </div>
                     ))}
@@ -541,10 +559,17 @@ export default function SettingsPage() {
                 )}
               </div>
 
-              <div className="rounded-xl border border-dashed border-[var(--crm-neutral-200)] p-6 text-center">
-                <BarChart3 className="h-8 w-8 text-[var(--crm-neutral-300)] mx-auto mb-2" />
-                <p className="text-sm font-medium text-[var(--crm-neutral-500)]">Storico fatture</p>
-                <p className="text-xs text-[var(--crm-neutral-400)] mt-1">La gestione pagamenti sarà disponibile prossimamente.</p>
+              <div className="rounded-xl border border-[var(--crm-neutral-100)] p-5 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <BarChart3 className="h-5 w-5 text-[var(--crm-primary)] flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Fatture e storico pagamenti</p>
+                    <p className="text-xs text-[var(--crm-neutral-500)]">Visualizza, scarica e gestisci le tue fatture</p>
+                  </div>
+                </div>
+                <a href="/billing" className="flex items-center gap-1.5 text-xs font-medium text-[var(--crm-primary)] hover:underline whitespace-nowrap flex-shrink-0">
+                  Vai a Billing →
+                </a>
               </div>
             </div>
           )}

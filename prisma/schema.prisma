@@ -58,6 +58,7 @@ model Organization {
   smtpConfig          SmtpConfig?
   leadFinderSearches  LeadFinderSearch[]
   leadCandidates      LeadCandidate[]
+  apiKeys             ApiKey[]
 }
 
 model Invitation {
@@ -103,6 +104,7 @@ model User {
   activities     Activity[]
   emailAccounts  EmailAccount[]
   notifications  Notification[]
+  apiKeys        ApiKey[]
 
   @@index([organizationId])
 }
@@ -601,6 +603,25 @@ model LeadCandidate {
 
   @@index([organizationId])
   @@index([searchId])
+}
+
+// ============ API KEYS ============
+
+model ApiKey {
+  id             String       @id @default(cuid())
+  name           String
+  keyHash        String       @unique     // SHA-256 hash of the raw key
+  prefix         String                   // First 12 chars (e.g. "pip_live_abc1") for display
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy      String
+  user           User         @relation(fields: [createdBy], references: [id])
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([keyHash])
 }
 
 // ============ SMTP CONFIG ============

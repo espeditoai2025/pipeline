@@ -1,23 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { MOCK_COMPANIES } from "@/lib/mock-contacts";
-import type { ApiResponse } from "@/types";
-import type { Company } from "@/types/contacts";
+import { db } from "@/lib/db";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
-  if (!session) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
+  const orgId = (session.user as { organizationId?: string }).organizationId;
+  if (!orgId) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
 
   const { searchParams } = req.nextUrl;
   const search = searchParams.get("search")?.toLowerCase();
-  const industry = searchParams.get("industry");
+  const industry = searchParams.get("industry") ?? undefined;
 
-  const filtered = MOCK_COMPANIES.filter((c) => {
-    if (search && !c.name.toLowerCase().includes(search)) return false;
-    if (industry && c.industry !== industry) return false;
-    return true;
+  const rows = await db.company.findMany({
+    where: {
+      organizationId: orgId,
+      ...(industry ? { industry } : {}),
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { email: { contains: search, mode: "insensitive" } },
+              { city: { contains: search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    include: {
+      _count: { select: { contacts: true, deals: true } },
+    },
   });
 
-  const response: ApiResponse<Company[]> = { data: filtered, error: null };
-  return NextResponse.json(response);
+  return NextResponse.json({ data: rows, error: null });
 }

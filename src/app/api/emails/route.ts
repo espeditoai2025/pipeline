@@ -1,25 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { MOCK_EMAIL_THREADS } from "@/lib/mock-emails";
-import type { ApiResponse } from "@/types";
-import type { EmailThread } from "@/types/emails";
+import { db } from "@/lib/db";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
-  if (!session) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
+  const orgId = (session.user as { organizationId?: string }).organizationId;
+  if (!orgId) return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });
 
   const { searchParams } = req.nextUrl;
-  const dealId = searchParams.get("dealId");
-  const contactId = searchParams.get("contactId");
-  const search = searchParams.get("search")?.toLowerCase();
+  const dealId = searchParams.get("dealId") ?? undefined;
+  const contactId = searchParams.get("contactId") ?? undefined;
+  const search = searchParams.get("search") ?? undefined;
 
-  const filtered = MOCK_EMAIL_THREADS.filter((t) => {
-    if (dealId && t.dealId !== dealId) return false;
-    if (contactId && t.contactId !== contactId) return false;
-    if (search && !t.subject.toLowerCase().includes(search)) return false;
-    return true;
+  const rows = await db.email.findMany({
+    where: {
+      organizationId: orgId,
+      ...(dealId ? { dealId } : {}),
+      ...(contactId ? { contactId } : {}),
+      ...(search ? { subject: { contains: search, mode: "insensitive" } } : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    include: {
+      contact: { select: { id: true, firstName: true, lastName: true, email: true } },
+      deal: { select: { id: true, title: true } },
+    },
   });
 
-  const response: ApiResponse<EmailThread[]> = { data: filtered, error: null };
-  return NextResponse.json(response);
+  return NextResponse.json({ data: rows, error: null });
 }

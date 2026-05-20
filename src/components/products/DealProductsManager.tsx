@@ -3,9 +3,8 @@
 import { useState, useEffect } from "react";
 import { Plus, Trash2, ChevronDown, ChevronRight, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
-import { addProductToDeal, removeProductFromDeal, getDealProducts } from "@/server/actions/products";
-import { MOCK_PRODUCTS } from "@/lib/mock-products";
-import type { DealProduct } from "@/types/products";
+import { addProductToDeal, removeProductFromDeal, getDealProducts, getProducts } from "@/server/actions/products";
+import type { DealProduct, Product } from "@/types/products";
 
 const inputCls = "rounded-lg border border-[var(--crm-neutral-100)] px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--crm-primary)]";
 
@@ -17,6 +16,7 @@ type Props = { dealId: string };
 
 export function DealProductsManager({ dealId }: Props) {
   const [rows, setRows] = useState<DealProduct[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [expanded, setExpanded] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -28,10 +28,11 @@ export function DealProductsManager({ dealId }: Props) {
 
   useEffect(() => {
     getDealProducts(dealId).then((r) => { if (r.data) setRows(r.data); });
+    getProducts().then(setProducts);
   }, [dealId]);
 
-  const selectedProduct = MOCK_PRODUCTS.find((p) => p.id === selectedProductId);
-  const activeProducts = MOCK_PRODUCTS.filter((p) => p.isActive);
+  const selectedProduct = products.find((p) => p.id === selectedProductId);
+  const activeProducts = products.filter((p) => p.isActive);
 
   const grandTotal = rows.reduce((s, r) => s + r.total, 0);
   const grandSubtotal = rows.reduce((s, r) => s + r.subtotal, 0);
@@ -43,7 +44,7 @@ export function DealProductsManager({ dealId }: Props) {
       return;
     }
     setSaving(true);
-    const product = MOCK_PRODUCTS.find((p) => p.id === selectedProductId)!;
+    const product = products.find((p) => p.id === selectedProductId)!;
     const res = await addProductToDeal({
       dealId,
       productId: selectedProductId,

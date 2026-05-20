@@ -6,6 +6,9 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
 import { compare, hash } from "bcryptjs";
+import { resend, FROM_DEFAULT } from "@/lib/resend";
+import { inviteEmailHtml } from "@/lib/email-templates";
+import { logger } from "@/lib/logger";
 type Role = "OWNER" | "ADMIN" | "MANAGER" | "SALES" | "VIEWER";
 
 function getIds(s: Session | null) {
@@ -130,9 +133,33 @@ export async function inviteTeamMember(email: string, role: Role) {
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 giorni
 
-  await db.invitation.create({
-    data: { email: normalizedEmail, role, token, organizationId: orgId, expiresAt },
-  });
+  const [invitation, inviter, org] = await Promise.all([
+    db.invitation.create({
+      data: { email: normalizedEmail, role, token, organizationId: orgId, expiresAt },
+    }),
+    db.user.findUnique({ where: { id: userId }, select: { name: true } }),
+    db.organization.findUnique({ where: { id: orgId }, select: { name: true } }),
+  ]);
+
+  if (resend && inviter && org) {
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://www.pipely.it").replace(/\/$/, "");
+    const inviteUrl = `${appUrl}/register?invite=${token}`;
+    const ROLE_LABELS: Record<string, string> = {
+      ADMIN: "Admin", MANAGER: "Manager", SALES: "Sales", VIEWER: "Viewer",
+    };
+    resend.emails.send({
+      from: FROM_DEFAULT,
+      to: normalizedEmail,
+      subject: `${inviter.name ?? "Il tuo collega"} ti ha invitato su Pipely`,
+      html: inviteEmailHtml({
+        inviterName: inviter.name ?? "Un collega",
+        orgName: org.name,
+        role: ROLE_LABELS[role] ?? role,
+        inviteUrl,
+        appUrl,
+      }),
+    }).catch((err: unknown) => logger.warn("invite", "Email invito fallita", { error: String(err), to: normalizedEmail }));
+  }
 
   revalidatePath("/settings");
   return { error: null, token };
@@ -204,6 +231,77 @@ export async function updateMemberRole(targetUserId: string, role: Role) {
 
   await db.user.update({ where: { id: targetUserId }, data: { role } });
   revalidatePath("/settings");
+  return { error: null };
+}
+
+// ─── API Keys ─────────────────────────────────────────────────────────────────
+
+import { createHash } from "crypto";
+
+function hashApiKey(raw: string): string {
+  return createHash("sha256").update(raw).digest("hex");
+}
+
+export type ApiKeyPublic = {
+  id: string;
+  name: string;
+  prefix: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+};
+
+export async function getApiKeys(): Promise<ApiKeyPublic[]> {
+  const session = await auth();
+  const { orgId } = getIds(session);
+  if (!orgId) return [];
+
+  const rows = await db.apiKey.findMany({
+    where: { organizationId: orgId },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, name: true, prefix: true, createdAt: true, lastUsedAt: true, expiresAt: true },
+  });
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    prefix: r.prefix,
+    createdAt: r.createdAt.toISOString(),
+    lastUsedAt: r.lastUsedAt?.toISOString() ?? null,
+    expiresAt: r.expiresAt?.toISOString() ?? null,
+  }));
+}
+
+export async function createApiKey(name: string): Promise<{ error: string | null; key: string | null }> {
+  const session = await auth();
+  const { orgId, userId } = getIds(session);
+  if (!orgId || !userId) return { error: "Non autorizzato", key: null };
+
+  if (!name.trim()) return { error: "Inserisci un nome per la chiave", key: null };
+
+  const count = await db.apiKey.count({ where: { organizationId: orgId } });
+  if (count >= 10) return { error: "Limite di 10 chiavi API raggiunto", key: null };
+
+  const raw = `pip_live_${randomBytes(20).toString("hex")}`;
+  const keyHash = hashApiKey(raw);
+  const prefix = raw.slice(0, 16);
+
+  await db.apiKey.create({
+    data: { name: name.trim(), keyHash, prefix, organizationId: orgId, createdBy: userId },
+  });
+
+  return { error: null, key: raw };
+}
+
+export async function revokeApiKey(id: string): Promise<{ error: string | null }> {
+  const session = await auth();
+  const { orgId } = getIds(session);
+  if (!orgId) return { error: "Non autorizzato" };
+
+  const key = await db.apiKey.findFirst({ where: { id, organizationId: orgId } });
+  if (!key) return { error: "Chiave non trovata" };
+
+  await db.apiKey.delete({ where: { id } });
   return { error: null };
 }
 
