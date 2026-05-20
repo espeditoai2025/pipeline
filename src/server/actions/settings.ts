@@ -205,3 +205,30 @@ export async function updateMemberRole(targetUserId: string, role: Role) {
   revalidatePath("/settings");
   return { error: null };
 }
+
+// ─── GDPR — Art. 17 Diritto all'oblio ────────────────────────────────────────
+// Cancella l'intera organizzazione dell'utente e tutti i dati collegati (Cascade).
+// Solo il proprietario (OWNER) può eseguire questa operazione.
+// Richiede conferma testuale per prevenire cancellazioni accidentali.
+
+export async function deleteAccount(confirmText: string): Promise<{ error: string | null }> {
+  const session = await auth();
+  const { orgId, userId } = getIds(session);
+  if (!orgId || !userId) return { error: "Non autorizzato" };
+
+  if (confirmText !== "ELIMINA") return { error: 'Scrivi "ELIMINA" per confermare' };
+
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { role: true, email: true },
+  });
+  if (!user || user.role !== "OWNER") {
+    return { error: "Solo il proprietario dell'account può eliminarlo" };
+  }
+
+  // Cancella organizzazione — Prisma Cascade rimuove tutti i dati collegati:
+  // users, deals, contacts, companies, activities, campaigns, workflows, smtp config, etc.
+  await db.organization.delete({ where: { id: orgId } });
+
+  return { error: null };
+}

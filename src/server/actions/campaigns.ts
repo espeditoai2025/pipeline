@@ -323,7 +323,7 @@ export async function sendCampaign(id: string): Promise<AR<{ sent: number; faile
 
   const campaign = await db.emailCampaign.findFirst({
     where: { id, organizationId: orgId },
-    include: { list: { include: { contacts: { where: { unsubscribed: false } } } } },
+    include: { list: { include: { contacts: { where: { unsubscribed: false } }, organization: { select: { name: true } } } } },
   });
   if (!campaign) return { error: "Campagna non trovata" };
   if (campaign.status === "SENT") return { error: "Campagna già inviata" };
@@ -362,8 +362,31 @@ export async function sendCampaign(id: string): Promise<AR<{ sent: number; faile
     // Inject open-tracking pixel (1x1 GIF) at the bottom of the email
     html += `<img src="${appUrl}/api/track/open/${campaign.id}/${contact.id}" width="1" height="1" style="display:none;border:0" alt="" />`;
 
+    // GDPR / Art. 130 c.4-bis Codice Privacy — footer obbligatorio con link unsubscribe visibile
+    const unsubscribeUrl = `${appUrl}/emails/unsubscribe?cid=${contact.id}&lid=${campaign.listId}`;
+    html += `
+<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center;font-family:sans-serif;">
+  Hai ricevuto questa email perché sei nella lista contatti di ${campaign.list?.organization?.name ?? "Pipely"}.
+  <br/>
+  <a href="${unsubscribeUrl}" style="color:#6366f1;text-decoration:underline;">Disiscriviti dalla lista</a>
+  &nbsp;·&nbsp;
+  <a href="https://www.pipely.it/privacy" style="color:#94a3b8;text-decoration:underline;">Privacy Policy</a>
+</div>`;
+
+    // List-Unsubscribe header HTTP (RFC 2369 + RFC 8058) — richiesto da Gmail/Outlook e art. 130 c.4-bis
+    const listUnsubscribeHeader = `<mailto:unsubscribe@pipely.it?subject=unsubscribe&body=${contact.id}>, <${unsubscribeUrl}>`;
+
     try {
-      await resend!.emails.send({ from, to: contact.email, subject: campaign.subject, html });
+      await resend!.emails.send({
+        from,
+        to: contact.email,
+        subject: campaign.subject,
+        html,
+        headers: {
+          "List-Unsubscribe": listUnsubscribeHeader,
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        },
+      });
       sent++;
     } catch {
       failed++;

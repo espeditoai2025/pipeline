@@ -23,7 +23,7 @@ const jsonLd = {
   isPartOf: { "@id": "https://www.pipely.it/#website" },
 };
 
-const LAST_UPDATED = "14 maggio 2026";
+const LAST_UPDATED = "20 maggio 2026";
 
 export default function PrivacyPage() {
   return (
@@ -145,25 +145,36 @@ export default function PrivacyPage() {
         </ul>
       </Section>
 
-      <Section title="6. Comunicazione a Terzi e Trasferimenti">
-        <p>I tuoi dati possono essere comunicati alle seguenti categorie di soggetti:</p>
+      <Section title="6. Comunicazione a Terzi, Trasferimenti e Data Processing Agreement">
+        <p>
+          I tuoi dati possono essere comunicati alle seguenti categorie di soggetti, tutti nominati
+          Responsabili del Trattamento ai sensi dell'art. 28 GDPR con appositi contratti (DPA):
+        </p>
         <ul>
           <li>
-            <strong>Vercel Inc.</strong> (USA) — hosting e infrastruttura cloud. Trasferimento
-            coperto da Standard Contractual Clauses (SCC).
+            <strong>Vercel Inc.</strong> (USA) — hosting e infrastruttura cloud. Trasferimento coperto
+            da Standard Contractual Clauses (SCC) con misure supplementari (HTTPS, cifratura at-rest).{" "}
+            <a href="https://vercel.com/legal/dpa" className="text-blue-600 hover:underline" target="_blank" rel="noopener">DPA Vercel</a>.
           </li>
           <li>
-            <strong>Neon / Supabase / PostgreSQL hosting provider</strong> — database. Ove
-            applicabile, trasferimento coperto da SCC o hosting in UE.
+            <strong>Supabase Inc.</strong> — database PostgreSQL. Dati ospitati in EU (Frankfurt, Germania).
+            Nessun trasferimento extra-UE per i dati del database.{" "}
+            <a href="https://supabase.com/privacy" className="text-blue-600 hover:underline" target="_blank" rel="noopener">Privacy Supabase</a>.
           </li>
           <li>
-            <strong>Resend Inc.</strong> (USA) — invio email transazionali (fallback). Trasferimento
-            coperto da SCC.
+            <strong>Resend Inc.</strong> (USA) — invio email transazionali. Trasferimento coperto da SCC.{" "}
+            <a href="https://resend.com/legal/dpa" className="text-blue-600 hover:underline" target="_blank" rel="noopener">DPA Resend</a>.
+          </li>
+          <li>
+            <strong>Stripe Inc.</strong> (USA) — elaborazione pagamenti. PCI-DSS Level 1 certificato.
+            Trasferimento coperto da SCC.{" "}
+            <a href="https://stripe.com/it/privacy" className="text-blue-600 hover:underline" target="_blank" rel="noopener">Privacy Stripe</a>.
           </li>
           <li>
             <strong>Anthropic PBC</strong> (USA) — elaborazione delle richieste AI Assistant.
             I prompt inviati all'AI includono dati della pipeline solo se l'utente avvia
-            una richiesta. Trasferimento coperto da SCC.
+            una richiesta. Trasferimento coperto da SCC.{" "}
+            <a href="https://www.anthropic.com/privacy" className="text-blue-600 hover:underline" target="_blank" rel="noopener">Privacy Anthropic</a>.
           </li>
           <li>
             <strong>Autorità competenti:</strong> in caso di obbligo di legge o richiesta

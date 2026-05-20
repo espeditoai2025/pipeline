@@ -314,17 +314,73 @@ GitHub (main) ──webhook──► Vercel
 |------|-------------|
 | `7245ee7` | seo (precedente) |
 | `2d02fc6` | seo: BreadcrumbList, LocalBusiness, OG dinamica blog, articoli correlati, pagine categoria |
-| (prossimo) | security: crypto key fail-closed, CSP header, auth whitelist, XSS fix AI email |
+| `0bdf899` | security: crypto key fail-closed, CSP header, auth whitelist, XSS fix AI email |
+| (prossimo) | gdpr: unsubscribe link email, endpoint disiscrizione, deleteAccount, DPA links privacy policy |
 
 ---
 
-### 9. TODO pendenti
+### 10. Audit GDPR e Compliance — 2026-05-20
 
-- [ ] Implementare `WAIT` action nel workflow engine (richiede Inngest cron)
-- [ ] Rimuovere mock data da `GET /api/contacts` e `GET /api/leads` (o implementare dati reali)
-- [ ] Aggiungere bounce handling per campagne email
-- [ ] Aggiungere rate limiting esplicito sullo scraper FatturatoItalia
-- [ ] Valutare migrazione da email-based admin a RBAC in DB
+#### Risultati audit legale completo
+
+| Area | Stato pre-audit | Stato post-fix |
+|------|----------------|----------------|
+| Privacy Policy | ✅ Presente | ✅ Aggiornata con DPA links |
+| Cookie Policy + Banner | ✅ Conforme | ✅ Invariato |
+| Termini di Servizio | ✅ Presente | ✅ Invariato |
+| Unsubscribe email (art. 130 c.4-bis) | ❌ Assente | ✅ Fixato |
+| Right to Access (art. 15 GDPR) | ❌ Solo email manuale | ⚠️ Pendente (UI) |
+| Right to Erasure (art. 17 GDPR) | ❌ Solo admin | ✅ deleteAccount() self-service |
+| Right to Portability (art. 20 GDPR) | ❌ Assente | ⚠️ Pendente |
+| DPA Processor linkati | ❌ Non linkati | ✅ Fixato in Privacy Policy |
+| Endpoint disiscrizione pubblico | ❌ Assente | ✅ /emails/unsubscribe |
+| Soft-delete con audit trail | ❌ Assente | ⚠️ Pendente (schema Prisma) |
+| Retention policy tracking email | ❌ Non implementata | ⚠️ Pendente (batch job) |
+
+#### Fix applicati (commit prossimo)
+
+**1. `src/server/actions/campaigns.ts` — List-Unsubscribe + footer obbligatorio**
+- Aggiunto `headers: { "List-Unsubscribe": ..., "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" }` ad ogni email di campagna
+- Aggiunto footer HTML con link disiscrizione visibile + link Privacy Policy
+- Richiesto da art. 130 c.4-bis Codice Privacy e RFC 2369/RFC 8058
+
+**2. `src/app/emails/unsubscribe/page.tsx` — Pagina disiscrizione pubblica**
+- Creata pagina pubblica `/emails/unsubscribe?cid={contactId}&lid={listId}`
+- Setta `EmailListContact.unsubscribed = true` via Prisma
+- Non richiede login (GDPR: il destinatario deve potersi disiscrivere senza account)
+- Aggiunta alla whitelist middleware in `auth.config.ts`
+
+**3. `src/server/actions/settings.ts` — `deleteAccount()` self-service**
+- Aggiunta funzione per OWNER che elimina l'intera organizzazione e dati (Cascade)
+- Richiede conferma testuale "ELIMINA" per prevenire cancellazioni accidentali
+- Implementa art. 17 GDPR (diritto all'oblio) in self-service
+
+**4. `src/app/(legal)/privacy/page.tsx` — DPA links e data aggiornamento**
+- Aggiunto link DPA/Privacy per ogni processor: Vercel, Supabase, Resend, Stripe, Anthropic
+- Specificato che database è in EU (Frankfurt, Germania) — nessun trasferimento extra-UE per i dati
+- Aggiornata data: 20 maggio 2026
+
+---
+
+### 11. TODO pendenti
+
+#### Sicurezza
 - [ ] Implementare Row-Level Security (RLS) su Supabase per defense-in-depth
+- [ ] Valutare migrazione da email-based admin a RBAC in DB
+- [ ] Aggiungere rate limiting esplicito sullo scraper FatturatoItalia
+- [ ] Rimuovere mock data da `GET /api/contacts` e `GET /api/leads`
+
+#### GDPR
+- [ ] Aggiungere UI "Elimina account" nella pagina Settings (collega a `deleteAccount()`)
+- [ ] Implementare export dati JSON/CSV self-service (art. 20 GDPR — portabilità)
+- [ ] Aggiungere soft-delete con `deletedAt` a schema Prisma (User, Organization, Contact, Deal)
+- [ ] Implementare batch job per cancellazione dati tracking email dopo 24 mesi
+- [ ] Age gate al signup (art. 8 GDPR — minori)
+
+#### Funzionalità
+- [ ] Implementare `WAIT` action nel workflow engine (richiede Inngest cron)
+- [ ] Aggiungere bounce handling per campagne email
 - [ ] Aggiungere WebSocket/SSE per notifiche real-time
+
+#### Ambiente
 - [ ] Configurare le 17 variabili d'ambiente mancanti in locale
