@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { Building2, Users, Briefcase, Megaphone, TrendingUp, Mail, Euro, Workflow } from "lucide-react";
+import { Building2, Users, Briefcase, Megaphone, TrendingUp, Mail, Euro, Workflow, Server } from "lucide-react";
 import type { AdminOverview, AdminPlanStats } from "@/server/actions/admin";
 
 const PLAN_BADGE: Record<string, string> = {
@@ -226,6 +226,7 @@ export function AdminDashboard({ data, planStats }: { data: AdminOverview; planS
           { href: "/admin/campaigns", label: "Campagne email", icon: Megaphone, color: "text-rose-400" },
           { href: "/admin/workflow-logs", label: "Log automazioni", icon: Workflow, color: "text-fuchsia-400" },
           { href: "/admin/organizations", label: "Organizzazioni", icon: Building2, color: "text-violet-400" },
+          { href: "/admin/system", label: "Sistema & Monitoring", icon: Server, color: "text-indigo-400" },
         ].map((item) => (
           <Link
             key={item.href}

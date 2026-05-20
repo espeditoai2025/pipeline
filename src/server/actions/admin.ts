@@ -328,6 +328,88 @@ export async function getAdminCampaigns(): Promise<AdminCampaign[] | null> {
   }));
 }
 
+// ─── System snapshot (backup / monitoring) ────────────────────────────────────
+
+export type SystemSnapshot = {
+  collectedAt: string;
+  db: {
+    orgs: number;
+    users: number;
+    contacts: number;
+    companies: number;
+    deals: number;
+    leads: number;
+    activities: number;
+    campaigns: number;
+    campaignsSent: number;
+    emailListContacts: number;
+    workflows: number;
+  };
+  config: {
+    sentryEnabled: boolean;
+    posthogEnabled: boolean;
+    redisEnabled: boolean;
+    resendEnabled: boolean;
+    smtpOrgs: number;
+    cronSecret: boolean;
+    adminEmail: boolean;
+    stripeEnabled: boolean;
+  };
+  links: {
+    sentry: string | null;
+    posthog: string | null;
+    vercelLogs: string | null;
+    supabase: string | null;
+  };
+};
+
+export async function getSystemSnapshot(): Promise<SystemSnapshot | null> {
+  if (!(await requireAdmin())) return null;
+
+  const [
+    orgs, users, contacts, companies, deals, leads,
+    activities, campaigns, campaignsSent, emailListContacts, workflows, smtpOrgs,
+  ] = await Promise.all([
+    db.organization.count(),
+    db.user.count(),
+    db.contact.count(),
+    db.company.count(),
+    db.deal.count(),
+    db.lead.count(),
+    db.activity.count(),
+    db.emailCampaign.count(),
+    db.emailCampaign.count({ where: { status: "SENT" } }),
+    db.emailListContact.count(),
+    db.workflow.count(),
+    db.smtpConfig.count(),
+  ]);
+
+  return {
+    collectedAt: new Date().toISOString(),
+    db: { orgs, users, contacts, companies, deals, leads, activities, campaigns, campaignsSent, emailListContacts, workflows },
+    config: {
+      sentryEnabled: !!process.env.SENTRY_DSN,
+      posthogEnabled: !!process.env.NEXT_PUBLIC_POSTHOG_KEY,
+      redisEnabled: !!process.env.UPSTASH_REDIS_REST_URL,
+      resendEnabled: !!process.env.RESEND_API_KEY,
+      smtpOrgs,
+      cronSecret: !!process.env.CRON_SECRET,
+      adminEmail: !!process.env.ADMIN_EMAIL,
+      stripeEnabled: !!process.env.STRIPE_SECRET_KEY,
+    },
+    links: {
+      sentry: process.env.SENTRY_DSN
+        ? "https://sentry.io/organizations/"
+        : null,
+      posthog: process.env.NEXT_PUBLIC_POSTHOG_HOST
+        ? `${process.env.NEXT_PUBLIC_POSTHOG_HOST}/project/default`
+        : null,
+      vercelLogs: "https://vercel.com/espeditoai2025-1690/pipeline/logs",
+      supabase: "https://supabase.com/dashboard/project/_/database/backups",
+    },
+  };
+}
+
 // ─── MRR / plan distribution ──────────────────────────────────────────────────
 
 export type AdminPlanStats = {
