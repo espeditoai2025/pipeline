@@ -19,7 +19,8 @@ import {
 } from "@/server/actions/settings";
 import type { ApiKeyPublic } from "@/server/actions/settings";
 import { getSmtpConfig } from "@/server/actions/smtp";
-import { SmtpWizard } from "@/components/settings/SmtpWizard";
+import dynamic from "next/dynamic";
+const SmtpWizard = dynamic(() => import("@/components/settings/SmtpWizard").then(m => m.SmtpWizard), { ssr: false, loading: () => <div className="h-12 animate-pulse rounded-lg bg-[var(--crm-neutral-100)]" /> });
 import { CustomFieldsManager } from "@/components/settings/CustomFieldsManager";
 import { BillingTypesManager } from "@/components/settings/BillingTypesManager";
 import type { SmtpConfigPublic } from "@/server/actions/smtp";

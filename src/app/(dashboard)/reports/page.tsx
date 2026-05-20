@@ -6,10 +6,12 @@ import {
   Briefcase, Euro, CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FunnelChart } from "@/components/charts/FunnelChart";
-import { TrendChart } from "@/components/charts/TrendChart";
-import { ActivitiesByTypeChart } from "@/components/charts/ActivitiesByTypeChart";
-import { TopPerformersTable } from "@/components/charts/TopPerformersTable";
+import dynamic from "next/dynamic";
+const ChartSkeleton = () => <div className="h-48 animate-pulse rounded-xl bg-[var(--crm-neutral-100)]" />;
+const FunnelChart         = dynamic(() => import("@/components/charts/FunnelChart").then(m => m.FunnelChart), { ssr: false, loading: ChartSkeleton });
+const TrendChart          = dynamic(() => import("@/components/charts/TrendChart").then(m => m.TrendChart), { ssr: false, loading: ChartSkeleton });
+const ActivitiesByTypeChart = dynamic(() => import("@/components/charts/ActivitiesByTypeChart").then(m => m.ActivitiesByTypeChart), { ssr: false, loading: ChartSkeleton });
+const TopPerformersTable  = dynamic(() => import("@/components/charts/TopPerformersTable").then(m => m.TopPerformersTable), { ssr: false, loading: () => <div className="h-24 animate-pulse rounded-xl bg-[var(--crm-neutral-100)]" /> });
 import { getReportData } from "@/server/actions/reports";
 import { AIInsightsStrip } from "@/components/ai/AIInsightsStrip";
 

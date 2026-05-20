@@ -2,7 +2,11 @@ import { getTranslations } from "next-intl/server";
 import Link from "next/link";
 import { ArrowUpRight, ArrowDownRight, Briefcase, CheckCircle, Euro, TrendingUp, Target } from "lucide-react";
 import type { Metadata } from "next";
-import { PipelineOverviewChart } from "@/components/charts/PipelineOverviewChart";
+import dynamic from "next/dynamic";
+const PipelineOverviewChart = dynamic(
+  () => import("@/components/charts/PipelineOverviewChart").then(m => m.PipelineOverviewChart),
+  { ssr: false, loading: () => <div className="h-48 animate-pulse rounded-xl bg-[var(--crm-neutral-100)]" /> }
+);
 import { redirect } from "next/navigation";
 import { getDashboardData, getOnboardingStatus } from "@/server/actions/dashboard";
 import { getCrmMode, isCrmModeSet } from "@/server/actions/crm-mode";

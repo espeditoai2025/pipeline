@@ -3,7 +3,8 @@
 import { useState, useEffect, useTransition } from "react";
 import { Mail, FileText, PenSquare, Megaphone, Users } from "lucide-react";
 import { InboxView } from "@/components/emails/InboxView";
-import { ComposeEmailModal } from "@/components/emails/ComposeEmailModal";
+import dynamic from "next/dynamic";
+const ComposeEmailModal = dynamic(() => import("@/components/emails/ComposeEmailModal").then(m => m.ComposeEmailModal), { ssr: false });
 import { TemplatesManager } from "@/components/emails/TemplatesManager";
 import { EmailListsTab } from "@/components/emails/EmailListsTab";
 import { CampaignsTab } from "@/components/emails/CampaignsTab";
