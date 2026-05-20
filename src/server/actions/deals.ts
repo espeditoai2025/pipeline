@@ -186,6 +186,8 @@ export async function getDealDetail(id: string) {
         include: { user: { select: { id: true, name: true, email: true } } },
       },
       customValues: { include: { field: true } },
+      notes: { orderBy: { createdAt: "desc" }, take: 20 },
+      products: { include: { product: { select: { id: true, name: true, code: true, unit: true } } }, orderBy: { id: "asc" } },
     },
   });
 
@@ -229,6 +231,19 @@ export async function getDealDetail(id: string) {
       fieldName: v.field.name,
       fieldType: v.field.fieldType,
       value: v.value,
+    })),
+    notes: deal.notes.map((n) => ({
+      id: n.id,
+      content: n.content,
+      authorId: n.authorId,
+      createdAt: n.createdAt.toISOString(),
+    })),
+    products: deal.products.map((p) => ({
+      id: p.id,
+      quantity: p.quantity,
+      unitPrice: Number(p.unitPrice),
+      discount: Number(p.discount),
+      product: p.product,
     })),
   };
 }

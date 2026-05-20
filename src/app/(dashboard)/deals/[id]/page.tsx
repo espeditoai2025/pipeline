@@ -2,10 +2,11 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, User, Building2, Calendar, Trophy, X as LostIcon,
-  Tag, TrendingUp, ExternalLink, Mail, Phone,
+  Tag, TrendingUp, ExternalLink, Mail, Phone, StickyNote,
 } from "lucide-react";
 import { getDealDetail } from "@/server/actions/deals";
 import { ActivityTimeline } from "@/components/shared/ActivityTimeline";
+import { DealProductsManager } from "@/components/products/DealProductsManager";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -177,8 +178,29 @@ export default async function DealDetailPage({ params }: Props) {
           )}
         </div>
 
-        {/* Right column: activity timeline */}
-        <div className="lg:col-span-2">
+        {/* Right column: prodotti + note + timeline */}
+        <div className="lg:col-span-2 space-y-4">
+          <DealProductsManager dealId={deal.id} />
+
+          {/* Note */}
+          {deal.notes.length > 0 && (
+            <div className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] p-5 space-y-3">
+              <h2 className="text-sm font-semibold text-[var(--crm-neutral-700)] flex items-center gap-2">
+                <StickyNote className="h-4 w-4 text-[var(--crm-primary)]" /> Note ({deal.notes.length})
+              </h2>
+              <div className="space-y-3">
+                {deal.notes.map((note) => (
+                  <div key={note.id} className="rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30 px-4 py-3">
+                    <p className="text-sm whitespace-pre-wrap text-[var(--crm-neutral-800)]">{note.content}</p>
+                    <p className="text-xs text-[var(--crm-neutral-400)] mt-1.5">
+                      {new Date(note.createdAt).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" })}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <ActivityTimeline
             activities={deal.activities}
             entityId={deal.id}

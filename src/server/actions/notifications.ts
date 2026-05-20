@@ -149,6 +149,34 @@ export async function getNotifications(): Promise<AppNotification[]> {
     });
   }
 
+  // Notifiche da workflow (SEND_NOTIFICATION)
+  const userId = (session?.user as { id?: string } | undefined)?.id;
+  if (userId) {
+    const workflowNotifs = await db.notification.findMany({
+      where: { userId, read: false },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    });
+    for (const n of workflowNotifs) {
+      notifications.push({
+        id: `wf-${n.id}`,
+        type: "due_today", // tipo generico — le workflow usano icona neutra
+        title: n.title,
+        body: n.message,
+        createdAt: n.createdAt.toISOString(),
+        read: n.read,
+        href: n.link ?? undefined,
+      });
+    }
+  }
+
   // Sort by date desc
   return notifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export async function markWorkflowNotificationsRead(): Promise<void> {
+  const session = await auth();
+  const userId = (session?.user as { id?: string } | undefined)?.id;
+  if (!userId) return;
+  await db.notification.updateMany({ where: { userId, read: false }, data: { read: true } });
 }

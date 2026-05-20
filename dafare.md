@@ -77,7 +77,24 @@ echo "https://eu.i.posthog.com" | vercel env add NEXT_PUBLIC_POSTHOG_HOST produc
 
 ---
 
-## 5. Redeploy finale
+## 5. Google OAuth — login con Google
+
+Il pulsante "Accedi con Google" nella pagina di login dà errore perché mancano le credenziali.
+
+1. Vai su https://console.cloud.google.com/
+2. Crea un progetto → **API & Services → Credentials → Create OAuth 2.0 Client ID**
+   - Application type: **Web application**
+   - Authorized redirect URIs: `https://www.pipely.it/api/auth/callback/google`
+3. Copia **Client ID** e **Client Secret**
+4. Esegui:
+```bash
+echo "xxx.apps.googleusercontent.com" | vercel env add GOOGLE_CLIENT_ID production
+echo "GOCSPX-xxx"                     | vercel env add GOOGLE_CLIENT_SECRET production
+```
+
+---
+
+## 6. Redeploy finale
 Dopo aver completato tutti i punti sopra:
 ```bash
 vercel deploy --prod
