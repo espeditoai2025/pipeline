@@ -2,11 +2,7 @@ import { getTranslations } from "next-intl/server";
 import Link from "next/link";
 import { ArrowUpRight, ArrowDownRight, Briefcase, CheckCircle, Euro, TrendingUp, Target } from "lucide-react";
 import type { Metadata } from "next";
-import dynamic from "next/dynamic";
-const PipelineOverviewChart = dynamic(
-  () => import("@/components/charts/PipelineOverviewChart").then(m => m.PipelineOverviewChart),
-  { ssr: false, loading: () => <div className="h-48 animate-pulse rounded-xl bg-[var(--crm-neutral-100)]" /> }
-);
+import { PipelineOverviewChartLazy } from "@/components/charts/PipelineOverviewChartLazy";
 import { redirect } from "next/navigation";
 import { getDashboardData, getOnboardingStatus } from "@/server/actions/dashboard";
 import { getCrmMode, isCrmModeSet } from "@/server/actions/crm-mode";
@@ -159,7 +155,7 @@ export default async function DashboardPage() {
 
       <div className="rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 bg-white dark:bg-[#1a1a2e] p-5 shadow-sm">
         <h2 className="text-sm font-semibold text-[var(--crm-neutral-900)] dark:text-white mb-4">{t("pipelineOverview")}</h2>
-        <PipelineOverviewChart data={pipelineChartData} />
+        <PipelineOverviewChartLazy data={pipelineChartData} />
       </div>
     </div>
   );
