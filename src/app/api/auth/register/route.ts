@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { resend, FROM_DEFAULT } from "@/lib/resend";
+import { welcomeEmailHtml } from "@/lib/email-templates";
+import { withAuthRateLimit } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 const bodySchema = z.object({
   name: z.string().min(2),
@@ -12,6 +16,10 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  // Rate limiting: max 10 registration attempts per IP per minute
+  const limited = await withAuthRateLimit(req);
+  if (limited) return limited;
+
   const body: unknown = await req.json();
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
@@ -19,13 +27,14 @@ export async function POST(req: NextRequest) {
   }
 
   const { name, email, organizationName, password, inviteToken } = parsed.data;
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://www.pipely.it").replace(/\/$/, "");
 
   try {
     // ── Invite flow ──────────────────────────────────────────────────────────
     if (inviteToken) {
       const invitation = await db.invitation.findUnique({
         where: { token: inviteToken },
-        include: { organization: { select: { id: true } } },
+        include: { organization: { select: { id: true, name: true } } },
       });
 
       if (!invitation || invitation.acceptedAt || invitation.expiresAt < new Date()) {
@@ -60,6 +69,18 @@ export async function POST(req: NextRequest) {
         }),
       ]);
 
+      logger.info("register", "Utente invitato registrato", { email: normalizedEmail, orgId: invitation.organizationId });
+
+      // Welcome email (fire-and-forget)
+      if (resend) {
+        resend.emails.send({
+          from: FROM_DEFAULT,
+          to: normalizedEmail,
+          subject: `Benvenuto su Pipely, ${name}!`,
+          html: welcomeEmailHtml({ name, orgName: invitation.organization.name, appUrl }),
+        }).catch((err: unknown) => logger.warn("register", "Welcome email fallita", { error: String(err) }));
+      }
+
       return NextResponse.json({ ok: true }, { status: 201 });
     }
 
@@ -68,7 +89,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Nome azienda non valido" }, { status: 422 });
     }
 
-    const existing = await db.user.findUnique({ where: { email } });
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = await db.user.findUnique({ where: { email: normalizedEmail } });
     if (existing) {
       return NextResponse.json({ error: "Email già in uso" }, { status: 409 });
     }
@@ -80,21 +102,34 @@ export async function POST(req: NextRequest) {
       .slice(0, 50)}-${Date.now()}`;
 
     const passwordHash = await hash(password, 12);
+    const orgName = organizationName.trim();
 
     await db.organization.create({
       data: {
-        name: organizationName,
+        name: orgName,
         slug,
         users: {
-          create: { name, email, passwordHash, role: "OWNER" },
+          create: { name, email: normalizedEmail, passwordHash, role: "OWNER" },
         },
       },
     });
 
+    logger.info("register", "Nuova organizzazione registrata", { email: normalizedEmail, orgName });
+
+    // Welcome email (fire-and-forget)
+    if (resend) {
+      resend.emails.send({
+        from: FROM_DEFAULT,
+        to: normalizedEmail,
+        subject: `Benvenuto su Pipely, ${name}!`,
+        html: welcomeEmailHtml({ name, orgName, appUrl }),
+      }).catch((err: unknown) => logger.warn("register", "Welcome email fallita", { error: String(err) }));
+    }
+
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("[register]", msg);
+    logger.error("register", "Registrazione fallita", { error: msg });
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

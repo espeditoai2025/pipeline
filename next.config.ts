@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
@@ -76,4 +77,11 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withNextIntl(nextConfig);
+const withIntl = withNextIntl(nextConfig);
+
+export default withSentryConfig(withIntl, {
+  // Sentry organization and project (set via SENTRY_ORG and SENTRY_PROJECT env vars in CI)
+  silent: true,
+  disableLogger: true,
+  automaticVercelMonitors: false,
+});

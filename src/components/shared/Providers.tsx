@@ -2,10 +2,11 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "next-auth/react";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "./ThemeProvider";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { PostHogProvider } from "./PostHogProvider";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -20,8 +21,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <TooltipProvider>
-            {children}
-            <Toaster position="bottom-right" richColors />
+            <Suspense>
+              <PostHogProvider>
+                {children}
+                <Toaster position="bottom-right" richColors />
+              </PostHogProvider>
+            </Suspense>
           </TooltipProvider>
         </ThemeProvider>
       </QueryClientProvider>
