@@ -102,6 +102,61 @@ vercel deploy --prod
 
 ---
 
+---
+
+# Roadmap Prodotto — Verso il miglior CRM italiano
+
+## Priorità 1 — Quick wins (base già esistente)
+
+### 7. Vista Calendario attività
+Le attività (call, meeting, task, ecc.) esistono già. Serve un componente calendario visuale (FullCalendar o simile) nella pagina `/activities` per vedere tutto a colpo d'occhio.
+- **File coinvolti**: `src/app/(dashboard)/activities/`, `src/server/actions/activities.ts`
+- **Effort**: Medio
+
+### 8. Merge duplicati contatti
+Il rilevamento duplicati per email funziona già nell'import CSV. Serve una UI dedicata per confrontare e unire i contatti duplicati esistenti.
+- **File coinvolti**: `src/components/contacts/ContactsTable.tsx` (detection già presente), nuovo componente merge
+- **Effort**: Basso
+
+### 9. Grafico Forecast pipeline
+I dati di forecast pesato (valore deal × probabilità stage) sono già calcolati in `dashboard.ts`. Serve il chart Recharts forecast vs actual per mese.
+- **File coinvolti**: `src/server/actions/dashboard.ts`, `src/components/charts/`
+- **Effort**: Medio
+
+### 10. Webhook endpoints in/out
+API pubblica per ricevere eventi esterni (webhook in) e notificare sistemi terzi quando succede qualcosa nel CRM (webhook out). Lo schema `ApiKey` esiste già.
+- **File coinvolti**: `src/app/api/`, schema Prisma
+- **Effort**: Medio
+
+### 11. Generazione preventivi PDF
+I prodotti e deal products ci sono già. Serve un template PDF generabile dalla pagina deal con dati azienda, contatto, prodotti, prezzi, sconti.
+- **File coinvolti**: `src/server/actions/products.ts`, `src/components/products/DealProductsManager.tsx`
+- **Effort**: Medio-Alto
+
+## Priorità 2 — Differenziatori mercato italiano
+
+### 12. Email Sequences / Drip campaigns
+Builder dedicato per sequenze automatiche (giorno 1: email benvenuto, giorno 3: follow-up, ecc.). I workflow coprono parzialmente ma serve UX dedicata.
+- **Effort**: Alto
+
+### 13. WhatsApp Business API
+Integrazione con WhatsApp Business per inviare messaggi, template, e tracciare conversazioni dal CRM. Canale #1 in Italia per vendita.
+- **Effort**: Alto
+
+### 14. Zapier / Make connector
+Connettore per aprire l'ecosistema a 5000+ integrazioni senza sviluppo custom. Richiede API REST pubblica documentata + app Zapier/Make.
+- **Effort**: Medio-Alto
+
+### 15. PWA / Mobile responsive
+Progressive Web App con manifest, service worker, e UI ottimizzata per mobile. Il 60%+ degli utenti CRM accede da smartphone.
+- **Effort**: Medio
+
+### 16. Integrazione fatturazione italiana
+Collegamento con FatturaPA, FatturaPro, Danea Easyfatt per generare e-fatture direttamente dal deal. Fondamentale per il mercato italiano.
+- **Effort**: Alto
+
+---
+
 ## Note
 - `CRON_SECRET` ✅ già impostato su Vercel
 - `NEXT_PUBLIC_APP_URL` ✅ già impostato su Vercel (`https://www.pipely.it`)
