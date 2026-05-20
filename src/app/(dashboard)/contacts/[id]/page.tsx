@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, Mail, Phone, Building2, Briefcase, Calendar, User, ExternalLink } from "lucide-react";
 import { getContactDetail } from "@/server/actions/contacts";
 import { ActivityTimeline } from "@/components/shared/ActivityTimeline";
+import { ContactNotePanel } from "@/components/contacts/ContactNotePanel";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -146,8 +147,9 @@ export default async function ContactDetailPage({ params }: Props) {
           )}
         </div>
 
-        {/* Right column: activity timeline */}
-        <div className="lg:col-span-2">
+        {/* Right column: note + activity timeline */}
+        <div className="lg:col-span-2 space-y-4">
+          <ContactNotePanel contactId={contact.id} initialNotes={contact.notes} />
           <ActivityTimeline
             activities={contact.activities}
             entityId={contact.id}

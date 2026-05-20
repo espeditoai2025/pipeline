@@ -100,7 +100,9 @@ export function LeadsTable({ initialLeads }: Props) {
         </button>
       ),
       cell: ({ row }) => (
-        <p className="font-medium text-sm">{row.original.title}</p>
+        <a href={`/leads/${row.original.id}`} className="font-medium text-sm hover:text-[var(--crm-primary)] hover:underline">
+          {row.original.title}
+        </a>
       ),
     }),
     col.accessor("email", {

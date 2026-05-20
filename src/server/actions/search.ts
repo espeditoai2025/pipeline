@@ -88,14 +88,14 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
     id: c.id, type: "company",
     title: c.name,
     subtitle: c.industry ?? "Azienda",
-    href: `/companies`,
+    href: `/companies/${c.id}`,
   }));
 
   leads.forEach((l) => results.push({
     id: l.id, type: "lead",
     title: l.title,
     subtitle: [l.source, l.email].filter(Boolean).join(" · "),
-    href: `/leads`,
+    href: `/leads/${l.id}`,
   }));
 
   return results;

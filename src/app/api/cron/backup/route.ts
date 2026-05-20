@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { resend, FROM_DEFAULT } from "@/lib/resend";
 import { logger } from "@/lib/logger";
-import { runWorkflows } from "@/lib/workflow-engine";
+import { runWorkflows, runStepsFrom, type WorkflowPayload } from "@/lib/workflow-engine";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -125,7 +125,43 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ ok: true, snapshot, overdueTriggered: overdueActivities.length });
+    // ── WorkflowQueue — resume paused workflows whose delay has elapsed ────────
+    const dueQueueItems = await db.workflowQueue.findMany({
+      where: { resumeAt: { lte: new Date() } },
+      include: { workflow: { select: { id: true, steps: true, isActive: true } } },
+      take: 50,
+    });
+
+    let queueResumed = 0;
+    for (const item of dueQueueItems) {
+      if (!item.workflow.isActive) {
+        await db.workflowQueue.delete({ where: { id: item.id } });
+        continue;
+      }
+      const payload = item.payload as WorkflowPayload;
+      const entityId = ("dealId" in payload ? payload.dealId : "contactId" in payload ? (payload.contactId ?? "") : "leadId" in payload ? payload.leadId : "") ?? "";
+      const entityLabel = "dealTitle" in payload ? payload.dealTitle : "contactName" in payload ? payload.contactName : "leadTitle" in payload ? payload.leadTitle : "";
+      const entityType = payload.trigger.startsWith("DEAL") ? "deal" : payload.trigger.startsWith("CONTACT") ? "contact" : "lead";
+
+      await runStepsFrom({
+        workflows: [item.workflow],
+        payload,
+        orgId: item.orgId,
+        ownerId: item.ownerId,
+        entityId,
+        entityLabel,
+        entityType,
+        startIndex: item.stepIndex,
+      });
+      await db.workflowQueue.delete({ where: { id: item.id } });
+      queueResumed++;
+    }
+
+    if (queueResumed > 0) {
+      logger.info("cron:backup", "Workflow in coda ripresi", { count: queueResumed });
+    }
+
+    return NextResponse.json({ ok: true, snapshot, overdueTriggered: overdueActivities.length, queueResumed });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error("cron:backup", "Backup snapshot fallito", { error: message });

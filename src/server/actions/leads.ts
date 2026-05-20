@@ -81,6 +81,19 @@ export async function getLeads(): Promise<Lead[]> {
   return rows.map(mapLead);
 }
 
+export async function getLeadDetail(id: string): Promise<Lead | null> {
+  const session = await auth();
+  const { orgId } = getIds(session);
+  if (!orgId) return null;
+
+  const row = await db.lead.findFirst({
+    where: { id, organizationId: orgId },
+    select: LEAD_SELECT,
+  });
+
+  return row ? mapLead(row) : null;
+}
+
 const leadSchema = z.object({
   title: z.string().min(1, "Titolo obbligatorio"),
   source: z.string().optional(),

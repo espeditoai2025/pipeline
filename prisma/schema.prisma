@@ -209,6 +209,7 @@ model Contact {
   emails       Email[]
   customValues CustomFieldValue[]
   tags         Tag[]              @relation("ContactTags")
+  notes        Note[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -422,7 +423,8 @@ model Workflow {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  executions WorkflowExecution[]
+  executions   WorkflowExecution[]
+  queuedSteps  WorkflowQueue[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -474,6 +476,8 @@ model Note {
   content   String   @db.Text
   dealId    String?
   deal      Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
   authorId  String
   createdAt DateTime @default(now())
 }
@@ -603,6 +607,22 @@ model LeadCandidate {
 
   @@index([organizationId])
   @@index([searchId])
+}
+
+// ============ WORKFLOW QUEUE ============
+
+model WorkflowQueue {
+  id         String   @id @default(cuid())
+  workflowId String
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  stepIndex  Int      // index of next step to execute when resumed
+  payload    Json     // full WorkflowPayload serialized
+  orgId      String
+  ownerId    String
+  resumeAt   DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([resumeAt])
 }
 
 // ============ API KEYS ============

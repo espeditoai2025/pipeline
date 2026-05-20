@@ -174,7 +174,7 @@ export function ContactsTable({ initialContacts, companies }: Props) {
           value={globalFilter}
           onChange={(e) => setGlobalFilter(e.target.value)}
           placeholder="Cerca contatti..."
-          className="rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] w-64"
+          className="rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] w-full sm:w-64"
         />
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
@@ -190,8 +190,8 @@ export function ContactsTable({ initialContacts, companies }: Props) {
         </div>
       </div>
 
-      <div className="rounded-xl border border-[var(--crm-neutral-100)] overflow-hidden bg-white dark:bg-[#1a1a2e]">
-        <table className="w-full">
+      <div className="rounded-xl border border-[var(--crm-neutral-100)] overflow-x-auto bg-white dark:bg-[#1a1a2e]">
+        <table className="w-full min-w-[640px]">
           <thead className="bg-[var(--crm-neutral-50)] dark:bg-[#0f0f1a]">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>

@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui";
+import { X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { PipelyFavicon, PipelyWordmark, PipelyWordmarkDark } from "@/components/shared/PipelyLogo";
@@ -50,7 +51,7 @@ const bottomItems = [
 export function Sidebar() {
   const t = useTranslations("nav");
   const pathname = usePathname();
-  const { sidebarCollapsed, toggleSidebar } = useUIStore();
+  const { sidebarCollapsed, toggleSidebar, mobileSidebarOpen, closeMobileSidebar } = useUIStore();
 
   function isActive(href: string) {
     if (href === "/dashboard") return pathname === "/dashboard";
@@ -94,7 +95,7 @@ export function Sidebar() {
     return link;
   }
 
-  return (
+  const sidebarContent = (
     <aside
       className={cn(
         "relative flex flex-col border-r border-[var(--crm-neutral-100)] dark:border-white/10 bg-white dark:bg-[#1a1a2e] transition-all duration-200",
@@ -134,10 +135,10 @@ export function Sidebar() {
         ))}
       </div>
 
-      {/* Collapse toggle */}
+      {/* Collapse toggle (desktop only) */}
       <button
         onClick={toggleSidebar}
-        className="absolute -right-3 top-16 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-[var(--crm-neutral-100)] dark:border-white/10 bg-white dark:bg-[#1a1a2e] shadow-sm hover:shadow-md transition-shadow"
+        className="absolute -right-3 top-16 z-10 hidden md:flex h-6 w-6 items-center justify-center rounded-full border border-[var(--crm-neutral-100)] dark:border-white/10 bg-white dark:bg-[#1a1a2e] shadow-sm hover:shadow-md transition-shadow"
         aria-label={sidebarCollapsed ? "Espandi sidebar" : "Comprimi sidebar"}
       >
         {sidebarCollapsed ? (
@@ -147,5 +148,89 @@ export function Sidebar() {
         )}
       </button>
     </aside>
+  );
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <div className="hidden md:flex">{sidebarContent}</div>
+
+      {/* Mobile overlay */}
+      {mobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={closeMobileSidebar}
+            aria-hidden
+          />
+          {/* Panel — always expanded on mobile */}
+          <div className="relative z-10 flex flex-col w-56 h-full border-r border-[var(--crm-neutral-100)] dark:border-white/10 bg-white dark:bg-[#1a1a2e]">
+            {/* Close button */}
+            <button
+              onClick={closeMobileSidebar}
+              className="absolute right-3 top-4 flex h-7 w-7 items-center justify-center rounded-lg hover:bg-[var(--crm-neutral-100)] dark:hover:bg-white/10"
+              aria-label="Chiudi menu"
+            >
+              <X className="h-4 w-4 text-[var(--crm-neutral-500)]" />
+            </button>
+
+            {/* Logo */}
+            <div className="flex items-center h-14 px-3 border-b border-[var(--crm-neutral-100)] dark:border-white/10 shrink-0 gap-2">
+              <PipelyWordmark className="dark:hidden" />
+              <PipelyWordmarkDark className="hidden dark:block" />
+            </div>
+
+            {/* Nav */}
+            <ScrollArea className="flex-1 py-3">
+              <nav className="space-y-0.5 px-2">
+                {navItems.map(({ key, href, icon: Icon }) => {
+                  const active = isActive(href);
+                  return (
+                    <Link
+                      key={key}
+                      href={href}
+                      onClick={closeMobileSidebar}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                        active
+                          ? "bg-[var(--crm-primary)] text-white"
+                          : "text-[var(--crm-neutral-500)] hover:bg-[var(--crm-neutral-50)] hover:text-[var(--crm-neutral-900)] dark:hover:bg-white/5 dark:hover:text-white",
+                      )}
+                    >
+                      <Icon className="h-5 w-5 shrink-0" />
+                      <span>{t(key)}</span>
+                    </Link>
+                  );
+                })}
+              </nav>
+            </ScrollArea>
+
+            {/* Bottom */}
+            <div className="py-3 border-t border-[var(--crm-neutral-100)] dark:border-white/10 px-2">
+              {bottomItems.map(({ key, href, icon: Icon }) => {
+                const active = isActive(href);
+                return (
+                  <Link
+                    key={key}
+                    href={href}
+                    onClick={closeMobileSidebar}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                      active
+                        ? "bg-[var(--crm-primary)] text-white"
+                        : "text-[var(--crm-neutral-500)] hover:bg-[var(--crm-neutral-50)] hover:text-[var(--crm-neutral-900)] dark:hover:bg-white/5 dark:hover:text-white",
+                    )}
+                  >
+                    <Icon className="h-5 w-5 shrink-0" />
+                    <span>{t(key)}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -172,7 +172,8 @@ async function executeStep(
     }
 
     case "WAIT":
-      return `WAIT ${action.days}gg — eseguito immediatamente (delay non implementato)`;
+      // Handled externally by the caller; should never reach here
+      return `WAIT ${action.days}gg`;
 
     default:
       return `SKIP: tipo step sconosciuto`;
@@ -195,17 +196,61 @@ export async function runWorkflows(payload: WorkflowPayload): Promise<void> {
   if (matching.length === 0) return;
 
   const ownerId = "ownerId" in payload ? payload.ownerId : "";
-  const entityId = "dealId" in payload ? payload.dealId : "contactId" in payload ? payload.contactId : "leadId" in payload ? payload.leadId : "";
+  const entityId = ("dealId" in payload ? payload.dealId : "contactId" in payload ? payload.contactId : "leadId" in payload ? payload.leadId : "") ?? "";
   const entityLabel = "dealTitle" in payload ? payload.dealTitle : "contactName" in payload ? payload.contactName : "leadTitle" in payload ? payload.leadTitle : "";
   const entityType = payload.trigger.startsWith("DEAL") ? "deal" : payload.trigger.startsWith("CONTACT") ? "contact" : "lead";
 
-  for (const wf of matching) {
+  await runStepsFrom({ workflows: matching, payload, orgId, ownerId, entityId, entityLabel, entityType, startIndex: 0 });
+}
+
+// ─── Shared step runner (also used by cron for resumed queued steps) ──────────
+
+export async function runStepsFrom({
+  workflows,
+  payload,
+  orgId,
+  ownerId,
+  entityId,
+  entityLabel,
+  entityType,
+  startIndex,
+}: {
+  workflows: { id: string; steps: unknown }[];
+  payload: WorkflowPayload;
+  orgId: string;
+  ownerId: string;
+  entityId: string;
+  entityLabel: string;
+  entityType: string;
+  startIndex: number;
+}): Promise<void> {
+  for (const wf of workflows) {
     const steps = wf.steps as WorkflowStep[];
     const logs: string[] = [`[${new Date().toLocaleTimeString("it-IT")}] Trigger: ${payload.trigger}`];
-    let status: "SUCCESS" | "FAILED" = "SUCCESS";
+    let status: "SUCCESS" | "FAILED" | "PAUSED" = "SUCCESS";
 
-    for (let i = 0; i < steps.length; i++) {
+    for (let i = startIndex; i < steps.length; i++) {
       const step = steps[i]!;
+
+      // Handle WAIT by scheduling the remainder and stopping
+      if (step.action.type === "WAIT") {
+        const days = step.action.days ?? 1;
+        const resumeAt = new Date(Date.now() + days * 86_400_000);
+        await db.workflowQueue.create({
+          data: {
+            workflowId: wf.id,
+            stepIndex: i + 1,
+            payload: payload as never,
+            orgId,
+            ownerId,
+            resumeAt,
+          },
+        });
+        logs.push(`[${new Date().toLocaleTimeString("it-IT")}] Step ${i + 1}: WAIT ${days}gg — riprende il ${resumeAt.toLocaleDateString("it-IT")}`);
+        status = "PAUSED";
+        break;
+      }
+
       try {
         const msg = await executeStep(step, payload, orgId, ownerId);
         logs.push(`[${new Date().toLocaleTimeString("it-IT")}] Step ${i + 1}: ${msg}`);
@@ -219,14 +264,16 @@ export async function runWorkflows(payload: WorkflowPayload): Promise<void> {
 
     logs.push(`[${new Date().toLocaleTimeString("it-IT")}] Fine esecuzione: ${status}`);
 
-    await db.workflowExecution.create({
-      data: {
-        workflowId: wf.id,
-        status,
-        payload: { trigger: payload.trigger, entityType, entityId, entityLabel },
-        logs,
-        finishedAt: new Date(),
-      },
-    });
+    if (status !== "PAUSED") {
+      await db.workflowExecution.create({
+        data: {
+          workflowId: wf.id,
+          status,
+          payload: { trigger: payload.trigger, entityType, entityId, entityLabel },
+          logs,
+          finishedAt: new Date(),
+        },
+      });
+    }
   }
 }

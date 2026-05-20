@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { signOut, useSession } from "next-auth/react";
-import { Bell, Moon, Search, Sun, Clock, Trophy, XCircle, Zap, CheckCircle2, Inbox, CalendarClock, TrendingDown } from "lucide-react";
+import { Bell, Moon, Search, Sun, Clock, Trophy, XCircle, Zap, CheckCircle2, Inbox, CalendarClock, TrendingDown, Menu } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -142,7 +142,7 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
 export function Topbar() {
   const t = useTranslations();
   const { data: session } = useSession();
-  const { theme, setTheme, openCommandPalette } = useUIStore();
+  const { theme, setTheme, openCommandPalette, toggleMobileSidebar } = useUIStore();
   const [notifOpen, setNotifOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -178,6 +178,15 @@ export function Topbar() {
 
   return (
     <header className="flex h-14 items-center gap-3 border-b border-[var(--crm-neutral-100)] dark:border-white/10 bg-white dark:bg-[#1a1a2e] px-4 shrink-0">
+      {/* Mobile hamburger */}
+      <button
+        onClick={toggleMobileSidebar}
+        className="md:hidden flex h-8 w-8 items-center justify-center rounded-lg hover:bg-[var(--crm-neutral-50)] dark:hover:bg-white/10 transition-colors"
+        aria-label="Apri menu"
+      >
+        <Menu className="h-5 w-5 text-[var(--crm-neutral-500)]" />
+      </button>
+
       {/* Search trigger */}
       <button
         onClick={openCommandPalette}

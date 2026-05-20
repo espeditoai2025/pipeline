@@ -86,6 +86,68 @@ export async function getCompanies(): Promise<Company[]> {
   }));
 }
 
+export async function getCompanyDetail(id: string) {
+  const session = await auth();
+  const orgId = getOrgId(session);
+  if (!orgId) return null;
+
+  const c = await db.company.findFirst({
+    where: { id, organizationId: orgId },
+    include: {
+      contacts: {
+        orderBy: { createdAt: "desc" },
+        select: { id: true, firstName: true, lastName: true, email: true, phone: true, jobTitle: true },
+      },
+      deals: {
+        where: { status: { not: "DELETED" } },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, title: true, value: true, currency: true, status: true, stage: { select: { name: true } } },
+      },
+    },
+  });
+
+  if (!c) return null;
+
+  return {
+    id: c.id,
+    name: c.name,
+    website: c.website ?? null,
+    industry: c.industry ?? null,
+    size: c.size ?? null,
+    address: c.address ?? null,
+    city: c.city ?? null,
+    country: c.country ?? null,
+    email: c.email ?? null,
+    phone: c.phone ?? null,
+    vatNumber: c.vatNumber ?? null,
+    description: c.description ?? null,
+    linkedinUrl: c.linkedinUrl ?? null,
+    referentName: c.referentName ?? null,
+    referentRole: c.referentRole ?? null,
+    referentEmail: c.referentEmail ?? null,
+    referentPhone: c.referentPhone ?? null,
+    organizationId: c.organizationId,
+    createdAt: c.createdAt.toISOString(),
+    updatedAt: c.updatedAt.toISOString(),
+    contacts: c.contacts.map((ct) => ({
+      id: ct.id,
+      firstName: ct.firstName,
+      lastName: ct.lastName ?? null,
+      email: ct.email ?? null,
+      phone: ct.phone ?? null,
+      jobTitle: ct.jobTitle ?? null,
+    })),
+    deals: c.deals.map((d) => ({
+      id: d.id,
+      title: d.title,
+      value: Number(d.value),
+      currency: d.currency,
+      status: d.status as string,
+      stageName: d.stage?.name ?? null,
+    })),
+  };
+}
+
 export async function getContactDetail(id: string) {
   const session = await auth();
   const orgId = getOrgId(session);
@@ -105,6 +167,7 @@ export async function getContactDetail(id: string) {
         include: { user: { select: { id: true, name: true, email: true } } },
       },
       customValues: { include: { field: true } },
+      notes: { orderBy: { createdAt: "desc" }, take: 20 },
     },
   });
 
@@ -151,7 +214,29 @@ export async function getContactDetail(id: string) {
       fieldType: v.field.fieldType,
       value: v.value,
     })),
+    notes: contact.notes.map((n) => ({
+      id: n.id,
+      content: n.content,
+      authorId: n.authorId,
+      createdAt: n.createdAt.toISOString(),
+    })),
   };
+}
+
+export async function createContactNote(contactId: string, content: string): Promise<{ ok?: boolean; error?: string }> {
+  const session = await auth();
+  const orgId = getOrgId(session);
+  const userId = (session?.user as { id?: string } | undefined)?.id;
+  if (!orgId || !userId) return { error: "Non autorizzato" };
+
+  if (!content.trim()) return { error: "Il contenuto della nota non può essere vuoto" };
+
+  const contact = await db.contact.findFirst({ where: { id: contactId, organizationId: orgId }, select: { id: true } });
+  if (!contact) return { error: "Contatto non trovato" };
+
+  await db.note.create({ data: { content: content.trim(), contactId, authorId: userId } });
+  revalidatePath(`/contacts/${contactId}`);
+  return { ok: true };
 }
 
 // ── SCHEMAS ─────────────────────────────────────────────────────────────────

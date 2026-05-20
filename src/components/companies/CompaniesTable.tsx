@@ -44,7 +44,7 @@ export function CompaniesTable({ initialCompanies }: Props) {
             <Briefcase className="h-4 w-4" />
           </div>
           <div>
-            <p className="font-medium text-sm">{row.original.name}</p>
+            <a href={`/companies/${row.original.id}`} className="font-medium text-sm hover:text-[var(--crm-primary)] hover:underline">{row.original.name}</a>
             {row.original.address && <p className="text-xs text-[var(--crm-neutral-500)]">{row.original.address}</p>}
           </div>
         </div>
@@ -136,7 +136,7 @@ export function CompaniesTable({ initialCompanies }: Props) {
           value={globalFilter}
           onChange={(e) => setGlobalFilter(e.target.value)}
           placeholder="Cerca aziende..."
-          className="rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] w-64"
+          className="rounded-lg border border-[var(--crm-neutral-100)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary)] w-full sm:w-64"
         />
         <Button
           size="sm"
@@ -147,8 +147,8 @@ export function CompaniesTable({ initialCompanies }: Props) {
         </Button>
       </div>
 
-      <div className="rounded-xl border border-[var(--crm-neutral-100)] overflow-hidden bg-white dark:bg-[#1a1a2e]">
-        <table className="w-full">
+      <div className="rounded-xl border border-[var(--crm-neutral-100)] overflow-x-auto bg-white dark:bg-[#1a1a2e]">
+        <table className="w-full min-w-[600px]">
           <thead className="bg-[var(--crm-neutral-50)] dark:bg-[#0f0f1a]">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
