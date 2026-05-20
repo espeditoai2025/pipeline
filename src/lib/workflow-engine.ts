@@ -28,7 +28,8 @@ export type WorkflowPayload =
   | { trigger: "DEAL_LOST";          orgId: string; dealId: string;    dealTitle: string; contactId?: string; ownerId: string }
   | { trigger: "DEAL_VALUE_CHANGED"; orgId: string; dealId: string;    dealTitle: string; newValue: number;  contactId?: string; ownerId: string }
   | { trigger: "CONTACT_CREATED";    orgId: string; contactId: string; contactName: string; contactEmail?: string; ownerId: string }
-  | { trigger: "LEAD_CREATED";       orgId: string; leadId: string;    leadTitle: string };
+  | { trigger: "LEAD_CREATED";       orgId: string; leadId: string;    leadTitle: string }
+  | { trigger: "ACTIVITY_OVERDUE";   orgId: string; activityId: string; ownerId: string; dealId?: string; contactId?: string };
 
 // ─── Trigger matcher ──────────────────────────────────────────────────────────
 
@@ -143,13 +144,15 @@ async function executeStep(
     }
 
     case "ASSIGN_OWNER": {
+      const targetUser = await db.user.findFirst({ where: { id: action.userId, organizationId: orgId } });
+      if (!targetUser) return `SKIP ASSIGN_OWNER: utente ${action.userId} non trovato nell'organizzazione`;
       if ("dealId" in payload) {
         await db.deal.update({ where: { id: payload.dealId }, data: { ownerId: action.userId } });
-        return `ASSIGN_OWNER (deal) → user ${action.userId}`;
+        return `ASSIGN_OWNER (deal) → ${targetUser.name ?? targetUser.email}`;
       }
       if ("contactId" in payload && payload.contactId) {
         await db.contact.update({ where: { id: payload.contactId }, data: { ownerId: action.userId } });
-        return `ASSIGN_OWNER (contact) → user ${action.userId}`;
+        return `ASSIGN_OWNER (contact) → ${targetUser.name ?? targetUser.email}`;
       }
       return `SKIP ASSIGN_OWNER: nessuna entità modificabile`;
     }

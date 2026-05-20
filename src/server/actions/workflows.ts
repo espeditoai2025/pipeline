@@ -192,36 +192,82 @@ export async function testWorkflow(id: string): Promise<{ stepsRun: number; log:
 
   const steps = workflow.steps as WorkflowStep[];
   const trigger = workflow.trigger as TriggerConfig;
-  const log: string[] = [`[${new Date().toLocaleTimeString("it-IT")}] Trigger: ${trigger.type}`];
+  const log: string[] = [
+    `[${new Date().toLocaleTimeString("it-IT")}] VALIDAZIONE — trigger: ${trigger.type}`,
+    `[${new Date().toLocaleTimeString("it-IT")}] (Nessuna email inviata, nessun dato modificato)`,
+  ];
   let stepsRun = 0;
+  let hasError = false;
 
   for (const step of steps) {
     const { action } = step;
+    const stepNum = stepsRun + 1;
     let msg = "";
+    let warn = "";
+
     switch (action.type) {
-      case "SEND_EMAIL":        msg = `Invio email (template: ${action.templateId}) a ${action.to}`; break;
-      case "CREATE_ACTIVITY":   msg = `Crea attività "${action.subject}" (${action.activityType}) tra ${action.dueDays}gg`; break;
-      case "UPDATE_DEAL_STAGE": msg = `Sposta affare a stage ${action.stageId}`; break;
-      case "ASSIGN_OWNER":      msg = `Assegna proprietario ${action.userId}`; break;
-      case "SEND_NOTIFICATION": msg = `Notifica: "${action.message}"`; break;
-      case "WAIT":              msg = `Attendi ${action.days} giorni`; break;
+      case "SEND_EMAIL": {
+        const tpl = await db.emailTemplate.findFirst({ where: { id: action.templateId, organizationId: orgId } });
+        if (!tpl) {
+          msg = `ERRORE: template "${action.templateId}" non trovato`;
+          hasError = true;
+        } else {
+          msg = `✓ Invio email (template: "${tpl.name}") a ${action.to}`;
+        }
+        break;
+      }
+      case "CREATE_ACTIVITY":
+        msg = `✓ Crea attività "${action.subject}" (${action.activityType}) tra ${action.dueDays ?? 0}gg`;
+        break;
+      case "UPDATE_DEAL_STAGE": {
+        const stage = await db.stage.findFirst({ where: { id: action.stageId, pipeline: { organizationId: orgId } } });
+        if (!stage) {
+          msg = `ERRORE: stage "${action.stageId}" non trovato`;
+          hasError = true;
+        } else {
+          msg = `✓ Sposta affare a stage "${stage.name}"`;
+        }
+        break;
+      }
+      case "ASSIGN_OWNER": {
+        const user = await db.user.findFirst({ where: { id: action.userId, organizationId: orgId } });
+        if (!user) {
+          msg = `ERRORE: utente "${action.userId}" non trovato nell'organizzazione`;
+          hasError = true;
+        } else {
+          msg = `✓ Assegna proprietario a ${user.name ?? user.email}`;
+        }
+        break;
+      }
+      case "SEND_NOTIFICATION":
+        msg = `✓ Notifica: "${action.message}"`;
+        break;
+      case "WAIT":
+        msg = `⚠ Attendi ${action.days} giorni (i delay vengono ignorati — eseguito immediatamente)`;
+        warn = "warning";
+        break;
     }
-    log.push(`[${new Date().toLocaleTimeString("it-IT")}] Step ${stepsRun + 1}: ${msg} ✓`);
+
+    const prefix = hasError ? "ERRORE" : warn === "warning" ? "⚠" : "✓";
+    log.push(`[${new Date().toLocaleTimeString("it-IT")}] Step ${stepNum}: ${msg}`);
+    if (hasError) break;
     stepsRun++;
+    void prefix;
   }
 
-  // Save execution record
+  const status = hasError ? "FAILED" : "SUCCESS";
+  log.push(`[${new Date().toLocaleTimeString("it-IT")}] Validazione ${status}: ${stepsRun}/${steps.length} step validi`);
+
   await db.workflowExecution.create({
     data: {
       workflowId: id,
-      status: "SUCCESS",
-      payload: { trigger: trigger.type, entityType: "deal", entityId: "test", entityLabel: "Test manuale" },
+      status,
+      payload: { trigger: trigger.type, entityType: "deal", entityId: "test", entityLabel: "Validazione manuale" },
       logs: log,
       finishedAt: new Date(),
     },
   });
 
-  log.push(`[${new Date().toLocaleTimeString("it-IT")}] Completato: ${stepsRun} step eseguiti`);
   revalidatePath("/automations");
-  return { stepsRun, log, error: null };
+  return { stepsRun, log, error: hasError ? "Automazione non valida — controlla gli errori nel log" : null };
 }

@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { resend, FROM_DEFAULT } from "@/lib/resend";
 import { logger } from "@/lib/logger";
+import { runWorkflows } from "@/lib/workflow-engine";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -96,7 +97,35 @@ export async function GET(req: NextRequest) {
       logger.info("cron:backup", "Snapshot email inviata", { to: adminEmail });
     }
 
-    return NextResponse.json({ ok: true, snapshot });
+    // ── ACTIVITY_OVERDUE trigger ─────────────────────────────────────────────
+    // Trova tutte le attività scadute non ancora completate e triggera i workflow
+    const overdueActivities = await db.activity.findMany({
+      where: {
+        completedAt: null,
+        dueDate: { lt: new Date() },
+      },
+      select: { id: true, organizationId: true, userId: true, dealId: true, contactId: true },
+    });
+
+    if (overdueActivities.length > 0) {
+      logger.info("cron:backup", "Attività scadute trovate", { count: overdueActivities.length });
+      // Raggruppa per org e triggera workflow (max 50 per evitare timeout)
+      const toProcess = overdueActivities.slice(0, 50);
+      await Promise.allSettled(
+        toProcess.map((a) =>
+          runWorkflows({
+            trigger: "ACTIVITY_OVERDUE",
+            orgId: a.organizationId,
+            activityId: a.id,
+            ownerId: a.userId,
+            dealId: a.dealId ?? undefined,
+            contactId: a.contactId ?? undefined,
+          })
+        )
+      );
+    }
+
+    return NextResponse.json({ ok: true, snapshot, overdueTriggered: overdueActivities.length });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error("cron:backup", "Backup snapshot fallito", { error: message });
