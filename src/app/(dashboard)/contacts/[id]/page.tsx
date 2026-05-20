@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Mail, Phone, Building2, Briefcase, Calendar, User, ExternalLink } from "lucide-react";
-import { getContactDetail } from "@/server/actions/contacts";
+import { getContactDetail, getCompanies } from "@/server/actions/contacts";
 import { ActivityTimeline } from "@/components/shared/ActivityTimeline";
 import { ContactNotePanel } from "@/components/contacts/ContactNotePanel";
+import { ContactDetailActions } from "@/components/contacts/ContactDetailActions";
+import { Breadcrumb } from "@/components/shared/Breadcrumb";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -18,7 +20,7 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default async function ContactDetailPage({ params }: Props) {
   const { id } = await params;
-  const contact = await getContactDetail(id);
+  const [contact, companies] = await Promise.all([getContactDetail(id), getCompanies()]);
   if (!contact) notFound();
 
   const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(" ");
@@ -26,13 +28,7 @@ export default async function ContactDetailPage({ params }: Props) {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-10">
-      {/* Back */}
-      <Link
-        href="/contacts"
-        className="inline-flex items-center gap-1.5 text-sm text-[var(--crm-neutral-500)] hover:text-[var(--crm-neutral-800)] transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" /> Contatti
-      </Link>
+      <Breadcrumb items={[{ label: "Contatti", href: "/contacts" }, { label: fullName }]} />
 
       {/* Header */}
       <div className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] p-6">
@@ -47,7 +43,7 @@ export default async function ContactDetailPage({ params }: Props) {
             )}
             {contact.company && (
               <Link
-                href={`/companies`}
+                href={`/companies/${contact.company.id}`}
                 className="inline-flex items-center gap-1 text-sm text-[var(--crm-primary)] hover:underline mt-0.5"
               >
                 <Building2 className="h-3.5 w-3.5" /> {contact.company.name}
@@ -55,6 +51,7 @@ export default async function ContactDetailPage({ params }: Props) {
             )}
           </div>
           <div className="flex gap-2 shrink-0">
+            <ContactDetailActions contact={contact} companies={companies} />
             {contact.email && (
               <a
                 href={`mailto:${contact.email}`}
@@ -113,11 +110,23 @@ export default async function ContactDetailPage({ params }: Props) {
           )}
 
           {/* Affari */}
-          {contact.deals.length > 0 && (
-            <div className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] p-5 space-y-3">
+          <div className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] p-5 space-y-3">
+            <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-[var(--crm-neutral-700)]">
                 Affari ({contact.deals.length})
               </h2>
+              <Link
+                href={`/deals?newDeal=1&contactId=${contact.id}`}
+                className="inline-flex items-center gap-1 rounded-lg border border-[var(--crm-neutral-200)] px-2.5 py-1.5 text-xs font-medium text-[var(--crm-neutral-600)] hover:bg-[var(--crm-neutral-50)] transition-colors"
+              >
+                <Briefcase className="h-3 w-3" /> Nuovo affare
+              </Link>
+            </div>
+            {contact.deals.length === 0 ? (
+              <p className="text-sm text-[var(--crm-neutral-400)] text-center py-4">
+                Nessun affare collegato. Crea il primo affare per questo contatto.
+              </p>
+            ) : (
               <div className="space-y-2">
                 {contact.deals.map((d) => (
                   <Link
@@ -143,8 +152,8 @@ export default async function ContactDetailPage({ params }: Props) {
                   </Link>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Right column: note + activity timeline */}

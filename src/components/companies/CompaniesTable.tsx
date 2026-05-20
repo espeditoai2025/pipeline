@@ -6,6 +6,7 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   getFilteredRowModel,
+  getPaginationRowModel,
   flexRender,
   createColumnHelper,
   type SortingState,
@@ -15,6 +16,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { deleteCompany } from "@/server/actions/contacts";
 import { CompanyForm } from "./CompanyForm";
+import { TablePagination } from "@/components/shared/TablePagination";
 import type { Company } from "@/types/contacts";
 
 type Props = {
@@ -127,6 +129,8 @@ export function CompaniesTable({ initialCompanies }: Props) {
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    initialState: { pagination: { pageSize: 25 } },
   });
 
   return (
@@ -163,8 +167,21 @@ export function CompaniesTable({ initialCompanies }: Props) {
           <tbody>
             {table.getRowModel().rows.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-12 text-center text-[var(--crm-neutral-400)] text-sm">
-                  Nessuna azienda trovata
+                <td colSpan={columns.length} className="px-4 py-16 text-center">
+                  {globalFilter ? (
+                    <div className="space-y-1">
+                      <p className="text-sm text-[var(--crm-neutral-500)]">Nessuna azienda corrisponde a &quot;{globalFilter}&quot;</p>
+                      <button onClick={() => setGlobalFilter("")} className="text-xs text-[var(--crm-primary)] hover:underline">Cancella ricerca</button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-[var(--crm-neutral-600)]">Nessuna azienda ancora</p>
+                      <p className="text-xs text-[var(--crm-neutral-400)]">Aggiungi la tua prima azienda per organizzare i contatti.</p>
+                      <Button size="sm" className="mt-2 bg-[var(--crm-primary)] hover:bg-[var(--crm-primary-dark)] text-white" onClick={() => { setEditing(null); setFormOpen(true); }}>
+                        <Plus className="h-4 w-4 mr-1.5" /> Nuova azienda
+                      </Button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ) : (
@@ -182,7 +199,7 @@ export function CompaniesTable({ initialCompanies }: Props) {
         </table>
       </div>
 
-      <p className="text-xs text-[var(--crm-neutral-500)]">{table.getFilteredRowModel().rows.length} aziende</p>
+      <TablePagination table={table} totalLabel="aziende" />
 
       <CompanyForm
         open={formOpen}

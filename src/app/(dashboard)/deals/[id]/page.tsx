@@ -5,8 +5,12 @@ import {
   Tag, TrendingUp, ExternalLink, Mail, Phone, StickyNote,
 } from "lucide-react";
 import { getDealDetail } from "@/server/actions/deals";
+import { getPipeline } from "@/server/actions/pipeline";
 import { ActivityTimeline } from "@/components/shared/ActivityTimeline";
 import { DealProductsManager } from "@/components/products/DealProductsManager";
+import { DealDetailActions } from "@/components/pipeline/DealDetailActions";
+import { DealNotePanel } from "@/components/pipeline/DealNotePanel";
+import { Breadcrumb } from "@/components/shared/Breadcrumb";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -21,8 +25,9 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default async function DealDetailPage({ params }: Props) {
   const { id } = await params;
-  const deal = await getDealDetail(id);
+  const [deal, pipeline] = await Promise.all([getDealDetail(id), getPipeline()]);
   if (!deal) notFound();
+  const stages = pipeline?.stages ?? [];
 
   const valueFormatted = deal.value.toLocaleString("it-IT", {
     style: "currency",
@@ -31,13 +36,7 @@ export default async function DealDetailPage({ params }: Props) {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-10">
-      {/* Back */}
-      <Link
-        href="/deals"
-        className="inline-flex items-center gap-1.5 text-sm text-[var(--crm-neutral-500)] hover:text-[var(--crm-neutral-800)] transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" /> Pipeline
-      </Link>
+      <Breadcrumb items={[{ label: "Pipeline", href: "/deals" }, { label: deal.title }]} />
 
       {/* Header */}
       <div className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] p-6">
@@ -57,6 +56,11 @@ export default async function DealDetailPage({ params }: Props) {
               <span className={`text-xs rounded-full border px-2.5 py-0.5 font-medium ${STATUS_COLOR[deal.status] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
                 {STATUS_LABEL[deal.status] ?? deal.status}
               </span>
+              <DealDetailActions
+                deal={{ ...deal, daysInStage: 0 } as import("@/types/deals").Deal}
+                stages={stages as import("@/types/deals").Stage[]}
+                pipelineId={deal.pipelineId}
+              />
             </div>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm text-[var(--crm-neutral-500)]">
               <span className="font-semibold text-[var(--crm-neutral-800)] dark:text-white">{valueFormatted}</span>
@@ -182,24 +186,7 @@ export default async function DealDetailPage({ params }: Props) {
         <div className="lg:col-span-2 space-y-4">
           <DealProductsManager dealId={deal.id} />
 
-          {/* Note */}
-          {deal.notes.length > 0 && (
-            <div className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] p-5 space-y-3">
-              <h2 className="text-sm font-semibold text-[var(--crm-neutral-700)] flex items-center gap-2">
-                <StickyNote className="h-4 w-4 text-[var(--crm-primary)]" /> Note ({deal.notes.length})
-              </h2>
-              <div className="space-y-3">
-                {deal.notes.map((note) => (
-                  <div key={note.id} className="rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30 px-4 py-3">
-                    <p className="text-sm whitespace-pre-wrap text-[var(--crm-neutral-800)]">{note.content}</p>
-                    <p className="text-xs text-[var(--crm-neutral-400)] mt-1.5">
-                      {new Date(note.createdAt).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" })}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <DealNotePanel dealId={deal.id} initialNotes={deal.notes} />
 
           <ActivityTimeline
             activities={deal.activities}

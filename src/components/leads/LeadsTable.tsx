@@ -6,6 +6,7 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   getFilteredRowModel,
+  getPaginationRowModel,
   flexRender,
   createColumnHelper,
   type SortingState,
@@ -19,6 +20,7 @@ import { deleteLead, deleteLeads, updateLeadStatus, enrichLead } from "@/server/
 import { LeadForm } from "./LeadForm";
 import { ConvertLeadModal } from "./ConvertLeadModal";
 import { LeadImportModal } from "./LeadImportModal";
+import { TablePagination } from "@/components/shared/TablePagination";
 import type { Lead, LeadStatus } from "@/types/contacts";
 
 type Props = { initialLeads: Lead[] };
@@ -249,6 +251,8 @@ export function LeadsTable({ initialLeads }: Props) {
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    initialState: { pagination: { pageSize: 25 } },
   });
 
   const selectedIds = Object.keys(rowSelection).filter((k) => rowSelection[k]);
@@ -467,8 +471,26 @@ export function LeadsTable({ initialLeads }: Props) {
             <tbody>
               {table.getRowModel().rows.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length} className="px-4 py-12 text-center text-[var(--crm-neutral-400)] text-sm">
-                    Nessun lead trovato
+                  <td colSpan={columns.length} className="px-4 py-16 text-center">
+                    {globalFilter || statusFilter || sourceFilter ? (
+                      <div className="space-y-1">
+                        <p className="text-sm text-[var(--crm-neutral-500)]">Nessun lead trovato con i filtri attivi</p>
+                        <button onClick={() => { setGlobalFilter(""); setStatusFilter(""); setSourceFilter(""); }} className="text-xs text-[var(--crm-primary)] hover:underline">Rimuovi tutti i filtri</button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-[var(--crm-neutral-600)]">Nessun lead ancora</p>
+                        <p className="text-xs text-[var(--crm-neutral-400)]">Crea o importa i tuoi primi lead per iniziare la pipeline.</p>
+                        <div className="flex items-center justify-center gap-2 mt-2">
+                          <Button size="sm" className="bg-[var(--crm-primary)] hover:bg-[var(--crm-primary-dark)] text-white" onClick={() => { setEditing(null); setFormOpen(true); }}>
+                            <Plus className="h-4 w-4 mr-1.5" /> Nuovo lead
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+                            <Upload className="h-4 w-4 mr-1.5" /> Importa
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -487,7 +509,7 @@ export function LeadsTable({ initialLeads }: Props) {
         </div>
       </div>
 
-      <p className="text-xs text-[var(--crm-neutral-500)]">{table.getFilteredRowModel().rows.length} lead</p>
+      <TablePagination table={table} totalLabel="lead" />
 
       <LeadForm
         open={formOpen}

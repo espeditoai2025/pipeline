@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Phone, Users, Mail, CheckSquare, Clock, UtensilsCrossed, Plus, CheckCircle2, Circle, Loader2 } from "lucide-react";
+import { Phone, Users, Mail, CheckSquare, Clock, UtensilsCrossed, Plus, CheckCircle2, Circle, Loader2, Pencil, Trash2, X, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { createActivity, completeActivity } from "@/server/actions/activities";
+import { createActivity, completeActivity, updateActivity, deleteActivity } from "@/server/actions/activities";
 import { useRouter } from "next/navigation";
 
 type ActivityItem = {
@@ -67,6 +67,12 @@ export function ActivityTimeline({ activities: initial, entityId, entityType }: 
   const [dueDate, setDueDate] = useState("");
   const [saving, setSaving] = useState(false);
   const [completingId, setCompletingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editType, setEditType] = useState<ActivityType>("CALL");
+  const [editSubject, setEditSubject] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [editDueDate, setEditDueDate] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function handleAdd() {
     if (!subject.trim()) { toast.error("Inserisci un oggetto"); return; }
@@ -96,6 +102,49 @@ export function ActivityTimeline({ activities: initial, entityId, entityType }: 
       prev.map((a) => a.id === id ? { ...a, completedAt: new Date().toISOString() } : a)
     );
     toast.success("Attività completata");
+  }
+
+  function startEdit(a: ActivityItem) {
+    setEditingId(a.id);
+    setEditType(a.type as ActivityType);
+    setEditSubject(a.subject);
+    setEditNotes(a.notes ?? "");
+    setEditDueDate(a.dueDate ? new Date(a.dueDate).toISOString().slice(0, 16) : "");
+  }
+
+  async function handleUpdate(id: string) {
+    if (!editSubject.trim()) { toast.error("Inserisci un oggetto"); return; }
+    setSaving(true);
+    const res = await updateActivity({
+      id,
+      type: editType,
+      subject: editSubject.trim(),
+      notes: editNotes.trim() || undefined,
+      dueDate: editDueDate || undefined,
+      ...(entityType === "contact" ? { contactId: entityId } : { dealId: entityId }),
+    });
+    setSaving(false);
+    if (res.error) { toast.error(res.error); return; }
+    setActivities((prev) =>
+      prev.map((a) => a.id === id ? {
+        ...a,
+        type: editType,
+        subject: editSubject.trim(),
+        notes: editNotes.trim() || null,
+        dueDate: editDueDate ? new Date(editDueDate).toISOString() : null,
+      } : a)
+    );
+    setEditingId(null);
+    toast.success("Attività aggiornata");
+  }
+
+  async function handleDelete(id: string) {
+    setDeletingId(id);
+    const res = await deleteActivity(id);
+    setDeletingId(null);
+    if (res.error) { toast.error(res.error); return; }
+    setActivities((prev) => prev.filter((a) => a.id !== id));
+    toast.success("Attività eliminata");
   }
 
   return (
@@ -178,6 +227,7 @@ export function ActivityTimeline({ activities: initial, entityId, entityType }: 
             const colorCls = TYPE_COLOR[a.type] ?? "bg-gray-100 text-gray-500";
             const isDone = !!a.completedAt;
             const isLast = i === activities.length - 1;
+            const isEditing = editingId === a.id;
 
             return (
               <div key={a.id} className="flex gap-3">
@@ -190,53 +240,98 @@ export function ActivityTimeline({ activities: initial, entityId, entityType }: 
                 </div>
 
                 {/* Content */}
-                <div className={`flex-1 min-w-0 pb-4 ${isLast ? "" : ""}`}>
-                  <div className="flex items-start gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium ${isDone ? "line-through text-[var(--crm-neutral-400)]" : ""}`}>
-                        {a.subject}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-x-2 mt-0.5 text-xs text-[var(--crm-neutral-400)]">
-                        <span>{TYPE_LABEL[a.type] ?? a.type}</span>
-                        {a.dueDate && (
-                          <>
-                            <span>·</span>
-                            <span>{new Date(a.dueDate).toLocaleString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
-                          </>
-                        )}
-                        {a.user.name && (
-                          <>
-                            <span>·</span>
-                            <span>{a.user.name}</span>
-                          </>
-                        )}
-                        {isDone && (
-                          <>
-                            <span>·</span>
-                            <span className="text-emerald-500">Completata</span>
-                          </>
+                <div className="flex-1 min-w-0 pb-4">
+                  {isEditing ? (
+                    <div className="rounded-lg border border-[var(--crm-primary)]/30 bg-[var(--crm-primary)]/5 p-3 space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <select value={editType} onChange={(e) => setEditType(e.target.value as ActivityType)} className={inputCls}>
+                          {(Object.entries(TYPE_LABEL) as [ActivityType, string][]).map(([k, v]) => (
+                            <option key={k} value={k}>{v}</option>
+                          ))}
+                        </select>
+                        <input type="datetime-local" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} className={inputCls} />
+                      </div>
+                      <input value={editSubject} onChange={(e) => setEditSubject(e.target.value)} placeholder="Oggetto" className={inputCls} autoFocus />
+                      <textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={2} placeholder="Note..." className={`${inputCls} resize-none`} />
+                      <div className="flex gap-2">
+                        <button onClick={() => handleUpdate(a.id)} disabled={saving} className="inline-flex items-center gap-1 rounded-md bg-[var(--crm-primary)] px-2.5 py-1 text-xs font-medium text-white hover:bg-[var(--crm-primary-dark)]">
+                          {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />} Salva
+                        </button>
+                        <button onClick={() => setEditingId(null)} className="inline-flex items-center gap-1 rounded-md border border-[var(--crm-neutral-200)] px-2.5 py-1 text-xs hover:bg-[var(--crm-neutral-50)]">
+                          <X className="h-3 w-3" /> Annulla
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2 group">
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium ${isDone ? "line-through text-[var(--crm-neutral-400)]" : ""}`}>
+                          {a.subject}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-x-2 mt-0.5 text-xs text-[var(--crm-neutral-400)]">
+                          <span>{TYPE_LABEL[a.type] ?? a.type}</span>
+                          {a.dueDate && (
+                            <>
+                              <span>·</span>
+                              <span>{new Date(a.dueDate).toLocaleString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                            </>
+                          )}
+                          {a.user.name && (
+                            <>
+                              <span>·</span>
+                              <span>{a.user.name}</span>
+                            </>
+                          )}
+                          {isDone && (
+                            <>
+                              <span>·</span>
+                              <span className="text-emerald-500">Completata</span>
+                            </>
+                          )}
+                        </div>
+                        {a.notes && (
+                          <p className="mt-1 text-xs text-[var(--crm-neutral-500)] leading-relaxed">{a.notes}</p>
                         )}
                       </div>
-                      {a.notes && (
-                        <p className="mt-1 text-xs text-[var(--crm-neutral-500)] leading-relaxed">{a.notes}</p>
-                      )}
-                    </div>
 
-                    {!isDone && (
-                      <button
-                        onClick={() => handleComplete(a.id)}
-                        disabled={completingId === a.id}
-                        className="shrink-0 text-[var(--crm-neutral-300)] hover:text-emerald-500 transition-colors mt-0.5"
-                        title="Segna come completata"
-                      >
-                        {completingId === a.id
-                          ? <Loader2 className="h-4 w-4 animate-spin" />
-                          : <Circle className="h-4 w-4" />
-                        }
-                      </button>
-                    )}
-                    {isDone && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />}
-                  </div>
+                      <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                        {/* Edit / Delete buttons — visible on hover */}
+                        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => startEdit(a)}
+                            className="p-1 rounded hover:bg-[var(--crm-neutral-100)] dark:hover:bg-white/10 text-[var(--crm-neutral-400)] hover:text-[var(--crm-neutral-700)]"
+                            title="Modifica"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(a.id)}
+                            disabled={deletingId === a.id}
+                            className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-[var(--crm-neutral-400)] hover:text-red-600"
+                            title="Elimina"
+                          >
+                            {deletingId === a.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                          </button>
+                        </div>
+
+                        {/* Complete button */}
+                        {!isDone && (
+                          <button
+                            onClick={() => handleComplete(a.id)}
+                            disabled={completingId === a.id}
+                            className="shrink-0 text-[var(--crm-neutral-300)] hover:text-emerald-500 transition-colors"
+                            title="Segna come completata"
+                          >
+                            {completingId === a.id
+                              ? <Loader2 className="h-4 w-4 animate-spin" />
+                              : <Circle className="h-4 w-4" />
+                            }
+                          </button>
+                        )}
+                        {isDone && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             );

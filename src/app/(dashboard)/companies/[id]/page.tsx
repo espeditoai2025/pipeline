@@ -5,6 +5,8 @@ import {
   Users, Briefcase, ExternalLink, Tag, FileText,
 } from "lucide-react";
 import { getCompanyDetail } from "@/server/actions/contacts";
+import { CompanyDetailActions } from "@/components/companies/CompanyDetailActions";
+import { Breadcrumb } from "@/components/shared/Breadcrumb";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -22,13 +24,7 @@ export default async function CompanyDetailPage({ params }: Props) {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-10">
-      {/* Back */}
-      <Link
-        href="/companies"
-        className="inline-flex items-center gap-1.5 text-sm text-[var(--crm-neutral-500)] hover:text-[var(--crm-neutral-800)] transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" /> Aziende
-      </Link>
+      <Breadcrumb items={[{ label: "Aziende", href: "/companies" }, { label: company.name }]} />
 
       {/* Header */}
       <div className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] p-6">
@@ -53,6 +49,7 @@ export default async function CompanyDetailPage({ params }: Props) {
             </div>
           </div>
           <div className="flex gap-2 shrink-0">
+            <CompanyDetailActions company={company as import("@/types/contacts").Company} />
             {company.email && (
               <a href={`mailto:${company.email}`} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--crm-neutral-200)] px-3 py-2 text-sm hover:bg-[var(--crm-neutral-50)] transition-colors">
                 <Mail className="h-4 w-4 text-[var(--crm-neutral-400)]" /> Email

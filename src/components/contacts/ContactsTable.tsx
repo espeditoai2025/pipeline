@@ -6,6 +6,7 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   getFilteredRowModel,
+  getPaginationRowModel,
   flexRender,
   createColumnHelper,
   type SortingState,
@@ -16,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { deleteContact, getContacts } from "@/server/actions/contacts";
 import { ContactForm } from "./ContactForm";
 import { ImportCSVModal } from "./ImportCSVModal";
+import { TablePagination } from "@/components/shared/TablePagination";
 import type { Contact, Company, DuplicateGroup } from "@/types/contacts";
 
 type Props = {
@@ -151,6 +153,8 @@ export function ContactsTable({ initialContacts, companies }: Props) {
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    initialState: { pagination: { pageSize: 25 } },
   });
 
   return (
@@ -206,8 +210,21 @@ export function ContactsTable({ initialContacts, companies }: Props) {
           <tbody>
             {table.getRowModel().rows.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-12 text-center text-[var(--crm-neutral-400)] text-sm">
-                  Nessun contatto trovato
+                <td colSpan={columns.length} className="px-4 py-16 text-center">
+                  {globalFilter ? (
+                    <div className="space-y-1">
+                      <p className="text-sm text-[var(--crm-neutral-500)]">Nessun contatto corrisponde a &quot;{globalFilter}&quot;</p>
+                      <button onClick={() => setGlobalFilter("")} className="text-xs text-[var(--crm-primary)] hover:underline">Cancella ricerca</button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-[var(--crm-neutral-600)]">Nessun contatto ancora</p>
+                      <p className="text-xs text-[var(--crm-neutral-400)]">Crea il tuo primo contatto per iniziare a gestire le relazioni.</p>
+                      <Button size="sm" className="mt-2 bg-[var(--crm-primary)] hover:bg-[var(--crm-primary-dark)] text-white" onClick={() => { setEditing(null); setFormOpen(true); }}>
+                        <Plus className="h-4 w-4 mr-1.5" /> Nuovo contatto
+                      </Button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ) : (
@@ -225,7 +242,7 @@ export function ContactsTable({ initialContacts, companies }: Props) {
         </table>
       </div>
 
-      <p className="text-xs text-[var(--crm-neutral-500)]">{table.getFilteredRowModel().rows.length} contatti</p>
+      <TablePagination table={table} totalLabel="contatti" />
 
       <ContactForm
         open={formOpen}

@@ -248,6 +248,93 @@ export async function getDealDetail(id: string) {
   };
 }
 
+export async function createDealNote(dealId: string, content: string): Promise<{ ok?: boolean; error?: string }> {
+  const session = await auth();
+  const orgId = getOrgId(session);
+  const userId = (session?.user as { id?: string } | undefined)?.id;
+  if (!orgId || !userId) return { error: "Non autorizzato" };
+  if (!content.trim()) return { error: "Il contenuto della nota non può essere vuoto" };
+
+  const deal = await db.deal.findFirst({ where: { id: dealId, organizationId: orgId }, select: { id: true } });
+  if (!deal) return { error: "Affare non trovato" };
+
+  await db.note.create({ data: { content: content.trim(), dealId, authorId: userId } });
+  revalidatePath(`/deals/${dealId}`);
+  return { ok: true };
+}
+
+export async function updateNote(noteId: string, content: string): Promise<{ ok?: boolean; error?: string }> {
+  const session = await auth();
+  const userId = (session?.user as { id?: string } | undefined)?.id;
+  if (!userId) return { error: "Non autorizzato" };
+  if (!content.trim()) return { error: "Il contenuto della nota non può essere vuoto" };
+
+  const note = await db.note.findFirst({ where: { id: noteId, authorId: userId } });
+  if (!note) return { error: "Nota non trovata" };
+
+  await db.note.update({ where: { id: noteId }, data: { content: content.trim() } });
+  if (note.dealId) revalidatePath(`/deals/${note.dealId}`);
+  if (note.contactId) revalidatePath(`/contacts/${note.contactId}`);
+  return { ok: true };
+}
+
+export async function deleteNote(noteId: string): Promise<{ ok?: boolean; error?: string }> {
+  const session = await auth();
+  const userId = (session?.user as { id?: string } | undefined)?.id;
+  if (!userId) return { error: "Non autorizzato" };
+
+  const note = await db.note.findFirst({ where: { id: noteId, authorId: userId } });
+  if (!note) return { error: "Nota non trovata" };
+
+  await db.note.delete({ where: { id: noteId } });
+  if (note.dealId) revalidatePath(`/deals/${note.dealId}`);
+  if (note.contactId) revalidatePath(`/contacts/${note.contactId}`);
+  return { ok: true };
+}
+
+export async function deleteDeals(ids: string[]): Promise<{ count: number; error?: string }> {
+  const session = await auth();
+  const orgId = getOrgId(session);
+  if (!orgId) return { count: 0, error: "Non autorizzato" };
+  if (!ids.length) return { count: 0 };
+
+  try {
+    const result = await db.deal.updateMany({
+      where: { id: { in: ids }, organizationId: orgId },
+      data: { status: "DELETED" },
+    });
+    revalidatePath("/deals");
+    return { count: result.count };
+  } catch {
+    return { count: 0, error: "Errore durante l'eliminazione" };
+  }
+}
+
+export async function updateDealsStatus(
+  ids: string[],
+  status: "OPEN" | "WON" | "LOST",
+): Promise<{ count: number; error?: string }> {
+  const session = await auth();
+  const orgId = getOrgId(session);
+  if (!orgId) return { count: 0, error: "Non autorizzato" };
+  if (!ids.length) return { count: 0 };
+
+  try {
+    const result = await db.deal.updateMany({
+      where: { id: { in: ids }, organizationId: orgId },
+      data: {
+        status,
+        closedAt: status === "WON" || status === "LOST" ? new Date() : null,
+        updatedAt: new Date(),
+      },
+    });
+    revalidatePath("/deals");
+    return { count: result.count };
+  } catch {
+    return { count: 0, error: "Errore durante l'aggiornamento" };
+  }
+}
+
 export async function getDealsForSelect(): Promise<{ id: string; title: string; value: number; currency: string }[]> {
   const session = await auth();
   if (!session) return [];

@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
-  ArrowLeft, Mail, Phone, User, Calendar, Tag, Zap, ExternalLink,
+  Mail, Phone, User, Calendar, Tag, Zap, ExternalLink,
   ArrowRightCircle, StickyNote,
 } from "lucide-react";
 import { getLeadDetail } from "@/server/actions/leads";
 import { LeadDetailClient } from "@/components/leads/LeadDetailClient";
+import { Breadcrumb } from "@/components/shared/Breadcrumb";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -37,13 +38,7 @@ export default async function LeadDetailPage({ params }: Props) {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-10">
-      {/* Back */}
-      <Link
-        href="/leads"
-        className="inline-flex items-center gap-1.5 text-sm text-[var(--crm-neutral-500)] hover:text-[var(--crm-neutral-800)] transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" /> Lead
-      </Link>
+      <Breadcrumb items={[{ label: "Lead", href: "/leads" }, { label: lead.title }]} />
 
       {/* Header */}
       <div className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] p-6">

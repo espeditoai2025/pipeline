@@ -4,17 +4,16 @@ import { useState } from "react";
 import { StickyNote, Plus, Loader2, Pencil, Trash2, X, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { createContactNote } from "@/server/actions/contacts";
-import { updateNote, deleteNote } from "@/server/actions/deals";
+import { createDealNote, updateNote, deleteNote } from "@/server/actions/deals";
 
 type Note = { id: string; content: string; authorId: string; createdAt: string };
 
 type Props = {
-  contactId: string;
+  dealId: string;
   initialNotes: Note[];
 };
 
-export function ContactNotePanel({ contactId, initialNotes }: Props) {
+export function DealNotePanel({ dealId, initialNotes }: Props) {
   const [notes, setNotes] = useState<Note[]>(initialNotes);
   const [showForm, setShowForm] = useState(false);
   const [content, setContent] = useState("");
@@ -26,7 +25,7 @@ export function ContactNotePanel({ contactId, initialNotes }: Props) {
   async function handleAdd() {
     if (!content.trim()) { toast.error("Scrivi qualcosa prima di salvare"); return; }
     setSaving(true);
-    const res = await createContactNote(contactId, content.trim());
+    const res = await createDealNote(dealId, content.trim());
     setSaving(false);
     if (res.error) { toast.error(res.error); return; }
     setNotes((prev) => [
