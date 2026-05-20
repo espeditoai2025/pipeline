@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import {
   getOrgData, updateOrgDetails, getTeamMembers, getUsageStats,
   inviteTeamMember, getInvitations, revokeInvitation, removeMember, updateMemberRole,
-  deleteAccount,
+  deleteAccount, changePassword,
 } from "@/server/actions/settings";
 import { getSmtpConfig } from "@/server/actions/smtp";
 import { SmtpWizard } from "@/components/settings/SmtpWizard";
@@ -98,8 +98,12 @@ export default function SettingsPage() {
     }
   }, [session]);
 
-  // Security
+  // Security — password change
   const [showPwd, setShowPwd] = useState(false);
+  const [currentPwd, setCurrentPwd] = useState("");
+  const [newPwd, setNewPwd] = useState("");
+  const [confirmPwd, setConfirmPwd] = useState("");
+  const [savingPwd, setSavingPwd] = useState(false);
   const [twoFAEnabled, setTwoFAEnabled] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
@@ -207,6 +211,18 @@ export default function SettingsPage() {
     setUpdatingRoleId(null);
     if (res.error) toast.error(res.error);
     else { setMembers((arr) => arr.map((m) => m.id === id ? { ...m, role } : m)); toast.success("Ruolo aggiornato"); }
+  }
+
+  async function handleChangePassword() {
+    if (!currentPwd) { toast.error("Inserisci la password attuale"); return; }
+    if (newPwd.length < 8) { toast.error("La nuova password deve avere almeno 8 caratteri"); return; }
+    if (newPwd !== confirmPwd) { toast.error("Le password non coincidono"); return; }
+    setSavingPwd(true);
+    const res = await changePassword(currentPwd, newPwd);
+    setSavingPwd(false);
+    if (res.error) { toast.error(res.error); return; }
+    toast.success("Password aggiornata con successo");
+    setCurrentPwd(""); setNewPwd(""); setConfirmPwd("");
   }
 
   async function handleDeleteAccount() {
@@ -335,7 +351,13 @@ export default function SettingsPage() {
                   <div className="sm:col-span-2">
                     <label className="block text-sm font-medium mb-1">Password attuale</label>
                     <div className="relative">
-                      <input type={showPwd ? "text" : "password"} className={`${inputCls} pr-10`} placeholder="••••••••" />
+                      <input
+                        type={showPwd ? "text" : "password"}
+                        value={currentPwd}
+                        onChange={(e) => setCurrentPwd(e.target.value)}
+                        className={`${inputCls} pr-10`}
+                        placeholder="••••••••"
+                      />
                       <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--crm-neutral-400)]">
                         {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
@@ -343,14 +365,19 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Nuova password</label>
-                    <input type="password" className={inputCls} placeholder="••••••••" />
+                    <input type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} className={inputCls} placeholder="Min. 8 caratteri" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Conferma nuova</label>
-                    <input type="password" className={inputCls} placeholder="••••••••" />
+                    <input type="password" value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} className={inputCls} placeholder="••••••••" />
                   </div>
                 </div>
-                <Button variant="outline" onClick={() => toast.info("Funzionalità disponibile a breve")}>
+                <Button
+                  onClick={handleChangePassword}
+                  disabled={savingPwd}
+                  className="bg-[var(--crm-primary)] hover:bg-[var(--crm-primary-dark)] text-white"
+                >
+                  {savingPwd ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
                   Aggiorna password
                 </Button>
               </div>

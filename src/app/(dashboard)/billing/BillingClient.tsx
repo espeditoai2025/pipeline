@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Zap, CreditCard, ExternalLink, Loader2, AlertCircle } from "lucide-react";
+import { Check, Zap, CreditCard, ExternalLink, Loader2, AlertCircle, FileText, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { StripeInvoice } from "./page";
 
 type OrgBilling = {
   plan: string;
@@ -23,7 +24,7 @@ const PRO_FEATURES = [
   "Supporto prioritario",
 ];
 
-export function BillingClient({ org }: { org: OrgBilling }) {
+export function BillingClient({ org, invoices = [] }: { org: OrgBilling; invoices?: StripeInvoice[] }) {
   const [loading, setLoading] = useState<"checkout" | "portal" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -176,6 +177,73 @@ export function BillingClient({ org }: { org: OrgBilling }) {
             </Button>
           )}
         </div>
+      </div>
+      {/* Storico fatture */}
+      <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <FileText className="h-4 w-4 text-slate-500" />
+          <h2 className="text-base font-semibold text-slate-900 dark:text-white">Storico fatture</h2>
+        </div>
+
+        {invoices.length === 0 ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {org.stripeCustomerId
+              ? "Nessuna fattura disponibile."
+              : "Le fatture appariranno qui dopo il primo pagamento."}
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-white/10 text-left">
+                  <th className="pb-2 text-xs font-medium text-slate-500 dark:text-slate-400">Fattura</th>
+                  <th className="pb-2 text-xs font-medium text-slate-500 dark:text-slate-400">Data</th>
+                  <th className="pb-2 text-xs font-medium text-slate-500 dark:text-slate-400 text-right">Importo</th>
+                  <th className="pb-2 text-xs font-medium text-slate-500 dark:text-slate-400 text-center">Stato</th>
+                  <th className="pb-2"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                {invoices.map((inv) => (
+                  <tr key={inv.id} className="py-2">
+                    <td className="py-2.5 text-slate-700 dark:text-slate-300 font-mono text-xs">
+                      {inv.number ?? inv.id.slice(-8).toUpperCase()}
+                    </td>
+                    <td className="py-2.5 text-slate-600 dark:text-slate-400 text-xs">
+                      {new Date(inv.date * 1000).toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" })}
+                    </td>
+                    <td className="py-2.5 text-right font-semibold text-slate-900 dark:text-white text-xs">
+                      {(inv.total / 100).toLocaleString("it-IT", { style: "currency", currency: inv.currency.toUpperCase() })}
+                    </td>
+                    <td className="py-2.5 text-center">
+                      <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                        inv.status === "paid"
+                          ? "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400"
+                          : inv.status === "open"
+                          ? "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
+                          : "bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-400"
+                      }`}>
+                        {inv.status === "paid" ? "Pagata" : inv.status === "open" ? "In sospeso" : inv.status ?? "—"}
+                      </span>
+                    </td>
+                    <td className="py-2.5 text-right">
+                      {inv.pdfUrl && (
+                        <a
+                          href={inv.pdfUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                        >
+                          <Download className="h-3 w-3" /> PDF
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

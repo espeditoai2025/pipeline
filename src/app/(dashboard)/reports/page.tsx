@@ -59,6 +59,45 @@ export default function ReportsPage() {
   const byType = data?.byType ?? [];
   const performers = data?.performers ?? [];
 
+  function handleExportCSV() {
+    if (!data) return;
+    const rows: string[][] = [];
+    const periodLabel = PERIODS.find((p) => p.value === period)?.label ?? period;
+
+    rows.push([`Report Pipely — ${periodLabel}`, "", "", ""]);
+    rows.push(["", "", "", ""]);
+
+    rows.push(["KPI", "Valore", "", ""]);
+    rows.push(["Affari aperti", String(kpis?.openDeals ?? 0), "", ""]);
+    rows.push(["Revenue periodo (€)", String(kpis?.wonValue ?? 0), "", ""]);
+    rows.push(["Affari vinti", String(kpis?.wonDeals ?? 0), "", ""]);
+    rows.push(["Affari persi", String(kpis?.lostDeals ?? 0), "", ""]);
+    rows.push(["Win rate (%)", String(kpis?.convRate ?? 0), "", ""]);
+    rows.push(["Avg deal size (€)", String(Math.round(kpis?.avgDeal ?? 0)), "", ""]);
+    rows.push(["Attività", String(kpis?.activities ?? 0), "", ""]);
+    rows.push(["", "", "", ""]);
+
+    rows.push(["Trend mensile", "Vinti", "Persi", "Revenue (€)"]);
+    for (const t of trend) rows.push([t.label, String(t.vinti), String(t.persi), String(t.valore)]);
+    rows.push(["", "", "", ""]);
+
+    rows.push(["Pipeline per stage", "Deal", "Valore (€)", ""]);
+    for (const f of funnel) rows.push([f.stage, String(f.count), String(f.value), ""]);
+    rows.push(["", "", "", ""]);
+
+    rows.push(["Top performer", "Affari vinti", "Revenue (€)", "Conv. rate (%)"]);
+    for (const p of performers) rows.push([p.name, String(p.won), String(p.revenue), String(p.convRate)]);
+
+    const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `pipely-report-${period}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const kpiCards = kpis ? [
     {
       title: "Affari aperti", value: String(kpis.openDeals),
@@ -118,7 +157,7 @@ export default function ReportsPage() {
             ))}
           </div>
 
-          <Button variant="outline" size="sm" disabled>
+          <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={!data || isPending}>
             <Download className="h-4 w-4 mr-1.5" /> Esporta CSV
           </Button>
         </div>

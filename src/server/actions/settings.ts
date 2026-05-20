@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
+import { compare, hash } from "bcryptjs";
 type Role = "OWNER" | "ADMIN" | "MANAGER" | "SALES" | "VIEWER";
 
 function getIds(s: Session | null) {
@@ -203,6 +204,38 @@ export async function updateMemberRole(targetUserId: string, role: Role) {
 
   await db.user.update({ where: { id: targetUserId }, data: { role } });
   revalidatePath("/settings");
+  return { error: null };
+}
+
+// ─── Cambio password ──────────────────────────────────────────────────────────
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ error: string | null }> {
+  const session = await auth();
+  const { userId } = getIds(session);
+  if (!userId) return { error: "Non autorizzato" };
+
+  if (newPassword.length < 8) return { error: "La nuova password deve avere almeno 8 caratteri" };
+
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { passwordHash: true },
+  });
+
+  if (!user?.passwordHash) {
+    return { error: "Il tuo account usa Google/OAuth — modifica la password dal pannello Google" };
+  }
+
+  const valid = await compare(currentPassword, user.passwordHash);
+  if (!valid) return { error: "Password attuale non corretta" };
+
+  if (currentPassword === newPassword) return { error: "La nuova password deve essere diversa da quella attuale" };
+
+  const newHash = await hash(newPassword, 12);
+  await db.user.update({ where: { id: userId }, data: { passwordHash: newHash } });
+
   return { error: null };
 }
 
