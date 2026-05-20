@@ -23,7 +23,6 @@ export const authConfig: NextAuthConfig = {
         nextUrl.pathname.startsWith("/register") ||
         nextUrl.pathname.startsWith("/forgot-password") ||
         nextUrl.pathname.startsWith("/api/auth") ||
-        nextUrl.pathname.startsWith("/api/leads") ||
         nextUrl.pathname.startsWith("/api/register") ||
         nextUrl.pathname.startsWith("/privacy") ||
         nextUrl.pathname.startsWith("/termini") ||

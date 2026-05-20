@@ -326,7 +326,15 @@ Rispondi SEMPRE con questo formato JSON esatto (nessun testo extra):
     const draft = JSON.parse(match[0]) as AIEmailDraft;
     if (!draft.subject || !draft.body) throw new Error("Email incompleta");
 
-    return { data: draft };
+    // Sanitize output: strip any HTML tags from AI-generated content
+    // to prevent XSS if the body is rendered as HTML downstream
+    const stripTags = (s: string) => s.replace(/<[^>]*>/g, "");
+    return {
+      data: {
+        subject: stripTags(draft.subject).trim(),
+        body: stripTags(draft.body).trim(),
+      },
+    };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Errore generazione email";
     console.error("[generateEmail]", msg);

@@ -4,14 +4,19 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 
-function isAdmin(email: string | null | undefined) {
+function isAdmin(email: string | null | undefined): boolean {
   const adminEmail = process.env.ADMIN_EMAIL;
-  return !!adminEmail && email === adminEmail;
+  if (!adminEmail) {
+    // ADMIN_EMAIL non configurata: fail closed — nessuno è admin
+    return false;
+  }
+  return email === adminEmail;
 }
 
-async function requireAdmin() {
+async function requireAdmin(): Promise<boolean> {
   const session = await auth();
-  return isAdmin((session?.user as { email?: string } | undefined)?.email);
+  if (!session?.user) return false;
+  return isAdmin((session.user as { email?: string }).email);
 }
 
 // ─── Plan management ──────────────────────────────────────────────────────────

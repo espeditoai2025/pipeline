@@ -1,12 +1,17 @@
 import crypto from "crypto";
 
-const KEY_HEX = process.env.SMTP_ENCRYPTION_KEY;
-
-// Derive a 32-byte key — falls back to a deterministic dev key when env var is missing
+// Derive a 32-byte key from SMTP_ENCRYPTION_KEY env var.
+// Must be set in all environments — no dev fallback to avoid silently encrypting
+// production data with a known key.
 function getKey(): Buffer {
-  if (KEY_HEX && KEY_HEX.length >= 32) return Buffer.from(KEY_HEX.slice(0, 32), "utf8");
-  // Dev fallback — NOT safe for production; set SMTP_ENCRYPTION_KEY in Vercel env vars
-  return Buffer.from("pipely-dev-key-00000000000000000", "utf8").slice(0, 32);
+  const key = process.env.SMTP_ENCRYPTION_KEY;
+  if (!key || key.length < 32) {
+    throw new Error(
+      "SMTP_ENCRYPTION_KEY non configurata o troppo corta (minimo 32 caratteri). " +
+      "Impostare la variabile d'ambiente prima di gestire configurazioni SMTP."
+    );
+  }
+  return Buffer.from(key.slice(0, 32), "utf8");
 }
 
 const ALG = "aes-256-cbc";
