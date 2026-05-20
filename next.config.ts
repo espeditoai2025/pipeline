@@ -44,6 +44,13 @@ const nextConfig: NextConfig = {
   images: {
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
+    remotePatterns: [
+      { protocol: "https", hostname: "*.uploadthing.com" },
+      { protocol: "https", hostname: "uploadthing.com" },
+      { protocol: "https", hostname: "*.ufs.sh" }, // UploadThing v6+ CDN
+      { protocol: "https", hostname: "lh3.googleusercontent.com" }, // Google avatars OAuth
+      { protocol: "https", hostname: "www.pipely.it" },
+    ],
   },
   async headers() {
     return [
