@@ -54,7 +54,7 @@ const POPULAR_ARTICLES = CATEGORIES.flatMap((c) =>
   c.articles.filter((a) => a.popular && !a.modes).map((a) => ({ ...a, category: c.label, categoryId: c.id, color: c.color, bgColor: c.bgColor, icon: c.icon }))
 ).slice(0, 6);
 
-// â”€â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Sub-components ──────────────────────────────────────────────────────────
 
 function CategoryCard({ cat, onClick }: { cat: Category; onClick: () => void }) {
   const Icon = cat.icon;
@@ -180,7 +180,7 @@ function ArticleView({ article, cat, onBack }: { article: Article; cat: Category
         <div className="rounded-xl border border-dashed border-[var(--crm-neutral-200)] dark:border-white/10 p-10 text-center">
           <ListChecks className="h-8 w-8 text-[var(--crm-neutral-300)] mx-auto mb-3" />
           <p className="text-sm font-medium text-[var(--crm-neutral-500)]">Articolo in fase di redazione</p>
-          <p className="text-xs text-[var(--crm-neutral-400)] mt-1">Questo contenuto sarÃ  disponibile a breve.</p>
+          <p className="text-xs text-[var(--crm-neutral-400)] mt-1">Questo contenuto sarà disponibile a breve.</p>
         </div>
       )}
 
@@ -193,9 +193,9 @@ function ArticleView({ article, cat, onBack }: { article: Article; cat: Category
           <ChevronLeft className="h-4 w-4" /> Torna a {cat.label}
         </button>
         <div className="flex items-center gap-2 rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 bg-white dark:bg-[#1a1a2e] px-4 py-2 text-xs text-[var(--crm-neutral-500)]">
-          Questo articolo ti Ã¨ stato utile?
-          <button className="ml-2 text-lg hover:scale-125 transition-transform" title="SÃ¬">ðŸ‘</button>
-          <button className="text-lg hover:scale-125 transition-transform" title="No">ðŸ‘Ž</button>
+          Questo articolo ti è stato utile?
+          <button className="ml-2 text-lg hover:scale-125 transition-transform" title="Sì">👍</button>
+          <button className="text-lg hover:scale-125 transition-transform" title="No">👎</button>
         </div>
       </div>
     </div>
@@ -276,7 +276,7 @@ function CategoryDetail({ cat, onBack, onArticleClick, crmMode }: { cat: Categor
             Non hai trovato quello che cercavi?
           </p>
           <p className="text-xs text-[var(--crm-neutral-500)] mt-1">
-            Il nostro team di supporto Ã¨ disponibile dal lunedÃ¬ al venerdÃ¬, 9:00â€“18:00 CET.
+            Il nostro team di supporto è disponibile dal lunedì al venerdì, 9:00—18:00 CET.
           </p>
           <Link href="/contatti" className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[var(--crm-primary)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--crm-primary-dark)] transition-colors">
             <ArrowUpRight className="h-3.5 w-3.5" /> Contatta il supporto
@@ -287,7 +287,7 @@ function CategoryDetail({ cat, onBack, onArticleClick, crmMode }: { cat: Categor
   );
 }
 
-// â”€â”€â”€ Main page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function GuidaPage() {
   const [search, setSearch] = useState("");
@@ -476,7 +476,7 @@ export default function GuidaPage() {
                     </div>
                     <div>
                       <p className="text-xs font-semibold text-[var(--crm-neutral-900)] dark:text-white">
-                        <span className="text-[var(--crm-neutral-400)] mr-1">Passo {s.step} Â·</span>{s.title}
+                        <span className="text-[var(--crm-neutral-400)] mr-1">Passo {s.step} ·</span>{s.title}
                       </p>
                       <p className="text-xs text-[var(--crm-neutral-500)] mt-0.5">{s.desc}</p>
                     </div>
@@ -491,7 +491,7 @@ export default function GuidaPage() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Star className="h-4 w-4 text-amber-500" />
-                <h2 className="text-sm font-semibold text-[var(--crm-neutral-900)] dark:text-white">Articoli piÃ¹ letti</h2>
+                <h2 className="text-sm font-semibold text-[var(--crm-neutral-900)] dark:text-white">Articoli più letti</h2>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -518,7 +518,7 @@ export default function GuidaPage() {
                         <p className="text-xs font-medium text-[var(--crm-neutral-900)] dark:text-white group-hover:text-[var(--crm-primary)] transition-colors line-clamp-2">
                           {a.title}
                         </p>
-                        <p className="text-xs text-[var(--crm-neutral-400)] mt-1">{a.category} Â· {a.readTime} min</p>
+                        <p className="text-xs text-[var(--crm-neutral-400)] mt-1">{a.category} · {a.readTime} min</p>
                       </div>
                     </div>
                   </div>
@@ -580,7 +580,7 @@ export default function GuidaPage() {
                 Hai ancora bisogno di aiuto?
               </h3>
               <p className="text-xs text-[var(--crm-neutral-500)] mt-1">
-                Il team di supporto Pipely Ã¨ disponibile dal lunedÃ¬ al venerdÃ¬, 9:00â€“18:00 CET.
+                Il team di supporto Pipely è disponibile dal lunedì al venerdì, 9:00—18:00 CET.
                 Puoi anche consultare la nostra community o guardare i tutorial video.
               </p>
             </div>

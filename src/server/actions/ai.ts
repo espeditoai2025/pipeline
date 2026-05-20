@@ -161,14 +161,16 @@ Se non hai abbastanza dati per rispondere, dillo chiaramente.
 Non inventare dati o numeri non presenti nel contesto.
 
 Funzionalità chiave di Pipely (per domande su come si usa):
-- Ricerca globale: Cmd+K (Mac) o Ctrl+K (Windows) da qualsiasi pagina apre la ricerca universale. Cerca in tempo reale su contatti, affari, aziende e lead. Senza testo mostra navigazione rapida e azioni rapide (nuovo affare, contatto, lead, attività).
-- Setup CRM (verticali): scelto una volta sola durante la registrazione, non modificabile. 4 modalità — Classic (B2B), Immobiliare, Assicurazioni, Ecommerce. Ogni modalità adatta la terminologia (es. "Affare" diventa "Polizza" per Assicurazioni). I 3 verticali hanno funzionalità settore-specifiche in arrivo.
+- Ricerca globale: Cmd+K (Mac) o Ctrl+K (Windows) da qualsiasi pagina apre la ricerca universale. Cerca in tempo reale su contatti, affari, aziende e lead. I risultati linkano direttamente alle pagine di dettaglio. Senza testo mostra navigazione rapida e azioni rapide (nuovo affare, contatto, lead, attività).
+- Setup CRM (verticali): 4 modalità — Classic (B2B), Immobiliare, Assicurazioni, Ecommerce. Ogni modalità adatta la terminologia (es. "Affare" diventa "Polizza" per Assicurazioni). Modificabile dalla dashboard.
 - Campi personalizzati: in Impostazioni → Campi puoi aggiungere campi extra (testo, numero, data, select, multiselect, booleano) per Affari, Contatti e Aziende.
 - Tipi di fatturazione: in Impostazioni → Prezzi puoi gestire tipi di pagamento personalizzati oltre ai 7 predefiniti (una tantum, mensile, annuale, noleggio mensile/annuale, affitto mensile/annuale). I tipi appaiono nel form prodotto.
 - Categorie prodotto: in Impostazioni → Prezzi puoi aggiungere categorie personalizzate (es. Formazione, Energia) oltre alle 9 predefinite (Software, Hardware, Servizio, Supporto, Licenza, SaaS, Sito Web, Agenti AI, Altro).
-- Vista dettaglio: ogni affare e contatto ha una pagina dedicata con timeline attività e campi personalizzati.
-- Notifiche in-app: attività scadute, affari in scadenza, lead nuovi — aggiornate ogni 60 secondi.
+- Pagine di dettaglio: affari, contatti, aziende e lead hanno pagine dedicate. Contatti includono pannello note. Aziende mostrano contatti e affari collegati. Lead mostrano status, score e pulsante conversione.
+- Notifiche in-app: campana nella topbar con badge non lette, notifiche da workflow automatici (azione SEND_NOTIFICATION), pulsante "Segna tutte lette".
+- Automazioni: 8 trigger (DEAL_CREATED, DEAL_STAGE_CHANGED, DEAL_WON, DEAL_LOST, DEAL_VALUE_CHANGED, CONTACT_CREATED, ACTIVITY_OVERDUE, LEAD_CREATED) e 6 azioni (SEND_EMAIL, CREATE_ACTIVITY, UPDATE_DEAL_STAGE, ASSIGN_OWNER, SEND_NOTIFICATION, WAIT). WAIT mette in pausa il workflow per N giorni. Testa workflow prima di attivarlo. Log esecuzioni con stato SUCCESS/FAILED.
 - Importazione contatti: CSV/XLS/XLSX, crea automaticamente le aziende collegate.
+- Mobile: navigazione con hamburger menu e drawer laterale, tabelle scrollabili orizzontalmente.
 
 ${modeContext}${sectorContext ? `\n\n${sectorContext}` : ""}
 

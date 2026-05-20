@@ -1,4 +1,4 @@
-// --- Guide data � NO React dependencies --------------------------------------
+// --- Guide data -- NO React dependencies --------------------------------------
 // Used by both the guide UI (page.tsx) and the AI assistant (ai.ts).
 
 export type GuideBlock =
@@ -278,7 +278,9 @@ export const GUIDE_SECTIONS: GuideSection[] = [
           "Ruolo/Qualifica — posizione nella sua azienda (es. Responsabile Acquisti)",
         ]},
         { type: "heading", text: "Modificare un contatto" },
-        { type: "para", text: "Clicca sul nome di qualsiasi contatto per aprire il dettaglio. Da lì puoi modificare tutti i campi, vedere lo storico delle attività, gli affari collegati e le email inviate." },
+        { type: "para", text: "Clicca sul nome di qualsiasi contatto per aprire la pagina di dettaglio. Da lì puoi modificare tutti i campi, vedere lo storico delle attività, gli affari collegati e le email inviate." },
+        { type: "heading", text: "Note sul contatto" },
+        { type: "para", text: "Nella pagina di dettaglio del contatto è disponibile un pannello Note: puoi aggiungere annotazioni libere (es. esito di una chiamata, preferenze del cliente). Le note appaiono in ordine cronologico inverso e sono visibili a tutto il team." },
         { type: "tip", text: "Collegare i contatti alle aziende ti permette di vedere tutti i referenti di un'azienda in un unico posto, nella scheda dell'azienda stessa." },
       ]},
       { id: "c2", title: "Collegare contatti alle aziende", excerpt: "Come associare un contatto a una o più aziende e gestire i ruoli.", readTime: 4, blocks: [
@@ -314,15 +316,15 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         { type: "para", text: "I contatti con la stessa email di uno già presente nel CRM vengono automaticamente ignorati. Puoi importare lo stesso file più volte senza creare duplicati." },
         { type: "warning", text: "Se il file supera i 5 MB, dividilo in più file da importare separatamente. Per file molto grandi usa blocchi da massimo 1000 righe ciascuno." },
       ]},
-      { id: "c4", title: "Gestire le aziende e i loro contatti", excerpt: "Vista aziendale, elenco dipendenti, affari collegati e storico attività.", readTime: 5, blocks: [
-        { type: "heading", text: "Aprire la scheda azienda" },
-        { type: "para", text: "Vai su Contatti → tab Aziende, oppure clicca sul nome di un'azienda da qualsiasi parte del CRM. La scheda mostra tutte le informazioni dell'azienda in un unico posto." },
-        { type: "heading", text: "Contenuto della scheda azienda" },
+      { id: "c4", title: "Gestire le aziende e i loro contatti", excerpt: "Pagina di dettaglio aziendale con contatti collegati, affari e informazioni complete.", readTime: 5, blocks: [
+        { type: "heading", text: "Aprire la pagina di dettaglio azienda" },
+        { type: "para", text: "Clicca sul nome di un'azienda nella tabella Aziende, dalla ricerca globale (Cmd+K) o da qualsiasi link nel CRM. Si apre la pagina di dettaglio dedicata con tutte le informazioni." },
+        { type: "heading", text: "Contenuto della pagina di dettaglio" },
         { type: "list", items: [
-          "Campi azienda: nome, settore, sito web, telefono, indirizzo",
-          "Contatti collegati: elenco di tutte le persone associate all'azienda",
-          "Affari associati: tutte le trattative collegate ai contatti dell'azienda",
-          "Attività: storico delle attività svolte con questa azienda",
+          "Header — nome dell'azienda con iniziale, settore e città",
+          "Informazioni azienda — nome, settore, sito web, telefono, indirizzo completo, email, referente (nome e ruolo), descrizione",
+          "Contatti collegati — elenco di tutti i contatti associati con link diretto alla scheda contatto",
+          "Affari collegati — lista degli affari con valore, stage e stato, con link diretto alla scheda affare",
         ]},
         { type: "heading", text: "Modificare i dati aziendali" },
         { type: "para", text: "Clicca sul pulsante Modifica nella scheda azienda per aggiornare nome, settore, sito web, telefono e altri campi. Le modifiche sono immediatamente visibili a tutti i membri del team." },
@@ -389,6 +391,8 @@ export const GUIDE_SECTIONS: GuideSection[] = [
           "Responsabile — membro del team che gestisce il lead",
           "Contatto collegato — collega il lead a un contatto Pipely già esistente",
         ]},
+        { type: "heading", text: "Pagina di dettaglio del lead" },
+        { type: "para", text: "Clicca sul titolo di un lead nella tabella per aprire la pagina di dettaglio. La pagina mostra: stato e score in evidenza nell'header, colonna informazioni (email, telefono, responsabile, contatto collegato con link diretto), campi dati dal form, sezione note e pulsante per convertire il lead in affare." },
         { type: "tip", text: "Usa la sezione Leads come filtro: inserisci tutti i contatti iniziali e converti in affare solo quelli che superano la qualificazione." },
       ]},
       { id: "l2", title: "Qualificare un lead: stati e workflow", excerpt: "Gli stati NEW, WORKING, NURTURING, CONVERTED, DISQUALIFIED e come cambiarli direttamente dalla tabella.", readTime: 5, blocks: [
@@ -419,7 +423,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       { id: "l3", title: "Convertire un lead in affare", excerpt: "Come trasformare un lead qualificato in un affare: imposta il valore, crea il contatto e conferma in un click.", readTime: 3, popular: true, blocks: [
         { type: "heading", text: "Come convertire un lead" },
         { type: "steps", items: [
-          "Nella tabella Leads, clicca l'icona freccia (→) sulla riga del lead",
+          "Dalla tabella Leads clicca l'icona freccia (→) sulla riga del lead, oppure dalla pagina di dettaglio del lead clicca il pulsante \"Converti in affare\"",
           "Si apre il pannello di conversione con un riepilogo del lead",
           "Modifica il titolo dell'affare se necessario",
           "Inserisci il valore dell'affare in Euro",
@@ -905,8 +909,8 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         { type: "para", text: "Un'automazione in Pipely è una regola trigger → azione: quando accade un evento specifico (trigger), Pipely esegue automaticamente un'azione predefinita. Non richiede alcuna competenza di programmazione." },
         { type: "heading", text: "Struttura di un workflow" },
         { type: "list", items: [
-          "Trigger — l'evento che attiva il workflow (es. affare creato, lead convertito)",
-          "Azione — cosa viene eseguito automaticamente (es. invia email, crea attività, invia notifica)",
+          "Trigger — l'evento che attiva il workflow (8 trigger disponibili: affare creato/cambiato stage/vinto/perso/valore cambiato, contatto creato, attività scaduta, lead creato)",
+          "Azioni — una o più azioni eseguite in sequenza (6 azioni: invia email, crea attività, cambia stage, assegna responsabile, invia notifica, attendi N giorni)",
         ]},
         { type: "heading", text: "Dove trovare le automazioni" },
         { type: "para", text: "Vai su Automazioni nella sidebar. Ogni workflow è elencato con nome, stato (attivo/inattivo) e un toggle verde/grigio per abilitarlo o disabilitarlo. Il log delle esecuzioni è visibile aprendo il singolo workflow." },
@@ -937,10 +941,23 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         ]},
         { type: "heading", text: "Trigger disponibili" },
         { type: "list", items: [
-          "Affare: creato, cambiato stage, vinto, perso",
-          "Contatto: creato, modificato",
-          "Attività: completata, scaduta",
-          "Lead: creato, convertito",
+          "DEAL_CREATED — quando viene creato un nuovo affare",
+          "DEAL_STAGE_CHANGED — quando un affare cambia stage nella pipeline",
+          "DEAL_WON — quando un affare viene chiuso come vinto",
+          "DEAL_LOST — quando un affare viene chiuso come perso",
+          "DEAL_VALUE_CHANGED — quando il valore di un affare viene modificato",
+          "CONTACT_CREATED — quando viene creato un nuovo contatto",
+          "ACTIVITY_OVERDUE — quando un'attività supera la data di scadenza",
+          "LEAD_CREATED — quando viene creato un nuovo lead",
+        ]},
+        { type: "heading", text: "Azioni disponibili" },
+        { type: "list", items: [
+          "SEND_EMAIL — invia un'email automatica al contatto collegato",
+          "CREATE_ACTIVITY — crea un'attività (chiamata, task, meeting) assegnata al responsabile",
+          "UPDATE_DEAL_STAGE — sposta automaticamente l'affare in uno stage specifico",
+          "ASSIGN_OWNER — assegna l'affare a un membro del team",
+          "SEND_NOTIFICATION — invia una notifica in-app visibile nella campana delle notifiche",
+          "WAIT — attende un numero di giorni prima di eseguire l'azione successiva (utile per follow-up ritardati)",
         ]},
         { type: "tip", text: "Inizia con automazioni semplici (un trigger, un'azione) e aggiungine di più complesse man mano che prendi confidenza con lo strumento." },
       ]},
@@ -976,7 +993,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
           "Affare vinto → notifica al manager con valore e nome del cliente",
           "Affare arrivato in Negoziazione → notifica al responsabile commerciale",
         ]},
-        { type: "tip", text: "Le notifiche in-app appaiono come badge nella sidebar di Pipely. Non vengono inviate via email o push al momento: per aggiornamenti su queste funzionalità consulta la roadmap." },
+        { type: "tip", text: "Le notifiche in-app appaiono nella campana delle notifiche in alto a destra. Clicca la campana per vedere tutte le notifiche recenti e usa \"Segna tutte lette\" per azzerarle. Non vengono inviate via email o push al momento." },
       ]},
       { id: "au5", title: "Automazioni per i lead in entrata", excerpt: "Assegna automaticamente i lead ai responsabili in base a regole personalizzate.", readTime: 5, blocks: [
         { type: "heading", text: "Automatizzare la gestione dei lead in entrata" },
@@ -998,9 +1015,17 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         ]},
         { type: "tip", text: "Combina entrambi i workflow: email di benvenuto immediata per il lead, e attività di follow-up per il commerciale. Il lead si sente seguito e il team ha un promemoria chiaro." },
       ]},
-      { id: "au6", title: "Monitorare e debuggare le automazioni", excerpt: "Come visualizzare la cronologia di esecuzione e risolvere gli errori.", readTime: 4, blocks: [
+      { id: "au6", title: "Monitorare e debuggare le automazioni", excerpt: "Come visualizzare la cronologia di esecuzione, testare i workflow e risolvere gli errori.", readTime: 4, blocks: [
         { type: "heading", text: "Il tab Log del workflow" },
-        { type: "para", text: "Ogni workflow dispone di un tab Log che mostra l'elenco delle ultime esecuzioni con data, entità coinvolta (es. nome dell'affare) e stato: SUCCESS o FAILED." },
+        { type: "para", text: "Ogni workflow dispone di un tab Log che mostra l'elenco delle ultime esecuzioni con data, entità coinvolta (es. nome dell'affare) e stato: SUCCESS o FAILED. I log vengono letti direttamente dal database e includono il nome del record che ha attivato il workflow." },
+        { type: "heading", text: "Testare un workflow prima di attivarlo" },
+        { type: "steps", items: [
+          "Apri il workflow che vuoi testare",
+          "Clicca il pulsante \"Testa workflow\"",
+          "Pipely simula un'esecuzione con dati di test reali dal tuo CRM",
+          "Verifica il risultato nel tab Log: la riga di test è contrassegnata come test run",
+          "Se il test va a buon fine, attiva il workflow con il toggle ON",
+        ]},
         { type: "heading", text: "Come accedere al log" },
         { type: "steps", items: [
           "Vai su Automazioni",
@@ -1011,11 +1036,12 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         ]},
         { type: "heading", text: "Errori comuni e soluzioni" },
         { type: "list", items: [
-          "SMTP non configurato → l'azione \"Invia email\" fallisce: configura SMTP in Impostazioni → Email",
-          "Contatto senza email → l'invio non riesce: verifica che il contatto abbia un'email valida",
-          "Workflow disattivato → le esecuzioni non partono: controlla il toggle ON/OFF",
+          "SMTP non configurato — l'azione \"Invia email\" fallisce: configura SMTP in Impostazioni → Email",
+          "Contatto senza email — l'invio non riesce: verifica che il contatto abbia un'email valida",
+          "Workflow disattivato — le esecuzioni non partono: controlla il toggle ON/OFF",
+          "Azione WAIT in corso — il workflow è in pausa: verrà ripreso automaticamente dopo il periodo di attesa configurato",
         ]},
-        { type: "tip", text: "Dopo aver corretto un errore, riattiva il workflow e verifica che la prossima esecuzione risulti SUCCESS nel log." },
+        { type: "tip", text: "Usa sempre il pulsante \"Testa workflow\" prima di attivare un'automazione in produzione. In questo modo verifichi che trigger, condizioni e azioni funzionino correttamente senza rischi." },
       ]},
     ],
   },
@@ -1212,14 +1238,21 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         { type: "warning", text: "Non puoi eliminare uno stage che contiene affari. Sposta prima tutti gli affari in un altro stage, poi potrai eliminarlo." },
         { type: "tip", text: "Imposta con cura la probabilità di ogni stage: viene usata per calcolare la previsione ponderata in dashboard e nei report di forecast." },
       ]},
-      { id: "im4", title: "Impostazioni di notifica", excerpt: "Configura email, push e alert in-app per gli eventi importanti.", readTime: 4, blocks: [
-        { type: "heading", text: "Notifiche disponibili" },
-        { type: "para", text: "Al momento Pipely supporta solo notifiche in-app: appaiono come badge nella sidebar e nella campana delle notifiche. Non sono disponibili notifiche via email o push mobile." },
+      { id: "im4", title: "Impostazioni di notifica", excerpt: "Campana delle notifiche in-app, notifiche da workflow e gestione letture.", readTime: 4, blocks: [
+        { type: "heading", text: "Campana delle notifiche" },
+        { type: "para", text: "Pipely dispone di un pannello notifiche accessibile cliccando l'icona campana in alto a destra della topbar. Il badge rosso indica il numero di notifiche non lette." },
         { type: "heading", text: "Tipi di notifiche in-app" },
         { type: "list", items: [
           "Affare assegnato a te",
           "Attività in scadenza (visibile in dashboard come KPI)",
-          "Notifiche da workflow automatici",
+          "Notifiche generate da workflow automatici (azione SEND_NOTIFICATION)",
+          "Notifiche di sistema (es. import completato)",
+        ]},
+        { type: "heading", text: "Gestire le notifiche" },
+        { type: "list", items: [
+          "Clicca la campana per aprire il pannello con l'elenco delle notifiche recenti",
+          "Clicca su una notifica per navigare al record collegato (affare, contatto, ecc.)",
+          "Usa il pulsante \"Segna tutte lette\" per azzerare il contatore delle non lette",
         ]},
         { type: "heading", text: "Funzionalità in roadmap" },
         { type: "list", items: [
@@ -1227,7 +1260,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
           "Notifiche push mobile via PWA (previsto Q4 2026)",
           "Personalizzazione degli eventi notificati",
         ]},
-        { type: "tip", text: "Controlla le attività scadute ogni mattina dalla dashboard: il KPI \"Attività scadute\" è il modo più rapido per non perdere follow-up importanti." },
+        { type: "tip", text: "Configura un'automazione con azione SEND_NOTIFICATION per ricevere avvisi in-app automatici quando un affare viene vinto, un lead creato o un'attività scade." },
       ]},
       { id: "im5", title: "Campi personalizzati globali", excerpt: "Crea campi aggiuntivi per affari, contatti e aziende a livello di organizzazione.", readTime: 6, blocks: [
         { type: "heading", text: "Creare un campo personalizzato" },
@@ -1275,10 +1308,10 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         { type: "para", text: "Premi Cmd+K su Mac oppure Ctrl+K su Windows e Linux da qualsiasi pagina del CRM. Si apre un pannello di ricerca al centro dello schermo." },
         { type: "heading", text: "Cosa puoi fare" },
         { type: "list", items: [
-          "Cerca contatti per nome, email o telefono",
-          "Cerca affari per titolo (solo affari aperti)",
-          "Cerca aziende per nome",
-          "Cerca lead per titolo o email",
+          "Cerca contatti per nome, email o telefono — clicca per aprire la scheda contatto",
+          "Cerca affari per titolo (solo affari aperti) — clicca per aprire la scheda affare",
+          "Cerca aziende per nome — clicca per aprire la pagina di dettaglio dell'azienda",
+          "Cerca lead per titolo o email — clicca per aprire la pagina di dettaglio del lead",
           "Naviga rapidamente a qualsiasi sezione del CRM",
           "Crea un nuovo affare, contatto, lead o attività con un click",
         ]},
@@ -1511,17 +1544,21 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         ]},
         { type: "tip", text: "La PWA offre un'esperienza quasi identica all'app nativa: icona nella home, schermo intero, accesso rapido senza aprire il browser." },
       ]},
-      { id: "mo2", title: "Funzionalità disponibili sull'app mobile", excerpt: "Cosa puoi fare da mobile: affari, contatti, attività e notifiche push.", readTime: 4, blocks: [
+      { id: "mo2", title: "Funzionalità disponibili sull'app mobile", excerpt: "Cosa puoi fare da mobile: navigazione con hamburger menu, affari, contatti, attività e notifiche.", readTime: 4, blocks: [
+        { type: "heading", text: "Navigazione mobile" },
+        { type: "para", text: "Su smartphone Pipely mostra un menu hamburger (tre linee) in alto a sinistra nella topbar. Toccalo per aprire il drawer laterale con tutte le voci di navigazione: Dashboard, Affari, Contatti, Lead, Attività, Campagne, Automazioni, Report, Impostazioni. Il drawer si chiude toccando la X o lo sfondo scuro." },
         { type: "heading", text: "Funzionalità accessibili da mobile" },
         { type: "para", text: "Tramite la PWA hai accesso a tutte le funzionalità di Pipely disponibili su desktop: non esiste una versione mobile ridotta." },
         { type: "list", items: [
           "Affari — crea, modifica e sposta affari nella pipeline",
-          "Contatti — aggiungi contatti, visualizza schede, invia email",
+          "Contatti — aggiungi contatti, visualizza schede con note, invia email",
           "Attività — crea e completa attività, vedi il calendario",
-          "Lead — gestisci e converti i lead in affare",
+          "Lead — gestisci, visualizza dettaglio e converti i lead in affare",
           "Report — visualizza i KPI e i grafici",
           "Campagne — monitora le statistiche di invio",
         ]},
+        { type: "heading", text: "Tabelle responsive" },
+        { type: "para", text: "Le tabelle di contatti, aziende e lead su schermi piccoli sono scrollabili orizzontalmente: scorrile lateralmente per vedere tutte le colonne. I campi di ricerca si adattano alla larghezza dello schermo." },
         { type: "heading", text: "Limiti rispetto al desktop" },
         { type: "para", text: "La schermata più piccola rende alcune operazioni meno comode (es. drag & drop nella Kanban). Non esistono funzionalità esclusive mobile al momento." },
         { type: "tip", text: "Per operazioni frequenti da mobile come creare un'attività o aggiungere una nota a un affare, la PWA è perfettamente adatta. Per import massivi o configurazioni avanzate usa il desktop." },
@@ -2056,10 +2093,10 @@ export const GUIDE_SECTIONS: GuideSection[] = [
 function serializeBlock(b: GuideBlock): string {
   if (b.type === "heading") return `**${b.text}**`;
   if (b.type === "para") return b.text;
-  if (b.type === "list") return b.items.map((i) => `� ${i}`).join("\n");
+  if (b.type === "list") return b.items.map((i) => `— ${i}`).join("\n");
   if (b.type === "steps") return b.items.map((i, n) => `${n + 1}. ${i}`).join("\n");
-  if (b.type === "tip") return `?? ${b.text}`;
-  if (b.type === "warning") return `?? ${b.text}`;
+  if (b.type === "tip") return `TIP: ${b.text}`;
+  if (b.type === "warning") return `ATTENZIONE: ${b.text}`;
   if (b.type === "link") return `[${b.text}](${b.href})`;
   return "";
 }
@@ -2118,7 +2155,7 @@ export function getGuideContext(query: string): string {
 }
 
 function getGuideIndex(): string {
-  const lines = ["=== GUIDA PIPELY � INDICE ==="];
+  const lines = ["=== GUIDA PIPELY — INDICE ==="];
   for (const s of GUIDE_SECTIONS) {
     lines.push(`\n[${s.label}]`);
     for (const a of s.articles) lines.push(`- ${a.title}`);
