@@ -206,6 +206,35 @@ export async function updateMemberRole(targetUserId: string, role: Role) {
   return { error: null };
 }
 
+// ─── GDPR — Art. 20 Portabilità dei dati ─────────────────────────────────────
+
+export async function exportOrgData() {
+  const session = await auth();
+  const { orgId } = getIds(session);
+  if (!orgId) return { error: "Non autorizzato", data: null };
+
+  const [org, users, contacts, companies, deals, activities, leads] = await Promise.all([
+    db.organization.findUnique({
+      where: { id: orgId },
+      select: { id: true, name: true, slug: true, plan: true, website: true, phone: true, vatNumber: true, address: true, city: true, country: true, sector: true, createdAt: true },
+    }),
+    db.user.findMany({
+      where: { organizationId: orgId },
+      select: { id: true, name: true, email: true, role: true, createdAt: true },
+    }),
+    db.contact.findMany({ where: { organizationId: orgId } }),
+    db.company.findMany({ where: { organizationId: orgId } }),
+    db.deal.findMany({ where: { organizationId: orgId } }),
+    db.activity.findMany({ where: { organizationId: orgId } }),
+    db.lead.findMany({ where: { organizationId: orgId } }),
+  ]);
+
+  return {
+    error: null,
+    data: { exportedAt: new Date().toISOString(), organization: org, users, contacts, companies, deals, activities, leads },
+  };
+}
+
 // ─── GDPR — Art. 17 Diritto all'oblio ────────────────────────────────────────
 // Cancella l'intera organizzazione dell'utente e tutti i dati collegati (Cascade).
 // Solo il proprietario (OWNER) può eseguire questa operazione.

@@ -1,19 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import {
   User, Shield, CreditCard, Sliders, Building2, Mail,
   Save, Loader2, Eye, EyeOff, Plus, Trash2,
   CheckCircle2, Clock, Key, Users, LogOut,
   Monitor, Package, Briefcase, Activity,
   Zap, BarChart3, Send, X, ChevronDown, SlidersHorizontal, DollarSign,
+  Download, AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   getOrgData, updateOrgDetails, getTeamMembers, getUsageStats,
   inviteTeamMember, getInvitations, revokeInvitation, removeMember, updateMemberRole,
+  deleteAccount,
 } from "@/server/actions/settings";
 import { getSmtpConfig } from "@/server/actions/smtp";
 import { SmtpWizard } from "@/components/settings/SmtpWizard";
@@ -125,6 +127,14 @@ export default function SettingsPage() {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
 
+  // Delete account
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [showDeleteZone, setShowDeleteZone] = useState(false);
+
+  // Data export
+  const [exportingData, setExportingData] = useState(false);
+
   // SMTP
   const [smtpConfig, setSmtpConfig] = useState<SmtpConfigPublic | null>(null);
   const [smtpLoaded, setSmtpLoaded] = useState(false);
@@ -197,6 +207,37 @@ export default function SettingsPage() {
     setUpdatingRoleId(null);
     if (res.error) toast.error(res.error);
     else { setMembers((arr) => arr.map((m) => m.id === id ? { ...m, role } : m)); toast.success("Ruolo aggiornato"); }
+  }
+
+  async function handleDeleteAccount() {
+    if (deleteConfirmText !== "ELIMINA") { toast.error('Scrivi "ELIMINA" per confermare'); return; }
+    setDeletingAccount(true);
+    const res = await deleteAccount(deleteConfirmText);
+    setDeletingAccount(false);
+    if (res.error) { toast.error(res.error); return; }
+    toast.success("Account eliminato. Arrivederci!");
+    await signOut({ callbackUrl: "/" });
+  }
+
+  async function handleExportData() {
+    setExportingData(true);
+    try {
+      const res = await fetch("/api/export");
+      if (!res.ok) { toast.error("Errore durante l'esportazione"); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const date = new Date().toISOString().slice(0, 10);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `pipely-export-${date}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Esportazione completata!");
+    } catch {
+      toast.error("Errore durante l'esportazione");
+    } finally {
+      setExportingData(false);
+    }
   }
 
   function handleGenerateKey() {
@@ -670,6 +711,20 @@ export default function SettingsPage() {
                 )}
               </div>
 
+              {/* Esporta dati (Art. 20 GDPR) */}
+              <div className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] p-6 space-y-3">
+                <h2 className="text-base font-semibold flex items-center gap-2">
+                  <Download className="h-4 w-4 text-[var(--crm-primary)]" /> Esporta i tuoi dati
+                </h2>
+                <p className="text-sm text-[var(--crm-neutral-500)]">
+                  Scarica una copia completa di tutti i dati della tua organizzazione in formato JSON (Art. 20 GDPR — portabilità).
+                </p>
+                <Button variant="outline" onClick={handleExportData} disabled={exportingData}>
+                  {exportingData ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
+                  {exportingData ? "Preparazione..." : "Esporta dati (JSON)"}
+                </Button>
+              </div>
+
               {/* Membri del team */}
               <div className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] p-6 space-y-3">
                 <div className="flex items-center justify-between">
@@ -736,6 +791,57 @@ export default function SettingsPage() {
                   </div>
                 )}
               </div>
+
+              {/* Zona pericolosa — solo OWNER */}
+              {members.find((m) => m.email === session?.user?.email)?.role === "OWNER" && (
+                <div className="rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/20 p-6 space-y-4">
+                  <h2 className="text-base font-semibold text-red-700 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" /> Zona pericolosa
+                  </h2>
+                  <p className="text-sm text-red-600">
+                    Elimina definitivamente l'account e tutti i dati dell'organizzazione (contatti, affari, campagne, ecc.).
+                    Questa operazione è irreversibile ai sensi dell'Art. 17 GDPR.
+                  </p>
+
+                  {!showDeleteZone ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowDeleteZone(true)}
+                      className="border-red-300 text-red-600 hover:bg-red-100"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" /> Elimina account
+                    </Button>
+                  ) : (
+                    <div className="space-y-3 rounded-lg border border-red-300 bg-white dark:bg-red-950/30 p-4">
+                      <p className="text-sm font-medium text-red-700">
+                        Scrivi <strong>ELIMINA</strong> nel campo sottostante per confermare:
+                      </p>
+                      <input
+                        value={deleteConfirmText}
+                        onChange={(e) => setDeleteConfirmText(e.target.value)}
+                        placeholder="ELIMINA"
+                        className="w-full rounded-lg border border-red-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 bg-transparent"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleDeleteAccount}
+                          disabled={deletingAccount || deleteConfirmText !== "ELIMINA"}
+                          className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                          {deletingAccount ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                          Elimina definitivamente
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => { setShowDeleteZone(false); setDeleteConfirmText(""); }}
+                        >
+                          Annulla
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

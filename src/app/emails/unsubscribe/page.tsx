@@ -22,7 +22,7 @@ export default async function UnsubscribePage({
   try {
     // Verifica che il contatto appartenga alla lista
     const entry = await db.emailListContact.findFirst({
-      where: { contactId: cid, listId: lid },
+      where: { id: cid, listId: lid },
     });
 
     if (!entry) {
