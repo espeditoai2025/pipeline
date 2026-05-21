@@ -3,8 +3,9 @@ import Link from "next/link";
 import { ArrowUpRight, ArrowDownRight, Briefcase, CheckCircle, Euro, TrendingUp, Target } from "lucide-react";
 import type { Metadata } from "next";
 import { PipelineOverviewChartLazy } from "@/components/charts/PipelineOverviewChartLazy";
+import { ForecastChartLazy } from "@/components/charts/ForecastChartLazy";
 import { redirect } from "next/navigation";
-import { getDashboardData, getOnboardingStatus } from "@/server/actions/dashboard";
+import { getDashboardData, getOnboardingStatus, getForecastData } from "@/server/actions/dashboard";
 import { getCrmMode, isCrmModeSet } from "@/server/actions/crm-mode";
 import { AIInsightsStrip } from "@/components/ai/AIInsightsStrip";
 import { OnboardingWizard } from "@/components/dashboard/OnboardingWizard";
@@ -63,8 +64,8 @@ export default async function DashboardPage() {
   const modeSet = await isCrmModeSet();
   if (!modeSet) redirect("/setup");
 
-  const [data, onboarding, crmMode, session] = await Promise.all([
-    getDashboardData(), getOnboardingStatus(), getCrmMode(), auth(),
+  const [data, onboarding, crmMode, session, forecastData] = await Promise.all([
+    getDashboardData(), getOnboardingStatus(), getCrmMode(), auth(), getForecastData(),
   ]);
 
   const orgId = (session?.user as { organizationId?: string } | undefined)?.organizationId;
@@ -132,24 +133,38 @@ export default async function DashboardPage() {
 
       <AIInsightsStrip compact />
 
-      <div className="rounded-xl border border-[var(--crm-primary)]/20 bg-[var(--crm-primary)]/5 px-5 py-3 flex items-center gap-6 flex-wrap">
-        <TrendingUp className="h-5 w-5 text-[var(--crm-primary)] flex-shrink-0" />
-        <div>
-          <p className="text-xs text-[var(--crm-neutral-500)]">Forecast ponderato pipeline</p>
-          <p className="text-lg font-bold text-[var(--crm-primary)]">{formatEur(forecast)}</p>
+      <div className="rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 bg-white dark:bg-[#1a1a2e] p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <TrendingUp className="h-5 w-5 text-[var(--crm-primary)]" />
+            <h2 className="text-sm font-semibold text-[var(--crm-neutral-900)] dark:text-white">Forecast Pipeline</h2>
+          </div>
+          <div className="flex items-center gap-4 text-right">
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--crm-neutral-400)]">Forecast</p>
+              <p className="text-base font-bold text-[var(--crm-primary)]">{formatEur(forecast)}</p>
+            </div>
+            <div className="h-6 w-px bg-[var(--crm-neutral-100)]" />
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--crm-neutral-400)]">Avg deal</p>
+              <p className="text-base font-bold">{formatEur(kpis.avgDeal)}</p>
+            </div>
+            <div className="h-6 w-px bg-[var(--crm-neutral-100)]" />
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--crm-neutral-400)]">Pipeline</p>
+              <p className="text-base font-bold">{kpis.openDeals}</p>
+            </div>
+          </div>
         </div>
-        <div className="h-6 w-px bg-[var(--crm-primary)]/20" />
-        <div>
-          <p className="text-xs text-[var(--crm-neutral-500)]">Avg deal vinti</p>
-          <p className="text-lg font-bold">{formatEur(kpis.avgDeal)}</p>
-        </div>
-        <div className="h-6 w-px bg-[var(--crm-primary)]/20" />
-        <div>
-          <p className="text-xs text-[var(--crm-neutral-500)]">Affari in pipeline</p>
-          <p className="text-lg font-bold">{kpis.openDeals}</p>
-        </div>
-        <p className="text-xs text-[var(--crm-neutral-400)] ml-auto hidden sm:block">
-          Vai a <Link href="/reports" className="text-[var(--crm-primary)] hover:underline">Report</Link> per l&apos;analisi completa
+        {forecastData && forecastData.length > 0 ? (
+          <ForecastChartLazy data={forecastData} />
+        ) : (
+          <div className="h-[280px] flex items-center justify-center text-sm text-[var(--crm-neutral-400)]">
+            Crea affari con date di chiusura previste per vedere il forecast
+          </div>
+        )}
+        <p className="text-xs text-[var(--crm-neutral-400)] mt-3 text-right">
+          <Link href="/reports" className="text-[var(--crm-primary)] hover:underline">Report completi →</Link>
         </p>
       </div>
 

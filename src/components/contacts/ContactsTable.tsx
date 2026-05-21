@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { deleteContact, getContacts } from "@/server/actions/contacts";
 import { ContactForm } from "./ContactForm";
 import { ImportCSVModal } from "./ImportCSVModal";
+import { MergeDuplicatesModal } from "./MergeDuplicatesModal";
 import { TablePagination } from "@/components/shared/TablePagination";
 import type { Contact, Company, DuplicateGroup } from "@/types/contacts";
 
@@ -48,6 +49,7 @@ export function ContactsTable({ initialContacts, companies }: Props) {
   const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<Contact | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [mergeOpen, setMergeOpen] = useState(false);
 
   const duplicates = useMemo(() => findDuplicates(contacts), [contacts]);
 
@@ -160,9 +162,9 @@ export function ContactsTable({ initialContacts, companies }: Props) {
   return (
     <div className="space-y-4">
       {duplicates.length > 0 && (
-        <div className="flex items-start gap-3 rounded-xl border border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20 p-4">
-          <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm">
+        <div className="flex items-center gap-3 rounded-xl border border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20 p-4">
+          <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0" />
+          <div className="text-sm flex-1">
             <p className="font-medium text-yellow-800 dark:text-yellow-400">
               {duplicates.length} {duplicates.length === 1 ? "duplicato rilevato" : "duplicati rilevati"}
             </p>
@@ -170,6 +172,12 @@ export function ContactsTable({ initialContacts, companies }: Props) {
               {duplicates.map((d) => d.key).join(", ")}
             </p>
           </div>
+          <button
+            onClick={() => setMergeOpen(true)}
+            className="flex-shrink-0 rounded-lg bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1.5 text-xs font-medium transition-colors"
+          >
+            Unisci duplicati
+          </button>
         </div>
       )}
 
@@ -260,6 +268,13 @@ export function ContactsTable({ initialContacts, companies }: Props) {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onImported={refreshContacts}
+      />
+
+      <MergeDuplicatesModal
+        open={mergeOpen}
+        onClose={() => setMergeOpen(false)}
+        duplicates={duplicates}
+        onMerged={refreshContacts}
       />
     </div>
   );

@@ -110,6 +110,76 @@ export async function getDashboardData() {
   };
 }
 
+export type ForecastMonth = {
+  label: string;
+  actual: number;
+  forecast: number;
+};
+
+export async function getForecastData(): Promise<ForecastMonth[] | null> {
+  const session = await auth();
+  const orgId = getOrgId(session);
+  if (!orgId) return null;
+
+  const now = new Date();
+
+  // Get won deals in last 6 months for "actual" bars
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+  const [wonDeals, openDeals, stages] = await Promise.all([
+    db.deal.findMany({
+      where: { organizationId: orgId, status: "WON", closedAt: { gte: sixMonthsAgo } },
+      select: { value: true, closedAt: true },
+    }),
+    db.deal.findMany({
+      where: { organizationId: orgId, status: "OPEN" },
+      select: { value: true, stageId: true, expectedClose: true },
+    }),
+    db.stage.findMany({
+      where: { pipeline: { organizationId: orgId } },
+      select: { id: true, probability: true },
+    }),
+  ]);
+
+  const stageProb = new Map(stages.map((s) => [s.id, s.probability ?? 50]));
+
+  const months: ForecastMonth[] = [];
+
+  for (let i = 5; i >= -3; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const mStart = new Date(d.getFullYear(), d.getMonth(), 1);
+    const mEnd = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    const label = d.toLocaleString("it-IT", { month: "short", year: "2-digit" });
+
+    // Actual: won deals closed in this month
+    const actual = i >= 0
+      ? wonDeals
+          .filter((x) => x.closedAt && new Date(x.closedAt) >= mStart && new Date(x.closedAt) < mEnd)
+          .reduce((s, x) => s + Number(x.value), 0)
+      : 0;
+
+    // Forecast: for future months (i < 0), weight open deals by stage probability + expected close
+    let forecast = 0;
+    if (i <= 0) {
+      for (const deal of openDeals) {
+        const prob = stageProb.get(deal.stageId) ?? 50;
+        if (deal.expectedClose) {
+          const closeDate = new Date(deal.expectedClose);
+          if (closeDate >= mStart && closeDate < mEnd) {
+            forecast += Number(deal.value) * (prob / 100);
+          }
+        } else if (i === 0) {
+          // Deals without expected close go into current month
+          forecast += Number(deal.value) * (prob / 100);
+        }
+      }
+    }
+
+    months.push({ label, actual: Math.round(actual), forecast: Math.round(forecast) });
+  }
+
+  return months;
+}
+
 export type OnboardingStatus = {
   hasCompany:   boolean;
   hasContact:   boolean;

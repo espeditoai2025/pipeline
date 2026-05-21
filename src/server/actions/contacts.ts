@@ -399,6 +399,56 @@ export async function deleteContact(id: string): Promise<{ error: string | null 
   }
 }
 
+export async function mergeContacts(
+  primaryId: string,
+  duplicateId: string,
+  overrides: { firstName?: string; lastName?: string; email?: string; phone?: string; jobTitle?: string; companyId?: string | null },
+): Promise<{ error: string | null }> {
+  const session = await auth();
+  const orgId = getOrgId(session);
+  if (!orgId) return { error: "Non autorizzato" };
+
+  if (primaryId === duplicateId) return { error: "Non puoi unire un contatto con se stesso" };
+
+  try {
+    // Verify both contacts belong to this org
+    const [primary, duplicate] = await Promise.all([
+      db.contact.findFirst({ where: { id: primaryId, organizationId: orgId } }),
+      db.contact.findFirst({ where: { id: duplicateId, organizationId: orgId } }),
+    ]);
+    if (!primary || !duplicate) return { error: "Contatto non trovato" };
+
+    // Reassign all relations from duplicate to primary
+    await db.$transaction([
+      db.deal.updateMany({ where: { contactId: duplicateId }, data: { contactId: primaryId } }),
+      db.activity.updateMany({ where: { contactId: duplicateId }, data: { contactId: primaryId } }),
+      db.email.updateMany({ where: { contactId: duplicateId }, data: { contactId: primaryId } }),
+      db.note.updateMany({ where: { contactId: duplicateId }, data: { contactId: primaryId } }),
+      db.lead.updateMany({ where: { contactId: duplicateId }, data: { contactId: primaryId } }),
+      db.customFieldValue.deleteMany({ where: { contactId: duplicateId } }),
+      // Update primary contact with chosen overrides
+      db.contact.update({
+        where: { id: primaryId },
+        data: {
+          firstName: overrides.firstName ?? primary.firstName,
+          lastName: overrides.lastName !== undefined ? overrides.lastName : primary.lastName,
+          email: overrides.email !== undefined ? overrides.email : primary.email,
+          phone: overrides.phone !== undefined ? overrides.phone : primary.phone,
+          jobTitle: overrides.jobTitle !== undefined ? overrides.jobTitle : primary.jobTitle,
+          companyId: overrides.companyId !== undefined ? overrides.companyId : primary.companyId,
+        },
+      }),
+      // Delete the duplicate
+      db.contact.delete({ where: { id: duplicateId } }),
+    ]);
+
+    revalidatePath("/contacts");
+    return { error: null };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Errore durante l'unione" };
+  }
+}
+
 export async function importContacts(rows: Array<{ firstName: string; lastName?: string; email?: string; phone?: string; jobTitle?: string; companyName?: string }>): Promise<{ imported: number; duplicates: number; error: string | null }> {
   const session = await auth();
   const orgId = getOrgId(session);

@@ -1,12 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Activity as ActivityIcon, CalendarDays, CheckCircle, Clock, Unlink } from "lucide-react";
+import { Activity as ActivityIcon, CalendarDays, CheckCircle, Clock, Unlink, List, CalendarRange } from "lucide-react";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
+import { cn } from "@/lib/utils";
 import { ActivitiesTable } from "./ActivitiesTable";
+import { ActivitiesCalendar } from "./ActivitiesCalendar";
+import { ActivityForm } from "./ActivityForm";
 import { MiniCalendar } from "./MiniCalendar";
 import type { Activity } from "@/types/activities";
+
+type ViewMode = "list" | "calendar";
 
 type Props = {
   initialActivities: Activity[];
@@ -15,9 +20,13 @@ type Props = {
 };
 
 export function ActivitiesPageClient({ initialActivities, gcalConnected: initialGcalConnected, gcalConfigured }: Props) {
-  const [activities] = useState(initialActivities);
+  const [activities, setActivities] = useState(initialActivities);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [gcalConnected, setGcalConnected] = useState(initialGcalConnected);
+  const [view, setView] = useState<ViewMode>("list");
+  const [calFormOpen, setCalFormOpen] = useState(false);
+  const [calEditing, setCalEditing] = useState<Activity | null>(null);
+  const [calNewDate, setCalNewDate] = useState<string | undefined>();
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -56,8 +65,27 @@ export function ActivitiesPageClient({ initialActivities, gcalConnected: initial
           </div>
         </div>
 
-        {/* Google Calendar connect */}
         <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex rounded-lg border border-[var(--crm-neutral-100)] dark:border-white/10 p-0.5 bg-white dark:bg-[#1a1a2e]">
+            {([["list", List, "Lista"], ["calendar", CalendarRange, "Calendario"]] as const).map(([v, Icon, label]) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                  view === v
+                    ? "bg-[var(--crm-primary)] text-white"
+                    : "text-[var(--crm-neutral-500)] hover:text-[var(--crm-neutral-900)] dark:hover:text-white",
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Google Calendar connect */}
           {gcalConfigured && (
             gcalConnected ? (
               <div className="flex items-center gap-2 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 px-3 py-1.5">
@@ -88,7 +116,7 @@ export function ActivitiesPageClient({ initialActivities, gcalConnected: initial
       {/* KPI strip */}
       <div className="flex gap-3 flex-wrap">
         {todayCount > 0 && (
-          <div className="flex items-center gap-2 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20 px-3 py-2 text-sm cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => setSelectedDay(new Date())}>
+          <div className="flex items-center gap-2 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20 px-3 py-2 text-sm cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => { setSelectedDay(new Date()); setView("list"); }}>
             <Clock className="h-4 w-4 text-blue-600" />
             <span className="font-medium text-blue-700 dark:text-blue-400">{todayCount} oggi</span>
           </div>
@@ -107,23 +135,47 @@ export function ActivitiesPageClient({ initialActivities, gcalConnected: initial
         )}
       </div>
 
-      {/* 2-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-6 items-start">
-        <ActivitiesTable
-          initialActivities={activities}
-          filterDay={selectedDay}
-          onClearDay={() => setSelectedDay(null)}
-          gcalConnected={gcalConnected}
-        />
-
-        <div className="lg:sticky lg:top-6">
-          <MiniCalendar
-            activities={activities}
-            selectedDay={selectedDay}
-            onSelectDay={setSelectedDay}
+      {/* Content based on view */}
+      {view === "list" ? (
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-6 items-start">
+          <ActivitiesTable
+            initialActivities={activities}
+            filterDay={selectedDay}
+            onClearDay={() => setSelectedDay(null)}
+            gcalConnected={gcalConnected}
           />
+          <div className="lg:sticky lg:top-6">
+            <MiniCalendar
+              activities={activities}
+              selectedDay={selectedDay}
+              onSelectDay={setSelectedDay}
+            />
+          </div>
         </div>
-      </div>
+      ) : (
+        <>
+          <ActivitiesCalendar
+            activities={activities}
+            onActivityClick={(a) => { setCalEditing(a); setCalFormOpen(true); }}
+            onNewActivity={(date) => {
+              setCalEditing(null);
+              setCalNewDate(date.toISOString().slice(0, 16));
+              setCalFormOpen(true);
+            }}
+          />
+          <ActivityForm
+            open={calFormOpen}
+            onClose={() => { setCalFormOpen(false); setCalEditing(null); setCalNewDate(undefined); }}
+            activity={calEditing}
+            defaultDueDate={calNewDate}
+            onSaved={(saved) => {
+              setActivities(prev =>
+                calEditing ? prev.map(a => a.id === saved.id ? saved : a) : [saved, ...prev]
+              );
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }
