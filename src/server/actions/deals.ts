@@ -6,6 +6,7 @@ import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { runWorkflows } from "@/lib/workflow-engine";
+import { dispatchWebhook } from "@/server/actions/webhooks";
 
 function getOrgId(session: Session | null) {
   return (session?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
@@ -42,6 +43,7 @@ export async function moveDeal(input: z.infer<typeof moveSchema>) {
       fromStageId: parsed.data.oldStageId, toStageId: newStageId,
       ownerId: deal.ownerId, contactId: deal.contactId ?? undefined,
     }).catch(console.error);
+    dispatchWebhook(orgId, "deal.stage_changed", { dealId, title: deal.title, fromStageId: parsed.data.oldStageId, toStageId: newStageId }).catch(() => {});
     return { ok: true };
   } catch {
     return { error: "Errore durante lo spostamento dell'affare" };
@@ -93,11 +95,14 @@ export async function updateDeal(input: z.infer<typeof updateSchema>) {
     const base = { orgId, dealId: updated.id, dealTitle: updated.title, ownerId: updated.ownerId, contactId: updated.contactId ?? undefined };
     if (status === "WON") {
       runWorkflows({ trigger: "DEAL_WON", ...base, dealValue: Number(updated.value) }).catch(console.error);
+      dispatchWebhook(orgId, "deal.won", { id: updated.id, title: updated.title, value: Number(updated.value) }).catch(() => {});
     } else if (status === "LOST") {
       runWorkflows({ trigger: "DEAL_LOST", ...base }).catch(console.error);
+      dispatchWebhook(orgId, "deal.lost", { id: updated.id, title: updated.title }).catch(() => {});
     } else if (rest.value !== undefined && prev && Number(rest.value) !== Number(prev.value)) {
       runWorkflows({ trigger: "DEAL_VALUE_CHANGED", ...base, newValue: Number(updated.value) }).catch(console.error);
     }
+    dispatchWebhook(orgId, "deal.updated", { id: updated.id, title: updated.title, value: Number(updated.value) }).catch(() => {});
 
     return { ok: true };
   } catch {
@@ -144,6 +149,7 @@ export async function createDeal(input: z.infer<typeof createSchema>) {
       orgId, dealId: deal.id, dealTitle: deal.title, dealValue: Number(deal.value),
       ownerId, stageId: deal.stageId, contactId: deal.contactId ?? undefined,
     }).catch(console.error);
+    dispatchWebhook(orgId, "deal.created", { id: deal.id, title: deal.title, value: Number(deal.value), stageId: deal.stageId }).catch(() => {});
     return { ok: true, id: deal.id };
   } catch {
     return { error: "Errore durante la creazione" };
@@ -353,4 +359,109 @@ export async function getDealsForSelect(): Promise<{ id: string; title: string; 
   } catch {
     return [];
   }
+}
+
+// ---------- QUOTE DATA ----------
+
+export type QuoteData = {
+  deal: {
+    id: string;
+    title: string;
+    currency: string;
+    expectedClose: string | null;
+    createdAt: string;
+  };
+  organization: {
+    name: string;
+    vatNumber: string | null;
+    address: string | null;
+    city: string | null;
+    country: string | null;
+    phone: string | null;
+    website: string | null;
+  };
+  contact: { firstName: string; lastName: string | null; email: string | null; phone: string | null } | null;
+  company: { name: string; website: string | null } | null;
+  items: {
+    name: string;
+    code: string | null;
+    quantity: number;
+    unit: string;
+    unitPrice: number;
+    discount: number;
+    taxRate: number;
+    subtotal: number;
+    tax: number;
+    total: number;
+  }[];
+  totals: { subtotal: number; tax: number; total: number };
+};
+
+export async function getQuoteData(dealId: string): Promise<{ data: QuoteData | null; error: string | null }> {
+  const session = await auth();
+  const orgId = getOrgId(session);
+  if (!orgId) return { data: null, error: "Non autorizzato" };
+
+  const deal = await db.deal.findFirst({
+    where: { id: dealId, organizationId: orgId },
+    include: {
+      organization: {
+        select: { name: true, vatNumber: true, address: true, city: true, country: true, phone: true, website: true },
+      },
+      contact: { select: { firstName: true, lastName: true, email: true, phone: true } },
+      company: { select: { name: true, website: true } },
+      products: {
+        include: { product: { select: { name: true, code: true, unit: true, taxRate: true } } },
+        orderBy: { id: "asc" },
+      },
+    },
+  });
+
+  if (!deal) return { data: null, error: "Affare non trovato" };
+  if (deal.products.length === 0) return { data: null, error: "Aggiungi almeno un prodotto all'affare prima di generare il preventivo" };
+
+  const items = deal.products.map((p) => {
+    const unitPrice = Number(p.unitPrice);
+    const discount = Number(p.discount);
+    const taxRate = Number(p.product.taxRate);
+    const subtotal = p.quantity * unitPrice * (1 - discount / 100);
+    const tax = subtotal * (taxRate / 100);
+    return {
+      name: p.product.name,
+      code: p.product.code,
+      quantity: p.quantity,
+      unit: p.product.unit,
+      unitPrice,
+      discount,
+      taxRate,
+      subtotal,
+      tax,
+      total: subtotal + tax,
+    };
+  });
+
+  const totals = items.reduce(
+    (acc, i) => ({ subtotal: acc.subtotal + i.subtotal, tax: acc.tax + i.tax, total: acc.total + i.total }),
+    { subtotal: 0, tax: 0, total: 0 },
+  );
+
+  return {
+    data: {
+      deal: {
+        id: deal.id,
+        title: deal.title,
+        currency: deal.currency,
+        expectedClose: deal.expectedClose?.toISOString() ?? null,
+        createdAt: deal.createdAt.toISOString(),
+      },
+      organization: deal.organization,
+      contact: deal.contact
+        ? { firstName: deal.contact.firstName, lastName: deal.contact.lastName ?? null, email: deal.contact.email ?? null, phone: deal.contact.phone ?? null }
+        : null,
+      company: deal.company,
+      items,
+      totals,
+    },
+    error: null,
+  };
 }

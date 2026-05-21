@@ -11,6 +11,9 @@ import { DealProductsManager } from "@/components/products/DealProductsManager";
 import { DealDetailActions } from "@/components/pipeline/DealDetailActions";
 import { DealNotePanel } from "@/components/pipeline/DealNotePanel";
 import { Breadcrumb } from "@/components/shared/Breadcrumb";
+import { QuotePDFButton } from "@/components/quotes/QuotePDFButton";
+import { WhatsAppButton } from "@/components/shared/WhatsAppButton";
+import { InvoiceButton } from "@/components/invoices/InvoiceButton";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -60,6 +63,12 @@ export default async function DealDetailPage({ params }: Props) {
                 deal={{ ...deal, daysInStage: 0 } as import("@/types/deals").Deal}
                 stages={stages as import("@/types/deals").Stage[]}
                 pipelineId={deal.pipelineId}
+              />
+              <QuotePDFButton dealId={deal.id} />
+              <InvoiceButton
+                dealId={deal.id}
+                contactName={deal.contact?.firstName}
+                companyName={deal.company?.name}
               />
             </div>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm text-[var(--crm-neutral-500)]">
@@ -139,9 +148,17 @@ export default async function DealDetailPage({ params }: Props) {
                 </a>
               )}
               {deal.contact.phone && (
-                <a href={`tel:${deal.contact.phone}`} className="flex items-center gap-2 text-sm text-[var(--crm-primary)] hover:underline">
-                  <Phone className="h-3.5 w-3.5" /> {deal.contact.phone}
-                </a>
+                <div className="flex items-center gap-2">
+                  <a href={`tel:${deal.contact.phone}`} className="flex items-center gap-2 text-sm text-[var(--crm-primary)] hover:underline">
+                    <Phone className="h-3.5 w-3.5" /> {deal.contact.phone}
+                  </a>
+                  <WhatsAppButton
+                    phone={deal.contact.phone}
+                    contactName={deal.contact.firstName}
+                    dealTitle={deal.title}
+                    variant="icon"
+                  />
+                </div>
               )}
             </div>
           )}

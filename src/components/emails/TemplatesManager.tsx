@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Pencil, Trash2, FileText, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, FileText, Loader2, Library } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/components/ui/sheet";
@@ -29,10 +29,75 @@ const CATEGORIES = ["Vendita", "Follow-up", "Chiusura", "Onboarding", "Supporto"
 
 const VARIABLE_HINTS = ["{{nome}}", "{{azienda}}", "{{data}}", "{{prodotto}}", "{{mittente}}", "{{oggetto}}", "{{scadenza}}"];
 
+const PRESET_TEMPLATES = [
+  {
+    name: "Benvenuto nuovo cliente",
+    subject: "Benvenuto in {{azienda}}!",
+    body: "Ciao {{nome}},\n\nGrazie per aver scelto {{azienda}}! Siamo felici di averti a bordo.\n\nIl tuo referente dedicato è {{mittente}} — non esitare a scriverci per qualsiasi esigenza.\n\nA presto,\n{{mittente}}",
+    category: "Onboarding",
+  },
+  {
+    name: "Follow-up dopo call",
+    subject: "Riepilogo della nostra chiamata",
+    body: "Ciao {{nome}},\n\nGrazie per il tempo dedicato alla nostra chiamata di oggi.\n\nCome discusso, ti riepilogo i punti principali:\n- [Punto 1]\n- [Punto 2]\n- [Prossimi passi]\n\nResto a disposizione per qualsiasi domanda.\n\nCordiali saluti,\n{{mittente}}",
+    category: "Follow-up",
+  },
+  {
+    name: "Proposta commerciale",
+    subject: "Proposta per {{azienda}} — {{prodotto}}",
+    body: "Gentile {{nome}},\n\nA seguito del nostro incontro, Le invio la proposta commerciale per {{prodotto}}.\n\nL'offerta include:\n- [Descrizione servizio/prodotto]\n- [Prezzo e condizioni]\n- Validità: {{scadenza}}\n\nResto a disposizione per un incontro di approfondimento.\n\nCordiali saluti,\n{{mittente}}",
+    category: "Vendita",
+  },
+  {
+    name: "Promemoria pagamento",
+    subject: "Promemoria: fattura in scadenza",
+    body: "Gentile {{nome}},\n\nLe ricordiamo che la fattura n. [numero] con scadenza {{scadenza}} risulta ancora in attesa di pagamento.\n\nLa preghiamo di provvedere al saldo al più presto.\n\nPer qualsiasi chiarimento, non esiti a contattarci.\n\nCordiali saluti,\n{{mittente}}",
+    category: "Follow-up",
+  },
+  {
+    name: "Richiesta feedback",
+    subject: "Come è andata? Il tuo feedback è importante",
+    body: "Ciao {{nome}},\n\nSperiamo che tu sia soddisfatto di {{prodotto}}!\n\nCi farebbe molto piacere avere un tuo feedback. Bastano 2 minuti:\n\n[Link al sondaggio]\n\nGrazie mille per il tuo tempo!\n\n{{mittente}}",
+    category: "Supporto",
+  },
+  {
+    name: "Upsell / Cross-sell",
+    subject: "{{nome}}, scopri cosa abbiamo preparato per te",
+    body: "Ciao {{nome}},\n\nCome cliente di {{azienda}}, abbiamo pensato a un'offerta esclusiva per te.\n\n[Descrizione offerta]\n\nL'offerta è valida fino al {{scadenza}}.\n\nVuoi saperne di più? Rispondi a questa email o prenota una call.\n\nA presto,\n{{mittente}}",
+    category: "Vendita",
+  },
+  {
+    name: "Re-engagement contatto freddo",
+    subject: "È passato un po'... ci manchi!",
+    body: "Ciao {{nome}},\n\nÈ passato un po' dall'ultima volta che ci siamo sentiti.\n\nNel frattempo, abbiamo introdotto novità interessanti che potrebbero fare al caso tuo:\n- [Novità 1]\n- [Novità 2]\n\nTi va di fare una breve call per aggiornarci?\n\n{{mittente}}",
+    category: "Follow-up",
+  },
+  {
+    name: "Conferma appuntamento",
+    subject: "Conferma appuntamento del {{data}}",
+    body: "Ciao {{nome}},\n\nTi confermo il nostro appuntamento:\n\n📅 Data: {{data}}\n⏰ Ora: [ora]\n📍 Luogo: [luogo / link videocall]\n\nSe hai bisogno di spostare, rispondi a questa email.\n\nA presto,\n{{mittente}}",
+    category: "Supporto",
+  },
+  {
+    name: "Chiusura affare — prossimi step",
+    subject: "Siamo ufficiali! Ecco i prossimi passi",
+    body: "Ciao {{nome}},\n\nSiamo felici di confermare la chiusura dell'accordo per {{prodotto}}!\n\nEcco i prossimi passi:\n1. [Passo 1 — es. firma contratto]\n2. [Passo 2 — es. onboarding]\n3. [Passo 3 — es. prima consegna]\n\nIl tuo referente dedicato sarà {{mittente}}.\n\nBenvenuto a bordo!\n{{mittente}}",
+    category: "Chiusura",
+  },
+  {
+    name: "Invito evento / webinar",
+    subject: "Sei invitato: [Nome evento] il {{data}}",
+    body: "Ciao {{nome}},\n\nTi invitiamo a [nome evento/webinar] organizzato da {{azienda}}.\n\n📅 {{data}}\n⏰ [ora]\n📍 [luogo / link]\n\nArgomenti:\n- [Topic 1]\n- [Topic 2]\n\nI posti sono limitati — registrati subito!\n\n[Link registrazione]\n\nA presto,\n{{mittente}}",
+    category: "Vendita",
+  },
+];
+
 export function TemplatesManager({ initialTemplates }: Props) {
   const [templates, setTemplates] = useState(initialTemplates);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<EmailTemplate | null>(null);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [importing, setImporting] = useState<string | null>(null);
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -85,10 +150,60 @@ export function TemplatesManager({ initialTemplates }: Props) {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <p className="text-sm text-[var(--crm-neutral-500)]">{templates.length} template disponibili</p>
-        <Button size="sm" className="bg-[var(--crm-primary)] hover:bg-[var(--crm-primary-dark)] text-white" onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-1.5" /> Nuovo template
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setLibraryOpen(true)}>
+            <Library className="h-4 w-4 mr-1.5" /> Template pronti
+          </Button>
+          <Button size="sm" className="bg-[var(--crm-primary)] hover:bg-[var(--crm-primary-dark)] text-white" onClick={openCreate}>
+            <Plus className="h-4 w-4 mr-1.5" /> Nuovo template
+          </Button>
+        </div>
       </div>
+
+      {/* Preset Library Sheet */}
+      <Sheet open={libraryOpen} onOpenChange={setLibraryOpen}>
+        <SheetContent side="right" className="sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Libreria Template Pronti</SheetTitle>
+          </SheetHeader>
+          <SheetBody>
+            <p className="text-xs text-[var(--crm-neutral-500)] mb-4">
+              Seleziona un template per importarlo. Potrai personalizzarlo dopo.
+            </p>
+            <div className="space-y-3">
+              {PRESET_TEMPLATES.map((preset) => (
+                <div key={preset.name} className="rounded-lg border border-[var(--crm-neutral-100)] p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">{preset.name}</p>
+                      <p className="text-xs text-[var(--crm-neutral-500)] mt-0.5">
+                        <span className="bg-[var(--crm-neutral-100)] dark:bg-white/10 rounded px-1.5 py-0.5 text-[10px] font-medium">{preset.category}</span>
+                        {" · "}{preset.subject}
+                      </p>
+                      <p className="text-xs text-[var(--crm-neutral-400)] mt-1 line-clamp-2">{preset.body.slice(0, 120)}...</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={importing === preset.name}
+                      onClick={async () => {
+                        setImporting(preset.name);
+                        const res = await createTemplate(preset);
+                        setImporting(null);
+                        if (res.error) { toast.error(res.error); return; }
+                        setTemplates((prev) => [res.data!, ...prev]);
+                        toast.success(`"${preset.name}" importato!`);
+                      }}
+                    >
+                      {importing === preset.name ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </SheetBody>
+        </SheetContent>
+      </Sheet>
 
       {Object.entries(byCategory).map(([category, items]) => (
         <div key={category}>

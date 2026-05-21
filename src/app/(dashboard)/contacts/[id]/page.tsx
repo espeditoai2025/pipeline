@@ -6,6 +6,7 @@ import { ActivityTimeline } from "@/components/shared/ActivityTimeline";
 import { ContactNotePanel } from "@/components/contacts/ContactNotePanel";
 import { ContactDetailActions } from "@/components/contacts/ContactDetailActions";
 import { Breadcrumb } from "@/components/shared/Breadcrumb";
+import { WhatsAppButton } from "@/components/shared/WhatsAppButton";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -61,12 +62,15 @@ export default async function ContactDetailPage({ params }: Props) {
               </a>
             )}
             {contact.phone && (
-              <a
-                href={`tel:${contact.phone}`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--crm-neutral-200)] px-3 py-2 text-sm hover:bg-[var(--crm-neutral-50)] transition-colors"
-              >
-                <Phone className="h-4 w-4 text-[var(--crm-neutral-400)]" /> Chiama
-              </a>
+              <>
+                <a
+                  href={`tel:${contact.phone}`}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--crm-neutral-200)] px-3 py-2 text-sm hover:bg-[var(--crm-neutral-50)] transition-colors"
+                >
+                  <Phone className="h-4 w-4 text-[var(--crm-neutral-400)]" /> Chiama
+                </a>
+                <WhatsAppButton phone={contact.phone} contactName={contact.firstName} />
+              </>
             )}
           </div>
         </div>

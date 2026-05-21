@@ -231,3 +231,66 @@ export async function getOnboardingStatus(): Promise<OnboardingStatus | null> {
   };
 }
 
+// ─── Team Performance / Leaderboard ───────────────────────────────────────────
+
+export type TeamMember = {
+  id: string;
+  name: string;
+  email: string;
+  dealsWon: number;
+  revenue: number;
+  dealsOpen: number;
+  activitiesDone: number;
+  winRate: number;
+};
+
+export async function getTeamPerformance(days: number = 30): Promise<TeamMember[]> {
+  const session = await auth();
+  const orgId = getOrgId(session);
+  if (!orgId) return [];
+
+  const since = new Date(Date.now() - days * 86400_000);
+
+  const users = await db.user.findMany({
+    where: { organizationId: orgId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      ownedDeals: {
+        where: {
+          OR: [
+            { status: "WON", closedAt: { gte: since } },
+            { status: "LOST", closedAt: { gte: since } },
+            { status: "OPEN" },
+          ],
+        },
+        select: { status: true, value: true },
+      },
+      activities: {
+        where: { completedAt: { gte: since } },
+        select: { id: true },
+      },
+    },
+  });
+
+  return users
+    .map((u) => {
+      const won = u.ownedDeals.filter((d) => d.status === "WON");
+      const lost = u.ownedDeals.filter((d) => d.status === "LOST");
+      const open = u.ownedDeals.filter((d) => d.status === "OPEN");
+      const closed = won.length + lost.length;
+      return {
+        id: u.id,
+        name: u.name ?? u.email.split("@")[0]!,
+        email: u.email,
+        dealsWon: won.length,
+        revenue: won.reduce((s, d) => s + Number(d.value), 0),
+        dealsOpen: open.length,
+        activitiesDone: u.activities.length,
+        winRate: closed > 0 ? Math.round((won.length / closed) * 100) : 0,
+      };
+    })
+    .sort((a, b) => b.revenue - a.revenue);
+}
+

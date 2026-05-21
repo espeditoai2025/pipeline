@@ -28,6 +28,7 @@ export const authConfig: NextAuthConfig = {
         nextUrl.pathname.startsWith("/api/cron/") ||
         nextUrl.pathname.startsWith("/api/track/") ||
         nextUrl.pathname === "/api/stripe/webhook" ||
+        nextUrl.pathname.startsWith("/api/v1/") ||
         nextUrl.pathname.startsWith("/emails/unsubscribe") ||
         nextUrl.pathname.startsWith("/privacy") ||
         nextUrl.pathname.startsWith("/termini") ||
@@ -42,7 +43,9 @@ export const authConfig: NextAuthConfig = {
         nextUrl.pathname.startsWith("/alternativa-") ||
         nextUrl.pathname.startsWith("/migliori-") ||
         nextUrl.pathname.startsWith("/chi-siamo") ||
-        nextUrl.pathname.startsWith("/blog");
+        nextUrl.pathname.startsWith("/blog") ||
+        nextUrl.pathname.startsWith("/book/") ||
+        nextUrl.pathname.startsWith("/survey/");
 
       if (isPublic) return true;
       return isLoggedIn;

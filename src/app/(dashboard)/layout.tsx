@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/shared/Sidebar";
 import { Topbar } from "@/components/shared/Topbar";
 import { CommandPalette } from "@/components/shared/CommandPalette";
 import { AIAssistant } from "@/components/ai/AIAssistant";
+import { MobileBottomNav } from "@/components/shared/MobileBottomNav";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -20,8 +21,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <Sidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
           <Topbar />
-          <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
+          <main className="flex-1 overflow-y-auto p-4 pb-20 md:p-6 md:pb-6">{children}</main>
         </div>
+        <MobileBottomNav />
         <CommandPalette />
         <AIAssistant />
       </div>

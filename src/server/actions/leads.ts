@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { Lead, LeadStatus } from "@/types/contacts";
 import { runWorkflows } from "@/lib/workflow-engine";
+import { dispatchWebhook } from "@/server/actions/webhooks";
 
 function getIds(s: Session | null) {
   const user = s?.user as { id?: string; organizationId?: string } | undefined;
@@ -135,6 +136,7 @@ export async function createLead(input: z.infer<typeof leadSchema>): Promise<{ d
 
     revalidatePath("/leads");
     runWorkflows({ trigger: "LEAD_CREATED", orgId, leadId: row.id, leadTitle: row.title }).catch(console.error);
+    dispatchWebhook(orgId, "lead.created", { id: row.id, title: row.title, email: row.email, source: row.source }).catch(() => {});
     return { data: mapLead(row), error: null };
   } catch (e) {
     return { data: null, error: e instanceof Error ? e.message : "Errore durante la creazione" };

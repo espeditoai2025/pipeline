@@ -8,7 +8,7 @@ import {
   CheckCircle2, Clock, Key, Users, LogOut,
   Monitor, Package, Briefcase, Activity,
   Zap, BarChart3, Send, X, ChevronDown, SlidersHorizontal, DollarSign,
-  Download, AlertTriangle,
+  Download, AlertTriangle, ExternalLink, Receipt, Calendar, ClipboardList, MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -22,11 +22,16 @@ import { getSmtpConfig } from "@/server/actions/smtp";
 import dynamic from "next/dynamic";
 const SmtpWizard = dynamic(() => import("@/components/settings/SmtpWizard").then(m => m.SmtpWizard), { ssr: false, loading: () => <div className="h-12 animate-pulse rounded-lg bg-[var(--crm-neutral-100)]" /> });
 import { CustomFieldsManager } from "@/components/settings/CustomFieldsManager";
+import { WebhooksManager } from "@/components/settings/WebhooksManager";
+import { InvoicesManager } from "@/components/invoices/InvoicesManager";
+import { BookingPagesManager } from "@/components/bookings/BookingPagesManager";
+import { SurveysManager } from "@/components/surveys/SurveysManager";
+import { ChatWidgetManager } from "@/components/settings/ChatWidgetManager";
 import { BillingTypesManager } from "@/components/settings/BillingTypesManager";
 import type { SmtpConfigPublic } from "@/server/actions/smtp";
 type Role = "OWNER" | "ADMIN" | "MANAGER" | "SALES" | "VIEWER";
 
-type Tab = "profile" | "security" | "billing" | "preferences" | "organization" | "email" | "fields" | "pricing";
+type Tab = "profile" | "security" | "billing" | "preferences" | "organization" | "email" | "fields" | "pricing" | "webhooks" | "invoices" | "bookings" | "surveys" | "chatbot";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "profile",      label: "Profilo",        icon: User },
@@ -37,6 +42,11 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "email",        label: "Email",          icon: Mail },
   { id: "fields",       label: "Campi",          icon: SlidersHorizontal },
   { id: "pricing",      label: "Prezzi",         icon: DollarSign },
+  { id: "webhooks",     label: "Webhook",        icon: Zap },
+  { id: "invoices",     label: "Fatture",        icon: Receipt },
+  { id: "bookings",     label: "Prenotazioni",   icon: Calendar },
+  { id: "surveys",      label: "Sondaggi",       icon: ClipboardList },
+  { id: "chatbot",      label: "Chatbot",        icon: MessageCircle },
 ];
 
 const PLANS = [
@@ -486,6 +496,76 @@ export default function SettingsPage() {
                     ))}
                   </div>
                 )}
+              </div>
+
+              {/* API Docs Reference */}
+              <div className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] p-6 space-y-4">
+                <h2 className="text-base font-semibold flex items-center gap-2">
+                  <ExternalLink className="h-4 w-4 text-[var(--crm-primary)]" /> Documentazione API REST
+                </h2>
+                <p className="text-sm text-[var(--crm-neutral-500)]">
+                  Usa le chiavi API per integrare Pipely con Zapier, Make, n8n o qualsiasi sistema esterno.
+                </p>
+
+                <div className="rounded-lg bg-[var(--crm-neutral-50)] dark:bg-white/5 p-4 space-y-3">
+                  <p className="text-xs font-semibold text-[var(--crm-neutral-600)]">Base URL</p>
+                  <code className="block text-xs font-mono bg-black/5 dark:bg-white/10 px-2 py-1 rounded">
+                    https://www.pipely.it/api/v1
+                  </code>
+
+                  <p className="text-xs font-semibold text-[var(--crm-neutral-600)] mt-3">Autenticazione</p>
+                  <code className="block text-xs font-mono bg-black/5 dark:bg-white/10 px-2 py-1 rounded">
+                    Authorization: Bearer pip_live_xxxxx
+                  </code>
+
+                  <p className="text-xs font-semibold text-[var(--crm-neutral-600)] mt-3">Endpoints disponibili</p>
+                  <div className="space-y-1.5 text-xs font-mono">
+                    {[
+                      { method: "GET", path: "/deals", desc: "Lista affari (filtri: search, status, pipeline_id)" },
+                      { method: "POST", path: "/deals", desc: "Crea affare" },
+                      { method: "GET", path: "/deals/:id", desc: "Dettaglio affare" },
+                      { method: "PATCH", path: "/deals/:id", desc: "Aggiorna affare" },
+                      { method: "DELETE", path: "/deals/:id", desc: "Elimina affare" },
+                      { method: "GET", path: "/contacts", desc: "Lista contatti (filtri: search, company_id)" },
+                      { method: "POST", path: "/contacts", desc: "Crea contatto" },
+                      { method: "GET", path: "/contacts/:id", desc: "Dettaglio contatto" },
+                      { method: "PATCH", path: "/contacts/:id", desc: "Aggiorna contatto" },
+                      { method: "DELETE", path: "/contacts/:id", desc: "Elimina contatto" },
+                      { method: "GET", path: "/companies", desc: "Lista aziende" },
+                      { method: "POST", path: "/companies", desc: "Crea azienda" },
+                      { method: "GET", path: "/companies/:id", desc: "Dettaglio azienda" },
+                      { method: "PATCH", path: "/companies/:id", desc: "Aggiorna azienda" },
+                      { method: "DELETE", path: "/companies/:id", desc: "Elimina azienda" },
+                      { method: "GET", path: "/leads", desc: "Lista lead (filtri: search, status, source)" },
+                      { method: "POST", path: "/leads", desc: "Crea lead" },
+                      { method: "GET", path: "/leads/:id", desc: "Dettaglio lead" },
+                      { method: "PATCH", path: "/leads/:id", desc: "Aggiorna lead" },
+                      { method: "DELETE", path: "/leads/:id", desc: "Elimina lead" },
+                    ].map((ep) => (
+                      <div key={ep.method + ep.path} className="flex items-center gap-2">
+                        <span className={`inline-block w-14 text-center rounded px-1 py-0.5 text-[10px] font-bold ${
+                          ep.method === "GET" ? "bg-blue-100 text-blue-700" :
+                          ep.method === "POST" ? "bg-green-100 text-green-700" :
+                          ep.method === "PATCH" ? "bg-amber-100 text-amber-700" :
+                          "bg-red-100 text-red-700"
+                        }`}>{ep.method}</span>
+                        <span className="text-[var(--crm-neutral-700)] dark:text-white/80">{ep.path}</span>
+                        <span className="text-[var(--crm-neutral-400)] font-sans text-[10px] hidden sm:inline">— {ep.desc}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="text-xs font-semibold text-[var(--crm-neutral-600)] mt-3">Paginazione</p>
+                  <p className="text-xs text-[var(--crm-neutral-500)]">
+                    Tutti gli endpoint lista supportano <code className="bg-black/5 dark:bg-white/10 px-1 rounded">?page=1&per_page=25</code> (max 100 per pagina).
+                  </p>
+
+                  <p className="text-xs font-semibold text-[var(--crm-neutral-600)] mt-3">Esempio cURL</p>
+                  <pre className="text-[10px] font-mono bg-black/5 dark:bg-white/10 px-2 py-1.5 rounded overflow-x-auto whitespace-pre-wrap">
+{`curl -H "Authorization: Bearer pip_live_xxxxx" \\
+  https://www.pipely.it/api/v1/deals?status=open&page=1`}
+                  </pre>
+                </div>
               </div>
             </div>
           )}
@@ -939,6 +1019,16 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
+
+          {tab === "webhooks" && <WebhooksManager />}
+
+          {tab === "invoices" && <InvoicesManager />}
+
+          {tab === "bookings" && <BookingPagesManager />}
+
+          {tab === "surveys" && <SurveysManager />}
+
+          {tab === "chatbot" && <ChatWidgetManager />}
 
         </div>
       </div>

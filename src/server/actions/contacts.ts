@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import type { Contact, Company } from "@/types/contacts";
 import { getOrgPlan, checkContactLimit } from "@/lib/plan";
 import { runWorkflows } from "@/lib/workflow-engine";
+import { dispatchWebhook } from "@/server/actions/webhooks";
 
 function getOrgId(s: Session | null) {
   return (s?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
@@ -310,6 +311,7 @@ export async function createContact(input: z.infer<typeof contactSchema>): Promi
       contactEmail: row.email ?? undefined,
       ownerId: row.ownerId,
     }).catch(console.error);
+    dispatchWebhook(orgId, "contact.created", { id: row.id, firstName: row.firstName, lastName: row.lastName, email: row.email }).catch(() => {});
     return {
       data: {
         id: row.id,

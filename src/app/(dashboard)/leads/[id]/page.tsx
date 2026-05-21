@@ -7,6 +7,7 @@ import {
 import { getLeadDetail } from "@/server/actions/leads";
 import { LeadDetailClient } from "@/components/leads/LeadDetailClient";
 import { Breadcrumb } from "@/components/shared/Breadcrumb";
+import { WhatsAppButton } from "@/components/shared/WhatsAppButton";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -103,7 +104,10 @@ export default async function LeadDetailPage({ params }: Props) {
                 <Phone className="h-4 w-4 text-[var(--crm-neutral-400)] mt-0.5 shrink-0" />
                 <div className="min-w-0">
                   <p className="text-xs text-[var(--crm-neutral-400)]">Telefono</p>
-                  <a href={`tel:${lead.phone}`} className="text-sm text-[var(--crm-primary)] hover:underline">{lead.phone}</a>
+                  <div className="flex items-center gap-2">
+                    <a href={`tel:${lead.phone}`} className="text-sm text-[var(--crm-primary)] hover:underline">{lead.phone}</a>
+                    <WhatsAppButton phone={lead.phone} contactName={lead.title.split(" ")[0]} variant="icon" />
+                  </div>
                 </div>
               </div>
             )}

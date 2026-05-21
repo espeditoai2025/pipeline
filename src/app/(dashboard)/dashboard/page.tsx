@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import { getDashboardData, getOnboardingStatus, getForecastData } from "@/server/actions/dashboard";
 import { getCrmMode, isCrmModeSet } from "@/server/actions/crm-mode";
 import { AIInsightsStrip } from "@/components/ai/AIInsightsStrip";
+import { TeamLeaderboard } from "@/components/dashboard/TeamLeaderboard";
 import { OnboardingWizard } from "@/components/dashboard/OnboardingWizard";
 import { CrmModeBadge } from "@/components/dashboard/CrmModeBadge";
 import { auth } from "@/lib/auth";
@@ -134,7 +135,7 @@ export default async function DashboardPage() {
       <AIInsightsStrip compact />
 
       <div className="rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 bg-white dark:bg-[#1a1a2e] p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-3">
             <TrendingUp className="h-5 w-5 text-[var(--crm-primary)]" />
             <h2 className="text-sm font-semibold text-[var(--crm-neutral-900)] dark:text-white">Forecast Pipeline</h2>
@@ -142,17 +143,17 @@ export default async function DashboardPage() {
           <div className="flex items-center gap-4 text-right">
             <div>
               <p className="text-[10px] uppercase tracking-wide text-[var(--crm-neutral-400)]">Forecast</p>
-              <p className="text-base font-bold text-[var(--crm-primary)]">{formatEur(forecast)}</p>
+              <p className="text-sm sm:text-base font-bold text-[var(--crm-primary)]">{formatEur(forecast)}</p>
             </div>
             <div className="h-6 w-px bg-[var(--crm-neutral-100)]" />
             <div>
               <p className="text-[10px] uppercase tracking-wide text-[var(--crm-neutral-400)]">Avg deal</p>
-              <p className="text-base font-bold">{formatEur(kpis.avgDeal)}</p>
+              <p className="text-sm sm:text-base font-bold">{formatEur(kpis.avgDeal)}</p>
             </div>
             <div className="h-6 w-px bg-[var(--crm-neutral-100)]" />
             <div>
               <p className="text-[10px] uppercase tracking-wide text-[var(--crm-neutral-400)]">Pipeline</p>
-              <p className="text-base font-bold">{kpis.openDeals}</p>
+              <p className="text-sm sm:text-base font-bold">{kpis.openDeals}</p>
             </div>
           </div>
         </div>
@@ -172,6 +173,8 @@ export default async function DashboardPage() {
         <h2 className="text-sm font-semibold text-[var(--crm-neutral-900)] dark:text-white mb-4">{t("pipelineOverview")}</h2>
         <PipelineOverviewChartLazy data={pipelineChartData} />
       </div>
+
+      <TeamLeaderboard />
     </div>
   );
 }

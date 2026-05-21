@@ -59,6 +59,11 @@ model Organization {
   leadFinderSearches  LeadFinderSearch[]
   leadCandidates      LeadCandidate[]
   apiKeys             ApiKey[]
+  webhooks            Webhook[]
+  invoices            Invoice[]
+  bookingPages        BookingPage[]
+  surveys             Survey[]
+  chatMessages        ChatMessage[]
 }
 
 model Invitation {
@@ -105,6 +110,8 @@ model User {
   emailAccounts  EmailAccount[]
   notifications  Notification[]
   apiKeys        ApiKey[]
+  invoicesCreated Invoice[]    @relation("InvoiceCreator")
+  bookingPages    BookingPage[]
 
   @@index([organizationId])
 }
@@ -171,6 +178,7 @@ model Deal {
   emails       Email[]
   products     DealProduct[]
   customValues CustomFieldValue[]
+  invoices     Invoice[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -644,6 +652,39 @@ model ApiKey {
   @@index([keyHash])
 }
 
+// ============ WEBHOOKS ============
+
+model Webhook {
+  id             String       @id @default(cuid())
+  name           String
+  url            String       // Target URL to POST to
+  secret         String       // HMAC-SHA256 signing secret
+  events         String[]     // e.g. ["deal.created", "deal.won", "contact.created"]
+  isActive       Boolean      @default(true)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deliveries     WebhookDelivery[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+}
+
+model WebhookDelivery {
+  id         String   @id @default(cuid())
+  webhookId  String
+  webhook    Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  event      String
+  payload    Json
+  statusCode Int?
+  response   String?
+  success    Boolean  @default(false)
+  attempts   Int      @default(1)
+  createdAt  DateTime @default(now())
+
+  @@index([webhookId])
+}
+
 // ============ SMTP CONFIG ============
 
 model SmtpConfig {
@@ -661,4 +702,162 @@ model SmtpConfig {
   isVerified     Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+// ============ FATTURAZIONE ============
+
+model Invoice {
+  id               String        @id @default(cuid())
+  number           String        // FT-2026/001
+  year             Int
+  progressive      Int           // progressive number within the year
+  status           InvoiceStatus @default(DRAFT)
+  issueDate        DateTime      @default(now())
+  dueDate          DateTime?
+  paidAt           DateTime?
+
+  // Emittente (org)
+  senderName       String
+  senderVat        String        // P.IVA
+  senderAddress    String?
+  senderCity       String?
+  senderCountry    String        @default("IT")
+
+  // Destinatario
+  recipientName    String
+  recipientVat     String?       // P.IVA o Codice Fiscale
+  recipientSdi     String?       // Codice SDI (7 chars) or PEC
+  recipientAddress String?
+  recipientCity    String?
+  recipientCountry String        @default("IT")
+
+  // Totali
+  subtotal         Decimal       @default(0)
+  taxAmount        Decimal       @default(0)
+  total            Decimal       @default(0)
+  currency         String        @default("EUR")
+
+  // Righe fattura (JSON array)
+  items            Json          // InvoiceItem[]
+
+  // Riferimenti
+  notes            String?
+  paymentMethod    String?       // "bonifico" | "carta" | "contanti" | etc.
+  paymentTerms     String?       // "30gg" | "60gg" | "immediato"
+
+  dealId           String?
+  deal             Deal?         @relation(fields: [dealId], references: [id])
+  organizationId   String
+  organization     Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdById      String
+  createdBy        User          @relation("InvoiceCreator", fields: [createdById], references: [id])
+
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@unique([organizationId, year, progressive])
+  @@index([organizationId, status])
+  @@index([dealId])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  CANCELLED
+}
+
+// ============ BOOKING PAGES ============
+
+model BookingPage {
+  id             String       @id @default(cuid())
+  slug           String       @unique
+  title          String
+  description    String?
+  duration       Int          @default(30) // minutes
+  availability   Json         // { "mon": ["09:00-13:00","14:00-18:00"], ... }
+  bufferBefore   Int          @default(0)  // minutes before meeting
+  bufferAfter    Int          @default(15) // minutes after meeting
+  maxDaysAhead   Int          @default(30) // how far in advance
+  isActive       Boolean      @default(true)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  bookings       Booking[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+}
+
+model Booking {
+  id             String      @id @default(cuid())
+  bookingPageId  String
+  bookingPage    BookingPage @relation(fields: [bookingPageId], references: [id], onDelete: Cascade)
+  guestName      String
+  guestEmail     String
+  guestPhone     String?
+  notes          String?
+  startTime      DateTime
+  endTime        DateTime
+  status         String      @default("CONFIRMED") // CONFIRMED | CANCELLED
+  createdAt      DateTime    @default(now())
+
+  @@index([bookingPageId, startTime])
+}
+
+// ============ SURVEY ============
+
+model Survey {
+  id             String       @id @default(cuid())
+  title          String
+  description    String?
+  isActive       Boolean      @default(true)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  questions      SurveyQuestion[]
+  responses      SurveyResponse[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+}
+
+model SurveyQuestion {
+  id         String   @id @default(cuid())
+  surveyId   String
+  survey     Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  text       String
+  type       String   // "text" | "choice" | "rating"
+  options    Json?    // ["Opzione 1", "Opzione 2", ...] for choice type
+  required   Boolean  @default(false)
+  position   Int      @default(0)
+  createdAt  DateTime @default(now())
+}
+
+model SurveyResponse {
+  id         String   @id @default(cuid())
+  surveyId   String
+  survey     Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  answers    Json     // { questionId: answer }
+  respondent String?  // name or email (optional)
+  createdAt  DateTime @default(now())
+}
+
+// ============ CHAT WIDGET ============
+
+model ChatMessage {
+  id             String       @id @default(cuid())
+  visitorName    String
+  visitorEmail   String
+  message        String       @db.Text
+  page           String?      // URL where widget was opened
+  isRead         Boolean      @default(false)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  leadId         String?      // if converted to lead
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, isRead])
 }
