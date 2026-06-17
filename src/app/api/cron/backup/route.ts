@@ -12,6 +12,7 @@ import { db } from "@/lib/db";
 import { resend, FROM_DEFAULT } from "@/lib/resend";
 import { logger } from "@/lib/logger";
 import { runWorkflows, runStepsFrom, type WorkflowPayload } from "@/lib/workflow-engine";
+import { processWebhookRetries } from "@/server/actions/webhooks";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -166,7 +167,14 @@ export async function GET(req: NextRequest) {
       logger.info("cron:backup", "Workflow in coda ripresi", { count: queueResumed });
     }
 
-    return NextResponse.json({ ok: true, snapshot, overdueTriggered: overdueActivities.length, queueResumed });
+    // ── Webhook retry — fallback daily run (a dedicated cron handles it more
+    // frequently when the plan allows; this guarantees retries happen at least daily).
+    const webhooksRetried = await processWebhookRetries(100).catch(() => 0);
+    if (webhooksRetried > 0) {
+      logger.info("cron:backup", "Consegne webhook ritentate", { count: webhooksRetried });
+    }
+
+    return NextResponse.json({ ok: true, snapshot, overdueTriggered: overdueActivities.length, queueResumed, webhooksRetried });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error("cron:backup", "Backup snapshot fallito", { error: message });
