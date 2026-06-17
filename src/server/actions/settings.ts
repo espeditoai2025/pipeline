@@ -332,7 +332,11 @@ export async function changePassword(
   if (currentPassword === newPassword) return { error: "La nuova password deve essere diversa da quella attuale" };
 
   const newHash = await hash(newPassword, 12);
-  await db.user.update({ where: { id: userId }, data: { passwordHash: newHash } });
+  // passwordChangedAt invalidates JWT sessions issued before this change (M5).
+  await db.user.update({
+    where: { id: userId },
+    data: { passwordHash: newHash, passwordChangedAt: new Date() },
+  });
 
   return { error: null };
 }

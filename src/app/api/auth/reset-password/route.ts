@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 
   const { token, password } = parsed.data;
 
-  const payload = verifyToken(token);
+  const payload = await verifyToken(token);
   if (!payload) {
     return NextResponse.json({ error: "Link non valido o scaduto. Richiedi un nuovo link." }, { status: 400 });
   }
@@ -38,7 +38,12 @@ export async function POST(req: NextRequest) {
   }
 
   const passwordHash = await hash(password, 12);
-  await db.user.update({ where: { id: payload.userId }, data: { passwordHash } });
+  // passwordChangedAt invalidates older JWT sessions (M5); the new hash also
+  // kills any other outstanding reset token (M4).
+  await db.user.update({
+    where: { id: payload.userId },
+    data: { passwordHash, passwordChangedAt: new Date() },
+  });
 
   logger.info("reset-password", "Password reimpostata", { userId: payload.userId });
 

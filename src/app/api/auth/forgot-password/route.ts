@@ -21,10 +21,14 @@ function getResetSecret(): string {
   return secret;
 }
 
-/** Signs a password-reset token valid for 1 hour. */
-function signToken(userId: string, expiresAt: number): string {
+/**
+ * Signs a password-reset token valid for 1 hour. The current passwordHash is
+ * mixed into the signature so the token becomes single-use: once the password
+ * is reset the hash changes and any outstanding token stops validating.
+ */
+function signToken(userId: string, expiresAt: number, passwordHash: string): string {
   const payload = `${userId}:${expiresAt}`;
-  const sig = createHmac("sha256", getResetSecret()).update(payload).digest("hex");
+  const sig = createHmac("sha256", getResetSecret()).update(`${payload}:${passwordHash}`).digest("hex");
   return Buffer.from(`${payload}:${sig}`).toString("base64url");
 }
 
@@ -48,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   if (user?.passwordHash) {
     const expiresAt = Date.now() + 60 * 60 * 1000; // 1 hour
-    const token = signToken(user.id, expiresAt);
+    const token = signToken(user.id, expiresAt, user.passwordHash);
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://www.pipely.it").replace(/\/$/, "");
     const resetUrl = `${appUrl}/reset-password?token=${token}`;
 
@@ -81,8 +85,13 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true });
 }
 
-/** Exported for use by reset-password route. */
-export function verifyToken(token: string): { userId: string } | null {
+/**
+ * Verifies a reset token. Async because it must re-fetch the user's CURRENT
+ * passwordHash to recompute the signature — this is what makes the token
+ * single-use (a token signed against the old hash fails after a reset).
+ * Exported for use by the reset-password route.
+ */
+export async function verifyToken(token: string): Promise<{ userId: string } | null> {
   try {
     const decoded = Buffer.from(token, "base64url").toString("utf8");
     const parts = decoded.split(":");
@@ -93,7 +102,12 @@ export function verifyToken(token: string): { userId: string } | null {
     const expiresAt = Number(expiresAtStr);
     if (Date.now() > expiresAt) return null;
 
-    const expected = createHmac("sha256", getResetSecret()).update(`${userId}:${expiresAtStr}`).digest("hex");
+    const user = await db.user.findUnique({ where: { id: userId }, select: { passwordHash: true } });
+    if (!user?.passwordHash) return null;
+
+    const expected = createHmac("sha256", getResetSecret())
+      .update(`${userId}:${expiresAtStr}:${user.passwordHash}`)
+      .digest("hex");
     if (sig !== expected) return null;
 
     return { userId };
