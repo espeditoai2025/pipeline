@@ -31,3 +31,21 @@ export function decrypt(ciphertext: string): string {
   const decipher = crypto.createDecipheriv(ALG, getKey(), iv);
   return Buffer.concat([decipher.update(enc), decipher.final()]).toString("utf8");
 }
+
+// Ciphertext format produced by encrypt(): "<ivHex>:<encHex>".
+const ENCRYPTED_RE = /^[0-9a-f]+:[0-9a-f]+$/i;
+
+/**
+ * Decrypts a value that may be either encrypted (new) or legacy plaintext.
+ * Used for fields migrated to encryption-at-rest where older rows are still
+ * stored in clear (e.g. Google OAuth tokens). Returns the value unchanged if it
+ * isn't in encrypted form or can't be decrypted.
+ */
+export function tryDecrypt(value: string): string {
+  if (!ENCRYPTED_RE.test(value)) return value; // legacy plaintext
+  try {
+    return decrypt(value);
+  } catch {
+    return value;
+  }
+}

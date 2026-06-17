@@ -2,6 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { encrypt, tryDecrypt } from "@/lib/crypto";
 import type { Activity } from "@/types/activities";
 
 async function getValidToken(userId: string): Promise<string | null> {
@@ -19,7 +20,8 @@ async function getValidToken(userId: string): Promise<string | null> {
     ? new Date(user.googleCalendarTokenExpiry) < new Date(Date.now() + 60_000)
     : false;
 
-  if (!isExpired) return user.googleCalendarToken;
+  // Tokens are encrypted at rest; tryDecrypt also handles legacy plaintext rows.
+  if (!isExpired) return tryDecrypt(user.googleCalendarToken);
 
   if (!user.googleCalendarRefreshToken) return null;
 
@@ -30,7 +32,7 @@ async function getValidToken(userId: string): Promise<string | null> {
       body: new URLSearchParams({
         client_id: process.env.GOOGLE_CLIENT_ID!,
         client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-        refresh_token: user.googleCalendarRefreshToken,
+        refresh_token: tryDecrypt(user.googleCalendarRefreshToken),
         grant_type: "refresh_token",
       }),
     });
@@ -40,7 +42,7 @@ async function getValidToken(userId: string): Promise<string | null> {
     const expiry = new Date(Date.now() + (data.expires_in ?? 3600) * 1000);
     await db.user.update({
       where: { id: userId },
-      data: { googleCalendarToken: data.access_token, googleCalendarTokenExpiry: expiry },
+      data: { googleCalendarToken: encrypt(data.access_token), googleCalendarTokenExpiry: expiry },
     });
     return data.access_token;
   } catch {
