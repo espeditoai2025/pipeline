@@ -193,44 +193,59 @@ export async function createInvoiceFromDeal(
   const taxAmount = items.reduce((s, i) => s + i.tax, 0);
   const total = subtotal + taxAmount;
 
-  // Progressive number for this year
   const year = new Date().getFullYear();
-  const lastInvoice = await db.invoice.findFirst({
-    where: { organizationId: orgId, year },
-    orderBy: { progressive: "desc" },
-    select: { progressive: true },
-  });
-  const progressive = (lastInvoice?.progressive ?? 0) + 1;
-  const number = `FT-${year}/${String(progressive).padStart(3, "0")}`;
 
-  const invoice = await db.invoice.create({
-    data: {
-      number,
-      year,
-      progressive,
-      senderName: deal.organization.name,
-      senderVat: deal.organization.vatNumber,
-      senderAddress: deal.organization.address,
-      senderCity: deal.organization.city,
-      senderCountry: deal.organization.country ?? "IT",
-      recipientName: input.recipientName,
-      recipientVat: input.recipientVat || null,
-      recipientSdi: input.recipientSdi || null,
-      recipientAddress: input.recipientAddress || null,
-      recipientCity: input.recipientCity || null,
-      subtotal,
-      taxAmount,
-      total,
-      items: items as any,
-      notes: input.notes || null,
-      paymentMethod: input.paymentMethod || null,
-      paymentTerms: input.paymentTerms || null,
-      dueDate: input.dueDate ? new Date(input.dueDate) : null,
-      dealId: deal.id,
-      organizationId: orgId,
-      createdById: userId,
-    },
-  });
+  // Shared invoice payload (everything except the per-year progressive number).
+  const baseData = {
+    senderName: deal.organization.name,
+    senderVat: deal.organization.vatNumber,
+    senderAddress: deal.organization.address,
+    senderCity: deal.organization.city,
+    senderCountry: deal.organization.country ?? "IT",
+    recipientName: input.recipientName,
+    recipientVat: input.recipientVat || null,
+    recipientSdi: input.recipientSdi || null,
+    recipientAddress: input.recipientAddress || null,
+    recipientCity: input.recipientCity || null,
+    subtotal,
+    taxAmount,
+    total,
+    items: items as any,
+    notes: input.notes || null,
+    paymentMethod: input.paymentMethod || null,
+    paymentTerms: input.paymentTerms || null,
+    dueDate: input.dueDate ? new Date(input.dueDate) : null,
+    dealId: deal.id,
+    organizationId: orgId,
+    createdById: userId,
+  };
+
+  // The progressive number is read-then-written, so two concurrent invoices can
+  // collide on @@unique([organizationId, year, progressive]). Retry on the
+  // resulting P2002 with a freshly recomputed progressive instead of crashing.
+  let invoice: { id: string; number: string } | null = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const lastInvoice = await db.invoice.findFirst({
+      where: { organizationId: orgId, year },
+      orderBy: { progressive: "desc" },
+      select: { progressive: true },
+    });
+    const progressive = (lastInvoice?.progressive ?? 0) + 1;
+    const number = `FT-${year}/${String(progressive).padStart(3, "0")}`;
+
+    try {
+      invoice = await db.invoice.create({
+        data: { number, year, progressive, ...baseData },
+        select: { id: true, number: true },
+      });
+      break;
+    } catch (e) {
+      if ((e as { code?: string }).code === "P2002" && attempt < 4) continue;
+      return { data: null, error: "Errore nella numerazione della fattura. Riprova." };
+    }
+  }
+
+  if (!invoice) return { data: null, error: "Impossibile generare un numero fattura univoco. Riprova." };
 
   revalidatePath("/settings");
   return { data: { id: invoice.id, number: invoice.number }, error: null };

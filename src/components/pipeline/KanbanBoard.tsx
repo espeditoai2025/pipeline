@@ -5,11 +5,14 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  KeyboardSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
   type DragStartEvent,
+  type Announcements,
 } from "@dnd-kit/core";
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { toast } from "sonner";
 import { moveDeal } from "@/server/actions/deals";
 import type { Deal, Pipeline, Stage } from "@/types/deals";
@@ -27,7 +30,18 @@ export function KanbanBoard({ pipeline, onDealClick }: Props) {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+
+  // Screen-reader announcements in Italian for keyboard drag-and-drop (WCAG 2.1.1).
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => `Hai preso l'affare ${active.id}. Usa le frecce per spostarlo, spazio per rilasciare.`,
+    onDragOver: ({ active, over }) =>
+      over ? `Affare ${active.id} sopra ${over.id}.` : `Affare ${active.id} non è sopra una zona valida.`,
+    onDragEnd: ({ active, over }) =>
+      over ? `Affare ${active.id} rilasciato su ${over.id}.` : `Affare ${active.id} rilasciato.`,
+    onDragCancel: ({ active }) => `Spostamento dell'affare ${active.id} annullato.`,
+  };
 
   function findStageByDealId(dealId: string) {
     return stages.find((s) => s.deals.some((d) => d.id === dealId));
@@ -96,7 +110,7 @@ export function KanbanBoard({ pipeline, onDealClick }: Props) {
   }, [stages, pipeline.stages]);
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} accessibility={{ announcements }}>
       <div className="w-full flex gap-4 overflow-x-auto pb-4" data-testid="kanban-board">
         {stages.map((stage) => (
           <StageColumn key={stage.id} stage={stage} onDealClick={onDealClick} />

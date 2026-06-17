@@ -7,11 +7,16 @@ export const runtime = "nodejs";
 
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET!;
 
+// "past_due" is kept on PRO as a grace period: Stripe is still retrying the
+// payment (dunning). The org is only downgraded when the subscription reaches a
+// terminal unpaid/canceled state (handled by subscription.updated/deleted).
+const GRACE_STATUSES = new Set<Stripe.Subscription.Status>(["active", "trialing", "past_due"]);
+
 async function handleSubscriptionUpsert(subscription: Stripe.Subscription) {
   const orgId = subscription.metadata?.organizationId;
   if (!orgId) return;
 
-  const isActive = subscription.status === "active" || subscription.status === "trialing";
+  const isActive = GRACE_STATUSES.has(subscription.status);
 
   const priceId = subscription.items.data[0]?.price?.id ?? null;
 
@@ -54,6 +59,15 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Invalid signature";
     return NextResponse.json({ error: msg }, { status: 400 });
+  }
+
+  // Idempotency: ignore events we've already processed (Stripe retries deliveries
+  // and may deliver out of order). The unique insert acts as a processing lock.
+  try {
+    await db.processedStripeEvent.create({ data: { id: event.id, type: event.type } });
+  } catch {
+    // Duplicate event id → already handled. Ack so Stripe stops retrying.
+    return NextResponse.json({ received: true, duplicate: true });
   }
 
   try {

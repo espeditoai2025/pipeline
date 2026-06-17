@@ -672,82 +672,91 @@ export async function convertLead(
       include: { stages: { orderBy: { position: "asc" }, take: 1 } },
     });
     if (!pipeline?.stages[0]) return { dealId: null, contactId: null, companyId: null, error: "Nessuna pipeline configurata" };
+    const firstStageId = pipeline.stages[0].id;
 
-    // Optionally create a Company
-    let companyId: string | null = null;
-    if (parsed.data.createCompany && parsed.data.companyName) {
-      const company = await db.company.create({
-        data: {
-          name: parsed.data.companyName,
-          website: parsed.data.companyWebsite || null,
-          industry: parsed.data.companySector || null,
-          size: parsed.data.companySize || null,
-          organizationId: orgId,
-        },
+    // Resolve the product price (scoped to the org) BEFORE the transaction.
+    let productUnitPrice: number | undefined = parsed.data.productId ? parsed.data.productUnitPrice : undefined;
+    if (parsed.data.productId && productUnitPrice === undefined) {
+      const product = await db.product.findFirst({
+        where: { id: parsed.data.productId, organizationId: orgId },
+        select: { unitPrice: true },
       });
-      companyId = company.id;
+      productUnitPrice = product ? Number(product.unitPrice) : 0;
     }
 
-    // Optionally create a Contact (linked to company if created)
-    let contactId: string | null = lead.contactId ?? null;
-    if (parsed.data.createContact && parsed.data.contactFirstName) {
-      const contact = await db.contact.create({
+    // All writes in a single transaction: a mid-way failure must not leave
+    // orphan company/contact/deal or a re-convertible lead (duplicates).
+    const { dealId, contactId, companyId } = await db.$transaction(async (tx) => {
+      let companyId: string | null = null;
+      if (parsed.data.createCompany && parsed.data.companyName) {
+        const company = await tx.company.create({
+          data: {
+            name: parsed.data.companyName,
+            website: parsed.data.companyWebsite || null,
+            industry: parsed.data.companySector || null,
+            size: parsed.data.companySize || null,
+            organizationId: orgId,
+          },
+        });
+        companyId = company.id;
+      }
+
+      let contactId: string | null = lead.contactId ?? null;
+      if (parsed.data.createContact && parsed.data.contactFirstName) {
+        const contact = await tx.contact.create({
+          data: {
+            firstName: parsed.data.contactFirstName,
+            lastName: parsed.data.contactLastName || null,
+            email: parsed.data.contactEmail || lead.email || null,
+            phone: parsed.data.contactPhone || lead.phone || null,
+            organizationId: orgId,
+            ownerId: userId,
+            companyId: companyId ?? undefined,
+          },
+        });
+        contactId = contact.id;
+      }
+
+      const deal = await tx.deal.create({
         data: {
-          firstName: parsed.data.contactFirstName,
-          lastName: parsed.data.contactLastName || null,
-          email: parsed.data.contactEmail || lead.email || null,
-          phone: parsed.data.contactPhone || lead.phone || null,
+          title: parsed.data.dealTitle,
+          value: parsed.data.dealValue,
+          currency: parsed.data.currency,
+          status: "OPEN",
+          pipelineId: pipeline.id,
+          stageId: firstStageId,
           organizationId: orgId,
           ownerId: userId,
+          contactId: contactId ?? undefined,
           companyId: companyId ?? undefined,
         },
       });
-      contactId = contact.id;
-    }
 
-    const deal = await db.deal.create({
-      data: {
-        title: parsed.data.dealTitle,
-        value: parsed.data.dealValue,
-        currency: parsed.data.currency,
-        status: "OPEN",
-        pipelineId: pipeline.id,
-        stageId: pipeline.stages[0].id,
-        organizationId: orgId,
-        ownerId: userId,
-        contactId: contactId ?? undefined,
-        companyId: companyId ?? undefined,
-      },
-    });
-
-    // Optionally link a product to the deal
-    if (parsed.data.productId) {
-      let unitPrice = parsed.data.productUnitPrice;
-      if (unitPrice === undefined) {
-        const product = await db.product.findUnique({ where: { id: parsed.data.productId }, select: { unitPrice: true } });
-        unitPrice = product ? Number(product.unitPrice) : 0;
+      if (parsed.data.productId) {
+        await tx.dealProduct.create({
+          data: {
+            dealId: deal.id,
+            productId: parsed.data.productId,
+            quantity: parsed.data.productQuantity ?? 1,
+            unitPrice: productUnitPrice ?? 0,
+            discount: 0,
+          },
+        });
       }
-      await db.dealProduct.create({
-        data: {
-          dealId: deal.id,
-          productId: parsed.data.productId,
-          quantity: parsed.data.productQuantity ?? 1,
-          unitPrice,
-          discount: 0,
-        },
-      });
-    }
 
-    await db.lead.update({
-      where: { id },
-      data: { status: "CONVERTED", convertedDealId: deal.id, contactId: contactId ?? undefined },
+      await tx.lead.update({
+        where: { id },
+        data: { status: "CONVERTED", convertedDealId: deal.id, contactId: contactId ?? undefined },
+      });
+
+      return { dealId: deal.id, contactId, companyId };
     });
 
     revalidatePath("/leads");
     revalidatePath("/deals");
     revalidatePath("/contacts");
     revalidatePath("/companies");
-    return { dealId: deal.id, contactId, companyId, error: null };
+    return { dealId, contactId, companyId, error: null };
   } catch (e) {
     return { dealId: null, contactId: null, companyId: null, error: e instanceof Error ? e.message : "Errore durante la conversione" };
   }
