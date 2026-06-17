@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { assertPublicUrl } from "@/lib/ssrf";
 
 function getOrgId(s: Session | null) {
   return (s?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
@@ -89,6 +90,13 @@ export async function createWebhook(input: z.infer<typeof createSchema>): Promis
   const parsed = createSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
 
+  // SSRF guard: only public https endpoints (no internal/metadata IPs).
+  try {
+    await assertPublicUrl(parsed.data.url);
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : "URL non consentito" };
+  }
+
   // Max 10 webhooks per org
   const count = await db.webhook.count({ where: { organizationId: orgId } });
   if (count >= 10) return { data: null, error: "Massimo 10 webhook per organizzazione" };
@@ -131,6 +139,15 @@ export async function updateWebhook(
   const session = await auth();
   const orgId = getOrgId(session);
   if (!orgId) return { error: "Non autorizzato" };
+
+  // SSRF guard on URL change (updateWebhook previously skipped validation).
+  if (input.url !== undefined) {
+    try {
+      await assertPublicUrl(input.url);
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "URL non consentito" };
+    }
+  }
 
   try {
     await db.webhook.update({
@@ -233,6 +250,24 @@ export async function dispatchWebhook(orgId: string, event: WebhookEvent, data: 
       let response: string | null = null;
       let success = false;
 
+      // Re-validate at send time (defends against DNS rebinding / record changes
+      // after the webhook was created).
+      try {
+        await assertPublicUrl(webhook.url);
+      } catch (e) {
+        await db.webhookDelivery.create({
+          data: {
+            webhookId: webhook.id,
+            event,
+            payload: data as object,
+            statusCode: null,
+            response: (e instanceof Error ? e.message : "URL non consentito").slice(0, 1000),
+            success: false,
+          },
+        }).catch(() => {});
+        return;
+      }
+
       try {
         const res = await fetch(webhook.url, {
           method: "POST",
@@ -289,6 +324,13 @@ export async function testWebhook(id: string): Promise<{ success: boolean; statu
   });
 
   const signature = signPayload(payload, webhook.secret);
+
+  // SSRF guard before issuing the test request.
+  try {
+    await assertPublicUrl(webhook.url);
+  } catch (e) {
+    return { success: false, statusCode: null, error: e instanceof Error ? e.message : "URL non consentito" };
+  }
 
   try {
     const res = await fetch(webhook.url, {

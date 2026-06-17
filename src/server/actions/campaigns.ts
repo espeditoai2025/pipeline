@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { resend, FROM_DEFAULT } from "@/lib/resend";
 import type { EmailList, EmailListDetail, EmailListContact, EmailCampaign } from "@/types/emails";
 import { getOrgPlan, checkFeature } from "@/lib/plan";
+import { sendViaSMTP } from "@/server/actions/smtp";
 
 function getOrgId(s: Session | null) {
   return (s?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
@@ -382,27 +383,45 @@ export async function sendCampaign(id: string): Promise<AR<{ sent: number; faile
     const listUnsubscribeHeader = `<mailto:unsubscribe@pipely.it?subject=unsubscribe&body=${contact.id}>, <${unsubscribeUrl}>`;
 
     try {
-      await resend!.emails.send({
-        from,
-        to: contact.email,
-        subject: campaign.subject,
-        html,
-        headers: {
-          "List-Unsubscribe": listUnsubscribeHeader,
-          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-        },
-      });
+      if (resend) {
+        await resend.emails.send({
+          from,
+          to: contact.email,
+          subject: campaign.subject,
+          html,
+          headers: {
+            "List-Unsubscribe": listUnsubscribeHeader,
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+          },
+        });
+      } else {
+        // No Resend → send via the org's verified SMTP config.
+        const r = await sendViaSMTP(orgId, {
+          to: contact.email,
+          subject: campaign.subject,
+          html,
+          fromName: campaign.fromName ?? undefined,
+        });
+        if (!r.ok) throw new Error(r.error ?? "Invio SMTP fallito");
+      }
       sent++;
     } catch {
       failed++;
     }
   }
 
+  // Only mark SENT if at least one email actually went out; otherwise revert to
+  // DRAFT so the user can retry (avoids "ghost sent" campaigns where 0 mail left).
   await db.emailCampaign.update({
     where: { id },
-    data: { status: "SENT", sentAt: new Date(), totalSent: sent },
+    data: sent > 0
+      ? { status: "SENT", sentAt: new Date(), totalSent: sent }
+      : { status: "DRAFT", totalSent: 0 },
   });
 
   revalidatePath("/emails");
+  if (sent === 0 && failed > 0) {
+    return { error: `Invio fallito per tutti i ${failed} destinatari. Verifica la configurazione email.` };
+  }
   return { data: { sent, failed } };
 }

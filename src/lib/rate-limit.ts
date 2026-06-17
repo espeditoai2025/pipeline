@@ -1,10 +1,14 @@
 /**
  * Rate limiting via Upstash Redis.
- * Falls back silently (allow-all) if UPSTASH_REDIS_REST_URL is not set,
- * so the app works locally without Redis configured.
+ *
+ * If UPSTASH_REDIS_REST_URL/TOKEN are not configured the limiter falls back to
+ * allow-all so local development works without Redis — but in PRODUCTION this
+ * fallback is logged loudly (fail-loud) so a misconfiguration that silently
+ * disables throttling on auth/API endpoints is visible.
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 
 type RateLimiter = {
   limit: (identifier: string) => Promise<{ success: boolean; remaining: number; reset: number }>;
@@ -13,9 +17,11 @@ type RateLimiter = {
 // Lazy-init so we don't crash at import time if env vars are missing.
 let _authLimiter: RateLimiter | null = null;
 let _apiLimiter: RateLimiter | null = null;
+let _keyLimiter: RateLimiter | null = null;
 let _initialized = false;
+let _warnedNoRedis = false;
 
-async function getLimiters(): Promise<{ auth: RateLimiter; api: RateLimiter }> {
+async function getLimiters(): Promise<{ auth: RateLimiter; api: RateLimiter; key: RateLimiter }> {
   if (!_initialized) {
     _initialized = true;
     const url = process.env.UPSTASH_REDIS_REST_URL;
@@ -40,9 +46,23 @@ async function getLimiters(): Promise<{ auth: RateLimiter; api: RateLimiter }> {
           limiter: Ratelimit.slidingWindow(60, "1 m"),
           prefix: "pipely:rl:api",
         });
-      } catch {
-        // Redis unavailable — fail open
+
+        // Public REST API (per API key): 120 requests per minute
+        _keyLimiter = new Ratelimit({
+          redis,
+          limiter: Ratelimit.slidingWindow(120, "1 m"),
+          prefix: "pipely:rl:key",
+        });
+      } catch (err) {
+        logger.error("rate-limit", "Inizializzazione Upstash fallita: rate limiting disattivato", { error: String(err) });
       }
+    }
+  }
+
+  if ((!_authLimiter || !_apiLimiter) && !_warnedNoRedis) {
+    _warnedNoRedis = true;
+    if (process.env.NODE_ENV === "production") {
+      logger.error("rate-limit", "UPSTASH non configurato in produzione: rate limiting DISATTIVO su auth/API (fail-open)");
     }
   }
 
@@ -50,7 +70,7 @@ async function getLimiters(): Promise<{ auth: RateLimiter; api: RateLimiter }> {
     limit: async () => ({ success: true, remaining: 999, reset: 0 }),
   };
 
-  return { auth: _authLimiter ?? noop, api: _apiLimiter ?? noop };
+  return { auth: _authLimiter ?? noop, api: _apiLimiter ?? noop, key: _keyLimiter ?? noop };
 }
 
 /** Returns the real client IP from Vercel/proxy headers. */
@@ -62,50 +82,42 @@ export function getClientIp(req: NextRequest): string {
   );
 }
 
-/** Applies auth rate limit. Returns a 429 response if exceeded, else null. */
-export async function withAuthRateLimit(
-  req: NextRequest,
-): Promise<NextResponse | null> {
-  const { auth } = await getLimiters();
-  const ip = getClientIp(req);
-  const { success, remaining, reset } = await auth.limit(ip);
-
-  if (!success) {
-    return NextResponse.json(
-      { error: "Troppe richieste. Riprova tra qualche minuto." },
-      {
-        status: 429,
-        headers: {
-          "Retry-After": String(Math.ceil((reset - Date.now()) / 1000)),
-          "X-RateLimit-Remaining": "0",
-        },
+function tooMany(message: string, reset: number): NextResponse {
+  return NextResponse.json(
+    { error: message },
+    {
+      status: 429,
+      headers: {
+        "Retry-After": String(Math.max(1, Math.ceil((reset - Date.now()) / 1000))),
+        "X-RateLimit-Remaining": "0",
       },
-    );
-  }
-
-  return null; // not limited
+    },
+  );
 }
 
-/** Applies general API rate limit. */
-export async function withApiRateLimit(
-  req: NextRequest,
-): Promise<NextResponse | null> {
+/** Applies auth rate limit (per IP). Returns a 429 response if exceeded, else null. */
+export async function withAuthRateLimit(req: NextRequest): Promise<NextResponse | null> {
+  const { auth } = await getLimiters();
+  const { success, reset } = await auth.limit(getClientIp(req));
+  if (!success) return tooMany("Troppe richieste. Riprova tra qualche minuto.", reset);
+  return null;
+}
+
+/** Applies general API rate limit (per IP). */
+export async function withApiRateLimit(req: NextRequest): Promise<NextResponse | null> {
   const { api } = await getLimiters();
-  const ip = getClientIp(req);
-  const { success, remaining, reset } = await api.limit(ip);
+  const { success, reset } = await api.limit(getClientIp(req));
+  if (!success) return tooMany("Limite richieste raggiunto. Riprova tra qualche minuto.", reset);
+  return null;
+}
 
-  if (!success) {
-    return NextResponse.json(
-      { error: "Limite richieste raggiunto. Riprova tra qualche minuto." },
-      {
-        status: 429,
-        headers: {
-          "Retry-After": String(Math.ceil((reset - Date.now()) / 1000)),
-          "X-RateLimit-Remaining": "0",
-        },
-      },
-    );
-  }
-
+/**
+ * Applies the public REST API rate limit keyed by API key id (not IP, which is
+ * spoofable). Returns a 429 response if exceeded, else null.
+ */
+export async function withApiKeyRateLimit(apiKeyId: string): Promise<NextResponse | null> {
+  const { key } = await getLimiters();
+  const { success, reset } = await key.limit(apiKeyId);
+  if (!success) return tooMany("Limite richieste API raggiunto. Riprova tra poco.", reset);
   return null;
 }

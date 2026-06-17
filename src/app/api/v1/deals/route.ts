@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { authenticateApiKey, parsePagination } from "@/lib/api-auth";
+import { authenticateApiKey, parsePagination, validateOrgForeignKeys } from "@/lib/api-auth";
 
 const createSchema = z.object({
   title: z.string().min(1, "title is required"),
@@ -88,6 +88,16 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Validation error", details: parsed.error.flatten().fieldErrors }, { status: 422 });
   }
+
+  // Prevent cross-tenant FK injection: every referenced id must belong to the org.
+  const fkError = await validateOrgForeignKeys(organizationId, {
+    stageId: parsed.data.stageId,
+    pipelineId: parsed.data.pipelineId,
+    contactId: parsed.data.contactId,
+    companyId: parsed.data.companyId,
+    ownerId: parsed.data.ownerId,
+  });
+  if (fkError) return fkError;
 
   const { expectedClose, ownerId, ...rest } = parsed.data;
 

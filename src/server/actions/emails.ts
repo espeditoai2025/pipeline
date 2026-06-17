@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { resend, FROM_DEFAULT, isEmailEnabled } from "@/lib/resend";
 import { getOrgPlan, getLimits } from "@/lib/plan";
+import { sendViaSMTP } from "@/server/actions/smtp";
 import type { EmailMessage, EmailTemplate } from "@/types/emails";
 
 function getOrgId(s: Session | null) {
@@ -133,7 +134,11 @@ export async function sendEmail(input: z.infer<typeof composeSchema>): Promise<{
   const threadId = `thread-${Date.now()}`;
   const now = new Date();
 
-  // Attempt real send via Resend if configured
+  // Attempt a real send: Resend first, then the org's SMTP config. Track whether
+  // an email actually left so we don't persist a misleading "SENT" status (H15).
+  const htmlBody = body.replace(/\n/g, "<br>");
+  let didSend = false;
+
   if (isEmailEnabled() && resend) {
     try {
       await resend.emails.send({
@@ -141,17 +146,26 @@ export async function sendEmail(input: z.infer<typeof composeSchema>): Promise<{
         to: [to],
         cc: cc ? [cc] : undefined,
         subject,
-        html: body.replace(/\n/g, "<br>"),
+        html: htmlBody,
         replyTo: fromAddress,
       });
+      didSend = true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Errore invio email";
       console.error("[sendEmail] Resend error:", msg);
       return { data: null, error: `Errore invio: ${msg}` };
     }
+  } else {
+    const r = await sendViaSMTP(orgId, { to, subject, html: htmlBody, fromName });
+    if (r.ok) {
+      didSend = true;
+    } else {
+      // No working provider — surface the failure instead of faking a send.
+      return { data: null, error: r.error ?? "Nessun provider email configurato (Resend o SMTP)." };
+    }
   }
 
-  // Save to DB
+  // Save to DB (status reflects reality)
   const row = await db.email.create({
     data: {
       subject,
@@ -160,9 +174,9 @@ export async function sendEmail(input: z.infer<typeof composeSchema>): Promise<{
       fromName,
       toAddresses: [to],
       ccAddresses: cc ? [cc] : [],
-      status: "SENT",
+      status: didSend ? "SENT" : "DRAFT",
       threadId,
-      sentAt: now,
+      sentAt: didSend ? now : null,
       dealId: dealId || null,
       contactId: contactId || null,
       organizationId: orgId,

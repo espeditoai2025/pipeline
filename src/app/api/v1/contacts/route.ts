@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { authenticateApiKey, parsePagination } from "@/lib/api-auth";
+import { authenticateApiKey, parsePagination, validateOrgForeignKeys } from "@/lib/api-auth";
+import { getOrgPlan, checkContactLimit } from "@/lib/plan";
 
 const createSchema = z.object({
   firstName: z.string().min(1, "firstName is required"),
@@ -85,6 +86,19 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Validation error", details: parsed.error.flatten().fieldErrors }, { status: 422 });
   }
+
+  // Plan gating: enforce contact limit (same leva di monetizzazione delle action interne).
+  const plan = await getOrgPlan(organizationId);
+  const currentCount = await db.contact.count({ where: { organizationId } });
+  const limitError = checkContactLimit(plan, currentCount);
+  if (limitError) return NextResponse.json({ error: limitError }, { status: 402 });
+
+  // Prevent cross-tenant FK injection (companyId/ownerId must belong to the org).
+  const fkError = await validateOrgForeignKeys(organizationId, {
+    companyId: parsed.data.companyId,
+    ownerId: parsed.data.ownerId,
+  });
+  if (fkError) return fkError;
 
   const { ownerId, ...rest } = parsed.data;
   let resolvedOwnerId = ownerId;

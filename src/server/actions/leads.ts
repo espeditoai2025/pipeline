@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import type { Lead, LeadStatus } from "@/types/contacts";
 import { runWorkflows } from "@/lib/workflow-engine";
 import { dispatchWebhook } from "@/server/actions/webhooks";
+import { safeFetch, assertPublicUrl } from "@/lib/ssrf";
 
 function getIds(s: Session | null) {
   const user = s?.user as { id?: string; organizationId?: string } | undefined;
@@ -472,10 +473,10 @@ async function _scrapeWebsite(website: string, piva?: string): Promise<{ email: 
 
   for (const path of paths) {
     try {
-      const res = await fetch(`${base}${path}`, {
+      // SSRF guard: validate host resolves to a public IP and re-validate each redirect hop.
+      const res = await safeFetch(`${base}${path}`, {
         headers: _ENRICH_HEADERS,
         signal: AbortSignal.timeout(20000),
-        redirect: "follow",
       });
       if (!res.ok) continue;
       const html = await res.text();
@@ -514,7 +515,12 @@ async function _findWebsite(name: string, location?: string, piva?: string): Pro
     while ((m = hrefRe.exec(html)) !== null) {
       const href = m[1];
       if (href && !skipDomains.test(href)) {
-        try { return new URL(href).origin; } catch { continue; }
+        let origin: string;
+        try { origin = new URL(href).origin; } catch { continue; }
+        // SSRF guard: skip any candidate that resolves to a private/internal IP.
+        if (await assertPublicUrl(origin, { requireHttps: false }).then(() => true).catch(() => false)) {
+          return origin;
+        }
       }
     }
   } catch (e) { console.error("[findWebsite] error:", e); }
