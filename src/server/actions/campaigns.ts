@@ -9,9 +9,20 @@ import { resend, FROM_DEFAULT } from "@/lib/resend";
 import type { EmailList, EmailListDetail, EmailListContact, EmailCampaign } from "@/types/emails";
 import { getOrgPlan, checkFeature } from "@/lib/plan";
 import { sendViaSMTP } from "@/server/actions/smtp";
+import { signEmailToken, tokenPayload } from "@/lib/email-tokens";
 
 function getOrgId(s: Session | null) {
   return (s?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
+}
+
+/** Escapes HTML-special chars to prevent markup injection from user values. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 type AR<T> = { data?: T; error?: string };
@@ -347,40 +358,49 @@ export async function sendCampaign(id: string): Promise<AR<{ sent: number; faile
   const from = FROM_DEFAULT;
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
+  const orgName = escapeHtml(campaign.list?.organization?.name ?? "Pipely");
+
   for (const contact of contacts) {
+    // HTML-escape user-controlled values before interpolating into markup so a
+    // contact's name/email cannot inject active markup into the recipient's inbox.
     const personalizedBody = campaign.body
-      .replace(/\{\{nome\}\}/g, contact.firstName ?? "")
-      .replace(/\{\{cognome\}\}/g, contact.lastName ?? "")
-      .replace(/\{\{email\}\}/g, contact.email);
+      .replace(/\{\{nome\}\}/g, escapeHtml(contact.firstName ?? ""))
+      .replace(/\{\{cognome\}\}/g, escapeHtml(contact.lastName ?? ""))
+      .replace(/\{\{email\}\}/g, escapeHtml(contact.email));
 
     // Convert plain-text newlines to HTML, then inject tracking
     let html = personalizedBody.replace(/\n/g, "<br>");
 
-    // Rewrite href links for click tracking
+    // Rewrite href links for click tracking — destination is HMAC-signed so the
+    // tracker can't be abused as an open redirector.
     html = html.replace(
       /href=(["'])(https?:\/\/[^"']+)\1/g,
       (_match, _quote, originalUrl) => {
-        const tracked = `${appUrl}/api/track/click/${campaign.id}/${contact.id}?url=${encodeURIComponent(originalUrl)}`;
+        const sig = signEmailToken(tokenPayload.click(campaign.id, contact.id, originalUrl));
+        const tracked = `${appUrl}/api/track/click/${campaign.id}/${contact.id}?url=${encodeURIComponent(originalUrl)}&sig=${sig}`;
         return `href="${tracked}"`;
       }
     );
 
-    // Inject open-tracking pixel (1x1 GIF) at the bottom of the email
-    html += `<img src="${appUrl}/api/track/open/${campaign.id}/${contact.id}" width="1" height="1" style="display:none;border:0" alt="" />`;
+    // Inject open-tracking pixel (1x1 GIF), signed so opens can't be forged.
+    const openSig = signEmailToken(tokenPayload.open(campaign.id, contact.id));
+    html += `<img src="${appUrl}/api/track/open/${campaign.id}/${contact.id}?sig=${openSig}" width="1" height="1" style="display:none;border:0" alt="" />`;
 
     // GDPR / Art. 130 c.4-bis Codice Privacy — footer obbligatorio con link unsubscribe visibile
-    const unsubscribeUrl = `${appUrl}/emails/unsubscribe?cid=${contact.id}&lid=${campaign.listId}`;
+    const unsubSig = signEmailToken(tokenPayload.unsubscribe(contact.id, campaign.listId));
+    const unsubscribeQs = `cid=${contact.id}&lid=${campaign.listId}&sig=${unsubSig}`;
+    const unsubscribeUrl = `${appUrl}/emails/unsubscribe?${unsubscribeQs}`;
     html += `
 <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center;font-family:sans-serif;">
-  Hai ricevuto questa email perché sei nella lista contatti di ${campaign.list?.organization?.name ?? "Pipely"}.
+  Hai ricevuto questa email perché sei nella lista contatti di ${orgName}.
   <br/>
   <a href="${unsubscribeUrl}" style="color:#6366f1;text-decoration:underline;">Disiscriviti dalla lista</a>
   &nbsp;·&nbsp;
   <a href="https://www.pipely.it/privacy" style="color:#94a3b8;text-decoration:underline;">Privacy Policy</a>
 </div>`;
 
-    // List-Unsubscribe header HTTP (RFC 2369 + RFC 8058) — richiesto da Gmail/Outlook e art. 130 c.4-bis
-    const listUnsubscribeHeader = `<mailto:unsubscribe@pipely.it?subject=unsubscribe&body=${contact.id}>, <${unsubscribeUrl}>`;
+    // List-Unsubscribe header (RFC 2369 + RFC 8058) — punta all'endpoint POST one-click.
+    const listUnsubscribeHeader = `<mailto:unsubscribe@pipely.it?subject=unsubscribe&body=${contact.id}>, <${appUrl}/api/emails/unsubscribe?${unsubscribeQs}>`;
 
     try {
       if (resend) {

@@ -30,6 +30,7 @@ export const authConfig: NextAuthConfig = {
         nextUrl.pathname === "/api/stripe/webhook" ||
         nextUrl.pathname.startsWith("/api/v1/") ||
         nextUrl.pathname.startsWith("/emails/unsubscribe") ||
+        nextUrl.pathname.startsWith("/api/emails/unsubscribe") ||
         nextUrl.pathname.startsWith("/privacy") ||
         nextUrl.pathname.startsWith("/termini") ||
         nextUrl.pathname.startsWith("/cookie") ||
