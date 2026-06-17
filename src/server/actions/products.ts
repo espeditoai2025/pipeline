@@ -168,6 +168,10 @@ export async function addProductToDeal(input: AddDealProductInput): Promise<Acti
     const product = await db.product.findUnique({ where: { id: parsed.data.productId, organizationId: orgId } });
     if (!product) return { error: "Prodotto non trovato" };
 
+    // Scoping tenant: anche il deal deve appartenere all'org (IDOR guard).
+    const deal = await db.deal.findFirst({ where: { id: parsed.data.dealId, organizationId: orgId }, select: { id: true } });
+    if (!deal) return { error: "Affare non trovato" };
+
     const row = await db.dealProduct.create({
       data: {
         dealId: parsed.data.dealId,
@@ -208,6 +212,10 @@ export async function getDealProducts(dealId: string): Promise<ActionResult<Deal
   const orgId = getOrgId(session);
   if (!orgId) return { error: "Non autorizzato" };
 
+  // Scoping tenant: il deal deve appartenere all'org (IDOR guard).
+  const deal = await db.deal.findFirst({ where: { id: dealId, organizationId: orgId }, select: { id: true } });
+  if (!deal) return { error: "Affare non trovato" };
+
   const rows = await db.dealProduct.findMany({ where: { dealId } });
 
   const productIds = [...new Set(rows.map((r) => r.productId))];
@@ -242,10 +250,13 @@ export async function getDealProducts(dealId: string): Promise<ActionResult<Deal
 
 export async function removeProductFromDeal(id: string): Promise<ActionResult<void>> {
   const session = await auth();
-  if (!session) return { error: "Non autorizzato" };
+  const orgId = getOrgId(session);
+  if (!orgId) return { error: "Non autorizzato" };
 
   try {
-    await db.dealProduct.delete({ where: { id } });
+    // Scoping tenant via parent: DealProduct non ha organizationId (IDOR guard).
+    const result = await db.dealProduct.deleteMany({ where: { id, deal: { organizationId: orgId } } });
+    if (result.count === 0) return { error: "Non trovato" };
     revalidatePath("/deals");
     return {};
   } catch (e) {
@@ -258,9 +269,17 @@ export async function updateDealProduct(
   updates: { quantity?: number; unitPrice?: number; discount?: number; note?: string }
 ): Promise<ActionResult<DealProduct>> {
   const session = await auth();
-  if (!session) return { error: "Non autorizzato" };
+  const orgId = getOrgId(session);
+  if (!orgId) return { error: "Non autorizzato" };
 
   try {
+    // Scoping tenant via parent: verifica che la riga appartenga a un deal dell'org.
+    const owned = await db.dealProduct.findFirst({
+      where: { id, deal: { organizationId: orgId } },
+      select: { id: true },
+    });
+    if (!owned) return { error: "Non trovato" };
+
     const row = await db.dealProduct.update({
       where: { id },
       data: {

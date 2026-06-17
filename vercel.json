@@ -1,6 +1,6 @@
 {
   "framework": "nextjs",
-  "buildCommand": "npx prisma db push --accept-data-loss && npm run build",
+  "buildCommand": "npx prisma migrate resolve --applied 0_init || true; npx prisma migrate deploy && npm run build",
   "installCommand": "npm ci",
   "outputDirectory": ".next",
   "env": {
@@ -9,9 +9,6 @@
   "functions": {
     "api/scraper.py": {
       "maxDuration": 300
-    },
-    "api/enrich.py": {
-      "maxDuration": 60
     }
   },
   "crons": [

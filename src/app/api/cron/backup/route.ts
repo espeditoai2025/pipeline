@@ -17,11 +17,16 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
-  // Verify cron secret to prevent unauthorized triggers
+  // Verify cron secret to prevent unauthorized triggers (fail-closed: if the
+  // secret is not configured, refuse the request rather than running open).
   const secret = process.env.CRON_SECRET;
   const authHeader = req.headers.get("authorization");
 
-  if (secret && authHeader !== `Bearer ${secret}`) {
+  if (!secret) {
+    logger.error("cron-backup", "CRON_SECRET non configurato: endpoint disabilitato");
+    return NextResponse.json({ error: "Cron non configurato" }, { status: 503 });
+  }
+  if (authHeader !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

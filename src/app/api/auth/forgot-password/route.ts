@@ -8,11 +8,23 @@ import { logger } from "@/lib/logger";
 
 const bodySchema = z.object({ email: z.string().email() });
 
+/**
+ * Resolves the signing secret fail-closed. Supports both NEXTAUTH_SECRET and
+ * AUTH_SECRET (the name NextAuth v5 uses). Throws if neither is configured —
+ * never falls back to a known/hardcoded value (account-takeover risk).
+ */
+function getResetSecret(): string {
+  const secret = process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET;
+  if (!secret) {
+    throw new Error("NEXTAUTH_SECRET/AUTH_SECRET non configurato: reset password disabilitato");
+  }
+  return secret;
+}
+
 /** Signs a password-reset token valid for 1 hour. */
 function signToken(userId: string, expiresAt: number): string {
-  const secret = process.env.NEXTAUTH_SECRET ?? "fallback-secret";
   const payload = `${userId}:${expiresAt}`;
-  const sig = createHmac("sha256", secret).update(payload).digest("hex");
+  const sig = createHmac("sha256", getResetSecret()).update(payload).digest("hex");
   return Buffer.from(`${payload}:${sig}`).toString("base64url");
 }
 
@@ -81,8 +93,7 @@ export function verifyToken(token: string): { userId: string } | null {
     const expiresAt = Number(expiresAtStr);
     if (Date.now() > expiresAt) return null;
 
-    const secret = process.env.NEXTAUTH_SECRET ?? "fallback-secret";
-    const expected = createHmac("sha256", secret).update(`${userId}:${expiresAtStr}`).digest("hex");
+    const expected = createHmac("sha256", getResetSecret()).update(`${userId}:${expiresAtStr}`).digest("hex");
     if (sig !== expected) return null;
 
     return { userId };

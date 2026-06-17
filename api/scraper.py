@@ -476,12 +476,14 @@ async def health():
 
 @app.post("/api/scraper")
 async def search(req: SearchRequest, request: Request):
-    # Autenticazione opzionale
+    # Autenticazione fail-closed: senza SCRAPER_SECRET_KEY l'endpoint è disabilitato
+    # (impedisce scraping/consumo crediti non autorizzato se la variabile manca).
     secret = os.getenv("SCRAPER_SECRET_KEY", "")
-    if secret:
-        key = request.headers.get("x-scraper-key", "")
-        if key != secret:
-            raise HTTPException(status_code=401, detail="Unauthorized")
+    if not secret:
+        raise HTTPException(status_code=503, detail="Scraper non configurato")
+    key = request.headers.get("x-scraper-key", "")
+    if key != secret:
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
     raw = await _scrape_all(req.location_slug, req.max_results, start_page=max(1, req.page_offset + 1))
     if not raw:

@@ -191,9 +191,14 @@ export async function importContactsToList(
 
 export async function removeContactFromList(id: string): Promise<AR<void>> {
   const session = await auth();
-  if (!session) return { error: "Non autorizzato" };
+  const orgId = getOrgId(session);
+  if (!orgId) return { error: "Non autorizzato" };
 
-  await db.emailListContact.delete({ where: { id } });
+  // Scoping tenant via parent: EmailListContact non ha organizationId (IDOR guard).
+  const result = await db.emailListContact.deleteMany({
+    where: { id, list: { organizationId: orgId } },
+  });
+  if (result.count === 0) return { error: "Non trovato" };
   revalidatePath("/emails");
   return {};
 }
