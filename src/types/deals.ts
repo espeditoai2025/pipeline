@@ -44,8 +44,9 @@ export type Stage = {
   position: number;
   probability: number;
   rotting: number | null;
-  deals: Deal[];
-  totalValue: number;
+  deals: Deal[];          // capped to the first N open deals for rendering
+  totalValue: number;     // accurate sum across ALL open deals (from aggregate)
+  dealCount?: number;     // accurate total of open deals (may exceed deals.length)
 };
 
 export type Pipeline = {

@@ -79,6 +79,7 @@ export function KanbanBoard({ pipeline, onDealClick }: Props) {
             ...s,
             deals: s.deals.filter((d) => d.id !== dealId),
             totalValue: s.totalValue - deal.value,
+            dealCount: s.dealCount !== undefined ? s.dealCount - 1 : undefined,
           };
         }
         if (s.id === targetStage.id) {
@@ -86,6 +87,7 @@ export function KanbanBoard({ pipeline, onDealClick }: Props) {
             ...s,
             deals: [...s.deals, { ...deal, stageId: targetStage.id }],
             totalValue: s.totalValue + deal.value,
+            dealCount: s.dealCount !== undefined ? s.dealCount + 1 : undefined,
           };
         }
         return s;

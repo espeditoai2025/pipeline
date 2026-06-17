@@ -31,7 +31,7 @@ export function StageColumn({ stage, onDealClick }: Props) {
               {stage.name}
             </span>
             <span className="shrink-0 rounded-full bg-[var(--crm-neutral-100)] dark:bg-white/10 px-1.5 py-0.5 text-[11px] font-medium text-[var(--crm-neutral-500)] dark:text-white/60">
-              {stage.deals.length}
+              {stage.dealCount ?? stage.deals.length}
             </span>
           </div>
           <p className="mt-0.5 text-xs font-medium text-[var(--crm-primary)]">
@@ -61,6 +61,12 @@ export function StageColumn({ stage, onDealClick }: Props) {
           <div className="flex flex-1 items-center justify-center rounded-lg border-2 border-dashed border-[var(--crm-neutral-100)] dark:border-white/10 py-6 text-xs text-[var(--crm-neutral-500)]">
             Trascina qui
           </div>
+        )}
+
+        {(stage.dealCount ?? stage.deals.length) > stage.deals.length && (
+          <p className="py-1 text-center text-[11px] text-[var(--crm-neutral-400)]">
+            +{(stage.dealCount ?? 0) - stage.deals.length} altri non mostrati
+          </p>
         )}
       </div>
     </div>

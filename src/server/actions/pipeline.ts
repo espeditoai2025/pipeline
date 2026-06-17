@@ -10,6 +10,12 @@ function daysBetween(a: Date, b: Date) {
   return Math.floor((b.getTime() - a.getTime()) / 86_400_000);
 }
 
+// Cap deals loaded per stage for rendering. A Kanban column can't usefully show
+// more than this; accurate counts/totals come from a separate aggregate so the
+// header figures stay correct even when the list is capped (avoids loading every
+// open deal with 3 relations — H17).
+const DEALS_PER_STAGE = 100;
+
 export async function getPipeline(): Promise<Pipeline | null> {
   const session = await auth();
   if (!session?.user) return null;
@@ -27,6 +33,7 @@ export async function getPipeline(): Promise<Pipeline | null> {
           deals: {
             where: { status: "OPEN" },
             orderBy: { createdAt: "asc" },
+            take: DEALS_PER_STAGE,
             include: {
               owner: { select: { id: true, name: true, email: true } },
               contact: { select: { id: true, firstName: true, lastName: true } },
@@ -81,6 +88,18 @@ export async function getPipeline(): Promise<Pipeline | null> {
 
   const now = new Date();
 
+  // Accurate count + value sum across ALL open deals per stage (the loaded
+  // `deals` array above is capped at DEALS_PER_STAGE).
+  const agg = await db.deal.groupBy({
+    by: ["stageId"],
+    where: { pipelineId: pipeline.id, status: "OPEN" },
+    _count: { _all: true },
+    _sum: { value: true },
+  });
+  const aggByStage = new Map(
+    agg.map((a) => [a.stageId, { count: a._count._all, sum: Number(a._sum.value ?? 0) }]),
+  );
+
   return {
     id: pipeline.id,
     name: pipeline.name,
@@ -108,6 +127,7 @@ export async function getPipeline(): Promise<Pipeline | null> {
         daysInStage: daysBetween(deal.updatedAt, now),
       }));
 
+      const stageAgg = aggByStage.get(stage.id);
       return {
         id: stage.id,
         name: stage.name,
@@ -115,7 +135,8 @@ export async function getPipeline(): Promise<Pipeline | null> {
         probability: stage.probability,
         rotting: stage.rotting,
         deals,
-        totalValue: deals.reduce((sum, d) => sum + d.value, 0),
+        totalValue: stageAgg ? stageAgg.sum : deals.reduce((sum, d) => sum + d.value, 0),
+        dealCount: stageAgg ? stageAgg.count : deals.length,
       };
     }),
   };
