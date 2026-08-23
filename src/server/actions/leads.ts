@@ -756,6 +756,7 @@ export async function convertLead(
     revalidatePath("/deals");
     revalidatePath("/contacts");
     revalidatePath("/companies");
+    dispatchWebhook(orgId, "lead.converted", { id, title: lead.title, dealId, contactId, companyId }).catch(() => {});
     return { dealId, contactId, companyId, error: null };
   } catch (e) {
     return { dealId: null, contactId: null, companyId: null, error: e instanceof Error ? e.message : "Errore durante la conversione" };

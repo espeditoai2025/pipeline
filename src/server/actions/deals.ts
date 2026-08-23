@@ -164,11 +164,12 @@ export async function deleteDeal(dealId: string) {
   if (!orgId) return { error: "Non autorizzato" };
 
   try {
-    await db.deal.update({
+    const deal = await db.deal.update({
       where: { id: dealId, organizationId: orgId },
       data: { status: "DELETED" },
     });
     revalidatePath("/deals");
+    dispatchWebhook(orgId, "deal.deleted", { id: deal.id, title: deal.title }).catch(() => {});
     return { ok: true };
   } catch {
     return { error: "Errore durante l'eliminazione" };
@@ -305,11 +306,20 @@ export async function deleteDeals(ids: string[]): Promise<{ count: number; error
   if (!ids.length) return { count: 0 };
 
   try {
+    // Risolvi prima i deal realmente eliminabili: gli eventi webhook vanno
+    // emessi solo per cancellazioni effettive, non per id arbitrari del client.
+    const toDelete = await db.deal.findMany({
+      where: { id: { in: ids }, organizationId: orgId, status: { not: "DELETED" } },
+      select: { id: true, title: true },
+    });
     const result = await db.deal.updateMany({
-      where: { id: { in: ids }, organizationId: orgId },
+      where: { id: { in: toDelete.map((d) => d.id) } },
       data: { status: "DELETED" },
     });
     revalidatePath("/deals");
+    for (const d of toDelete) {
+      dispatchWebhook(orgId, "deal.deleted", { id: d.id, title: d.title }).catch(() => {});
+    }
     return { count: result.count };
   } catch {
     return { count: 0, error: "Errore durante l'eliminazione" };

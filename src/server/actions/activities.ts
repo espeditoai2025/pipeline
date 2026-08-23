@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { dispatchWebhook } from "@/server/actions/webhooks";
 import type { Activity, ActivityType } from "@/types/activities";
 
 function getOrgId(s: Session | null) {
@@ -98,6 +99,7 @@ export async function createActivity(input: z.infer<typeof activitySchema>): Pro
     });
 
     revalidatePath("/activities");
+    dispatchWebhook(orgId, "activity.created", { id: row.id, type: row.type, subject: row.subject, dueDate: row.dueDate?.toISOString() ?? null }).catch(() => {});
     return { data: mapActivity(row), error: null };
   } catch (e) {
     return { data: null, error: e instanceof Error ? e.message : "Errore durante la creazione" };
@@ -144,11 +146,12 @@ export async function completeActivity(id: string): Promise<{ error: string | nu
   if (!orgId) return { error: "Non autorizzato" };
 
   try {
-    await db.activity.update({
+    const row = await db.activity.update({
       where: { id, organizationId: orgId },
       data: { completedAt: new Date() },
     });
     revalidatePath("/activities");
+    dispatchWebhook(orgId, "activity.completed", { id: row.id, type: row.type, subject: row.subject }).catch(() => {});
     return { error: null };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Errore" };

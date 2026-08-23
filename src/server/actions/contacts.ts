@@ -363,6 +363,7 @@ export async function updateContact(input: z.infer<typeof contactSchema> & { id:
     });
 
     revalidatePath("/contacts");
+    dispatchWebhook(orgId, "contact.updated", { id: row.id, firstName: row.firstName, lastName: row.lastName, email: row.email }).catch(() => {});
     return {
       data: {
         id: row.id,
@@ -395,6 +396,7 @@ export async function deleteContact(id: string): Promise<{ error: string | null 
   try {
     await db.contact.delete({ where: { id, organizationId: orgId } });
     revalidatePath("/contacts");
+    dispatchWebhook(orgId, "contact.deleted", { id }).catch(() => {});
     return { error: null };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Errore durante l'eliminazione" };
@@ -564,6 +566,7 @@ export async function createCompany(input: z.infer<typeof companySchema>): Promi
     });
 
     revalidatePath("/companies");
+    dispatchWebhook(orgId, "company.created", { id: row.id, name: row.name, vatNumber: row.vatNumber }).catch(() => {});
     return {
       data: {
         id: row.id,
@@ -628,6 +631,7 @@ export async function updateCompany(input: z.infer<typeof companySchema> & { id:
     });
 
     revalidatePath("/companies");
+    dispatchWebhook(orgId, "company.updated", { id: row.id, name: row.name, vatNumber: row.vatNumber }).catch(() => {});
     return {
       data: {
         id: row.id,
