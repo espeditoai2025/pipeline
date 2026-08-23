@@ -5,24 +5,12 @@ import { z } from "zod";
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { resend, FROM_DEFAULT } from "@/lib/resend";
 import type { EmailList, EmailListDetail, EmailListContact, EmailCampaign } from "@/types/emails";
 import { getOrgPlan, checkFeature } from "@/lib/plan";
-import { sendViaSMTP } from "@/server/actions/smtp";
-import { signEmailToken, tokenPayload } from "@/lib/email-tokens";
+import { deliverCampaign } from "@/lib/campaign-sender";
 
 function getOrgId(s: Session | null) {
   return (s?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
-}
-
-/** Escapes HTML-special chars to prevent markup injection from user values. */
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 type AR<T> = { data?: T; error?: string };
@@ -288,6 +276,8 @@ export async function createCampaign(input: z.infer<typeof campaignSchema>): Pro
       fromName: parsed.data.fromName ?? null,
       listId: parsed.data.listId,
       scheduledAt: parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : null,
+      // Con una data programmata la campagna è SCHEDULED: il cron la invierà.
+      status: parsed.data.scheduledAt ? "SCHEDULED" : "DRAFT",
       organizationId: orgId,
     },
     include: { list: { select: { name: true } } },
@@ -302,21 +292,36 @@ export async function updateCampaign(id: string, input: z.infer<typeof campaignS
   const orgId = getOrgId(session);
   if (!orgId) return { error: "Non autorizzato" };
 
-  const row = await db.emailCampaign.update({
-    where: { id, organizationId: orgId },
-    data: {
-      name: input.name,
-      subject: input.subject,
-      body: input.body,
-      fromName: input.fromName ?? null,
-      listId: input.listId,
-      scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
-    },
-    include: { list: { select: { name: true } } },
-  });
+  const parsed = campaignSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Input non valido" };
 
-  revalidatePath("/emails");
-  return { data: mapCampaign(row) };
+  // Anti-IDOR: la lista deve appartenere all'org (come in createCampaign).
+  const list = await db.emailList.findFirst({ where: { id: parsed.data.listId, organizationId: orgId } });
+  if (!list) return { error: "Lista non trovata" };
+
+  try {
+    const row = await db.emailCampaign.update({
+      // Modificabile solo finché non è partita (status filtra su DRAFT/SCHEDULED).
+      where: { id, organizationId: orgId, status: { in: ["DRAFT", "SCHEDULED"] } },
+      data: {
+        name: parsed.data.name,
+        subject: parsed.data.subject,
+        body: parsed.data.body,
+        fromName: parsed.data.fromName ?? null,
+        listId: parsed.data.listId,
+        scheduledAt: parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : null,
+        status: parsed.data.scheduledAt ? "SCHEDULED" : "DRAFT",
+      },
+      include: { list: { select: { name: true } } },
+    });
+
+    revalidatePath("/emails");
+    return { data: mapCampaign(row) };
+  } catch {
+    // P2025: nessuna riga matcha — la campagna non esiste o è già partita
+    // (es. il cron l'ha inviata mentre il form di modifica era aperto).
+    return { error: "Campagna non modificabile: non esiste o è già stata inviata" };
+  }
 }
 
 export async function deleteCampaign(id: string): Promise<AR<void>> {
@@ -338,110 +343,13 @@ export async function sendCampaign(id: string): Promise<AR<{ sent: number; faile
   const featureError = checkFeature(plan, "emailCampaigns");
   if (featureError) return { error: featureError };
 
-  const campaign = await db.emailCampaign.findFirst({
-    where: { id, organizationId: orgId },
-    include: { list: { include: { contacts: { where: { unsubscribed: false } }, organization: { select: { name: true } } } } },
-  });
-  if (!campaign) return { error: "Campagna non trovata" };
-  if (campaign.status === "SENT") return { error: "Campagna già inviata" };
-
-  if (!resend) {
-    const smtp = await db.smtpConfig.findUnique({ where: { organizationId: orgId } });
-    if (!smtp?.isVerified) return { error: "Configura un provider email (SMTP o Resend) prima di inviare campagne." };
-  }
-
-  await db.emailCampaign.update({ where: { id }, data: { status: "SENDING" } });
-
-  const contacts = campaign.list.contacts;
-  let sent = 0;
-  let failed = 0;
-  const from = FROM_DEFAULT;
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
-
-  const orgName = escapeHtml(campaign.list?.organization?.name ?? "Pipely");
-
-  for (const contact of contacts) {
-    // HTML-escape user-controlled values before interpolating into markup so a
-    // contact's name/email cannot inject active markup into the recipient's inbox.
-    const personalizedBody = campaign.body
-      .replace(/\{\{nome\}\}/g, escapeHtml(contact.firstName ?? ""))
-      .replace(/\{\{cognome\}\}/g, escapeHtml(contact.lastName ?? ""))
-      .replace(/\{\{email\}\}/g, escapeHtml(contact.email));
-
-    // Convert plain-text newlines to HTML, then inject tracking
-    let html = personalizedBody.replace(/\n/g, "<br>");
-
-    // Rewrite href links for click tracking — destination is HMAC-signed so the
-    // tracker can't be abused as an open redirector.
-    html = html.replace(
-      /href=(["'])(https?:\/\/[^"']+)\1/g,
-      (_match, _quote, originalUrl) => {
-        const sig = signEmailToken(tokenPayload.click(campaign.id, contact.id, originalUrl));
-        const tracked = `${appUrl}/api/track/click/${campaign.id}/${contact.id}?url=${encodeURIComponent(originalUrl)}&sig=${sig}`;
-        return `href="${tracked}"`;
-      }
-    );
-
-    // Inject open-tracking pixel (1x1 GIF), signed so opens can't be forged.
-    const openSig = signEmailToken(tokenPayload.open(campaign.id, contact.id));
-    html += `<img src="${appUrl}/api/track/open/${campaign.id}/${contact.id}?sig=${openSig}" width="1" height="1" style="display:none;border:0" alt="" />`;
-
-    // GDPR / Art. 130 c.4-bis Codice Privacy — footer obbligatorio con link unsubscribe visibile
-    const unsubSig = signEmailToken(tokenPayload.unsubscribe(contact.id, campaign.listId));
-    const unsubscribeQs = `cid=${contact.id}&lid=${campaign.listId}&sig=${unsubSig}`;
-    const unsubscribeUrl = `${appUrl}/emails/unsubscribe?${unsubscribeQs}`;
-    html += `
-<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center;font-family:sans-serif;">
-  Hai ricevuto questa email perché sei nella lista contatti di ${orgName}.
-  <br/>
-  <a href="${unsubscribeUrl}" style="color:#6366f1;text-decoration:underline;">Disiscriviti dalla lista</a>
-  &nbsp;·&nbsp;
-  <a href="https://www.pipely.it/privacy" style="color:#94a3b8;text-decoration:underline;">Privacy Policy</a>
-</div>`;
-
-    // List-Unsubscribe header (RFC 2369 + RFC 8058) — punta all'endpoint POST one-click.
-    const listUnsubscribeHeader = `<mailto:unsubscribe@pipely.it?subject=unsubscribe&body=${contact.id}>, <${appUrl}/api/emails/unsubscribe?${unsubscribeQs}>`;
-
-    try {
-      if (resend) {
-        await resend.emails.send({
-          from,
-          to: contact.email,
-          subject: campaign.subject,
-          html,
-          headers: {
-            "List-Unsubscribe": listUnsubscribeHeader,
-            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-          },
-        });
-      } else {
-        // No Resend → send via the org's verified SMTP config.
-        const r = await sendViaSMTP(orgId, {
-          to: contact.email,
-          subject: campaign.subject,
-          html,
-          fromName: campaign.fromName ?? undefined,
-        });
-        if (!r.ok) throw new Error(r.error ?? "Invio SMTP fallito");
-      }
-      sent++;
-    } catch {
-      failed++;
-    }
-  }
-
-  // Only mark SENT if at least one email actually went out; otherwise revert to
-  // DRAFT so the user can retry (avoids "ghost sent" campaigns where 0 mail left).
-  await db.emailCampaign.update({
-    where: { id },
-    data: sent > 0
-      ? { status: "SENT", sentAt: new Date(), totalSent: sent }
-      : { status: "DRAFT", totalSent: 0 },
-  });
+  // Core d'invio condiviso con il cron delle campagne programmate.
+  const result = await deliverCampaign(id, orgId);
 
   revalidatePath("/emails");
-  if (sent === 0 && failed > 0) {
-    return { error: `Invio fallito per tutti i ${failed} destinatari. Verifica la configurazione email.` };
+  if (result.error) return { error: result.error };
+  if (result.sent === 0 && result.failed > 0) {
+    return { error: `Invio fallito per tutti i ${result.failed} destinatari. Verifica la configurazione email.` };
   }
-  return { data: { sent, failed } };
+  return { data: { sent: result.sent, failed: result.failed } };
 }
