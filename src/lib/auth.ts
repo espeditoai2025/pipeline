@@ -71,12 +71,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         try {
           const u = await db.user.findUnique({
             where: { id: token.sub },
-            select: { passwordChangedAt: true },
+            select: { passwordChangedAt: true, name: true },
           });
           if (!u) return null; // user deleted → drop the session
           const current = u.passwordChangedAt ? u.passwordChangedAt.getTime() : 0;
           const issued = typeof token.pwdAt === "number" ? token.pwdAt : 0;
           if (current > issued) return null; // password changed after token issuance → invalidate
+          token.name = u.name; // keep the displayed name fresh after updateProfile
         } catch {
           // On a transient DB error, keep the existing token (don't lock users out).
         }

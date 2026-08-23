@@ -1,6 +1,7 @@
 "use server";
 
 import type { Session } from "next-auth";
+import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
@@ -133,7 +134,7 @@ export async function inviteTeamMember(email: string, role: Role) {
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 giorni
 
-  const [invitation, inviter, org] = await Promise.all([
+  const [, inviter, org] = await Promise.all([
     db.invitation.create({
       data: { email: normalizedEmail, role, token, organizationId: orgId, expiresAt },
     }),
@@ -336,6 +337,92 @@ export async function changePassword(
   await db.user.update({
     where: { id: userId },
     data: { passwordHash: newHash, passwordChangedAt: new Date() },
+  });
+
+  return { error: null };
+}
+
+// ─── Profilo utente ──────────────────────────────────────────────────────────
+
+export type MyProfile = {
+  name: string;
+  email: string;
+  phone: string;
+  jobTitle: string;
+  timezone: string;
+};
+
+export async function getMyProfile(): Promise<MyProfile | null> {
+  const session = await auth();
+  const { userId } = getIds(session);
+  if (!userId) return null;
+
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { name: true, email: true, phone: true, jobTitle: true, timezone: true },
+  });
+  if (!user) return null;
+
+  return {
+    name: user.name ?? "",
+    email: user.email,
+    phone: user.phone ?? "",
+    jobTitle: user.jobTitle ?? "",
+    timezone: user.timezone ?? "Europe/Rome",
+  };
+}
+
+// Whitelist allineata alle option del select in settings (le server action sono
+// endpoint POST invocabili direttamente: mai persistire input arbitrario).
+const PROFILE_TIMEZONES = ["Europe/Rome", "Europe/London", "America/New_York"] as const;
+
+const profileSchema = z.object({
+  name: z.string().trim().min(1, "Il nome non può essere vuoto").max(100, "Nome troppo lungo"),
+  phone: z.string().trim().max(30, "Telefono troppo lungo").optional(),
+  jobTitle: z.string().trim().max(100, "Ruolo troppo lungo").optional(),
+  timezone: z.enum(PROFILE_TIMEZONES).optional(),
+});
+
+export async function updateProfile(data: {
+  name: string;
+  phone?: string;
+  jobTitle?: string;
+  timezone?: string;
+}): Promise<{ error: string | null }> {
+  const session = await auth();
+  const { userId } = getIds(session);
+  if (!userId) return { error: "Non autorizzato" };
+
+  const parsed = profileSchema.safeParse(data);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Dati non validi" };
+
+  await db.user.update({
+    where: { id: userId },
+    data: {
+      name: parsed.data.name,
+      phone: parsed.data.phone || null,
+      jobTitle: parsed.data.jobTitle || null,
+      timezone: parsed.data.timezone || null,
+    },
+  });
+
+  revalidatePath("/settings");
+  return { error: null };
+}
+
+/**
+ * Disconnette tutte le sessioni dell'utente (incluso questo dispositivo):
+ * riusa il meccanismo passwordChangedAt — il callback jwt invalida ogni token
+ * emesso prima di questo istante. La password resta invariata.
+ */
+export async function logoutAllDevices(): Promise<{ error: string | null }> {
+  const session = await auth();
+  const { userId } = getIds(session);
+  if (!userId) return { error: "Non autorizzato" };
+
+  await db.user.update({
+    where: { id: userId },
+    data: { passwordChangedAt: new Date() },
   });
 
   return { error: null };

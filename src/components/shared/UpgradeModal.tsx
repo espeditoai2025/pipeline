@@ -1,6 +1,7 @@
 "use client";
 
-import { X, Zap, Check } from "lucide-react";
+import { useState } from "react";
+import { X, Zap, Check, Loader2 } from "lucide-react";
 import { PRO_FEATURES, PRO_PRICING } from "@/lib/plan-client";
 
 interface UpgradeModalProps {
@@ -9,6 +10,24 @@ interface UpgradeModalProps {
 }
 
 export function UpgradeModal({ message, onClose }: UpgradeModalProps) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleUpgrade() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/stripe/checkout", { method: "POST" });
+      const data = await res.json() as { url?: string; error?: string };
+      if (data.url) { window.location.href = data.url; return; }
+      setError(data.error ?? "Impossibile avviare il checkout. Riprova o scrivici a support@pipely.it");
+    } catch {
+      setError("Impossibile avviare il checkout. Riprova o scrivici a support@pipely.it");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="relative w-full max-w-md rounded-2xl bg-slate-900 border border-white/10 shadow-2xl overflow-hidden">
@@ -58,13 +77,18 @@ export function UpgradeModal({ message, onClose }: UpgradeModalProps) {
             <span className="ml-auto text-xs text-slate-500">oppure {PRO_PRICING.yearly}/anno ({PRO_PRICING.yearlyNote})</span>
           </div>
 
-          <a
-            href="mailto:support@pipely.it?subject=Upgrade%20a%20Pro"
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 px-4 py-3 text-sm font-semibold text-white transition-all"
+          {error && (
+            <p className="text-xs text-red-400 bg-red-900/30 border border-red-800/50 rounded-lg px-3 py-2">{error}</p>
+          )}
+
+          <button
+            onClick={handleUpgrade}
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 px-4 py-3 text-sm font-semibold text-white transition-all disabled:opacity-60"
           >
-            <Zap className="h-4 w-4" />
-            Contattaci per l&apos;upgrade
-          </a>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+            Passa a Pro
+          </button>
           <button
             onClick={onClose}
             className="w-full text-center text-xs text-slate-500 hover:text-slate-300 transition-colors py-1"

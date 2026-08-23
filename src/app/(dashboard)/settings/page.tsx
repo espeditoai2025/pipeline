@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import {
   User, Shield, CreditCard, Sliders, Building2, Mail,
@@ -16,7 +17,9 @@ import {
   getOrgData, updateOrgDetails, getTeamMembers, getUsageStats,
   inviteTeamMember, getInvitations, revokeInvitation, removeMember, updateMemberRole,
   deleteAccount, changePassword, getApiKeys, createApiKey, revokeApiKey,
+  getMyProfile, updateProfile, logoutAllDevices,
 } from "@/server/actions/settings";
+import { useUIStore } from "@/stores/ui";
 import type { ApiKeyPublic } from "@/server/actions/settings";
 import { getSmtpConfig } from "@/server/actions/smtp";
 import dynamic from "next/dynamic";
@@ -103,28 +106,25 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState({ name: "", email: "", phone: "", timezone: "Europe/Rome", jobTitle: "" });
   const [savingProfile, setSavingProfile] = useState(false);
 
-  useEffect(() => {
-    const user = session?.user;
-    if (user) {
-      setProfile(p => ({ ...p, name: user.name ?? "", email: user.email ?? "" }));
-    }
-  }, [session]);
-
   // Security — password change
   const [showPwd, setShowPwd] = useState(false);
   const [currentPwd, setCurrentPwd] = useState("");
   const [newPwd, setNewPwd] = useState("");
   const [confirmPwd, setConfirmPwd] = useState("");
   const [savingPwd, setSavingPwd] = useState(false);
-  const [twoFAEnabled, setTwoFAEnabled] = useState(false);
+  const [loggingOutAll, setLoggingOutAll] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [apiKeys, setApiKeys] = useState<ApiKeyPublic[]>([]);
   const [creatingKey, setCreatingKey] = useState(false);
   const [revokingKeyId, setRevokingKeyId] = useState<string | null>(null);
 
-  // Preferences
-  const [prefs, setPrefs] = useState({ language: "it", emailNotif: true, pushNotif: false, weeklyReport: true, theme: "system" });
+  // Preferences — il tema usa lo store UI persistito (applicato dal ThemeProvider)
+  const theme = useUIStore((s) => s.theme);
+  const setTheme = useUIStore((s) => s.setTheme);
+
+  // Billing — upgrade via Stripe checkout
+  const [upgrading, setUpgrading] = useState(false);
 
   // Org — real data
   const [orgData, setOrgData] = useState<OrgData>(null);
@@ -158,6 +158,7 @@ export default function SettingsPage() {
   const [smtpLoaded, setSmtpLoaded] = useState(false);
 
   useEffect(() => {
+    getMyProfile().then((p) => { if (p) setProfile(p); });
     getOrgData().then((d) => {
       setOrgData(d);
       if (d) setOrgDetails({
@@ -180,9 +181,51 @@ export default function SettingsPage() {
 
   async function handleSaveProfile() {
     setSavingProfile(true);
-    await new Promise((r) => setTimeout(r, 400));
-    setSavingProfile(false);
-    toast.success("Profilo aggiornato");
+    try {
+      const res = await updateProfile({
+        name: profile.name,
+        phone: profile.phone,
+        jobTitle: profile.jobTitle,
+        timezone: profile.timezone,
+      });
+      if (res.error) toast.error(res.error);
+      else toast.success("Profilo aggiornato");
+    } catch {
+      toast.error("Errore durante il salvataggio. Riprova.");
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  async function handleLogoutAllDevices() {
+    setLoggingOutAll(true);
+    try {
+      const res = await logoutAllDevices();
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      // Anche questa sessione è invalidata: torna al login.
+      await signOut({ callbackUrl: "/login" });
+    } catch {
+      toast.error("Errore durante la disconnessione. Riprova.");
+    } finally {
+      setLoggingOutAll(false);
+    }
+  }
+
+  async function handleUpgrade() {
+    setUpgrading(true);
+    try {
+      const res = await fetch("/api/stripe/checkout", { method: "POST" });
+      const data = await res.json() as { url?: string; error?: string };
+      if (data.url) { window.location.href = data.url; return; }
+      toast.error(data.error ?? "Impossibile avviare il checkout");
+    } catch {
+      toast.error("Impossibile avviare il checkout. Riprova più tardi.");
+    } finally {
+      setUpgrading(false);
+    }
   }
 
   async function handleSaveOrg() {
@@ -342,7 +385,7 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Email</label>
-                  <input type="email" value={profile.email} onChange={e => setProfile(p => ({ ...p, email: e.target.value }))} className={inputCls} />
+                  <input type="email" value={profile.email} disabled title="L'email di accesso non può essere modificata" className={`${inputCls} opacity-60 cursor-not-allowed`} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Telefono</label>
@@ -409,27 +452,6 @@ export default function SettingsPage() {
                 </Button>
               </div>
 
-              <div className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] p-6">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h2 className="text-base font-semibold">Autenticazione a due fattori</h2>
-                    <p className="text-sm text-[var(--crm-neutral-500)] mt-0.5">Aggiunge un ulteriore livello di sicurezza</p>
-                  </div>
-                  <button
-                    onClick={() => { setTwoFAEnabled(v => !v); toast.success(twoFAEnabled ? "2FA disabilitato" : "2FA abilitato"); }}
-                    className={`relative h-5 w-9 rounded-full transition-colors flex-shrink-0 ${twoFAEnabled ? "bg-[var(--crm-primary)]" : "bg-[var(--crm-neutral-200)]"}`}
-                  >
-                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${twoFAEnabled ? "translate-x-4" : "translate-x-0.5"}`} />
-                  </button>
-                </div>
-                {twoFAEnabled && (
-                  <div className="mt-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 px-3 py-2 flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
-                    <p className="text-xs text-green-700">2FA attivo — account protetto</p>
-                  </div>
-                )}
-              </div>
-
               {/* Sessione corrente */}
               <div className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] p-6 space-y-3">
                 <h2 className="text-base font-semibold">Sessione corrente</h2>
@@ -446,10 +468,12 @@ export default function SettingsPage() {
                   </span>
                 </div>
                 <button
-                  onClick={() => toast.info("Disconnessione da tutti i dispositivi: funzionalità in arrivo")}
-                  className="flex items-center gap-1.5 text-xs text-[var(--crm-danger)] hover:underline"
+                  onClick={handleLogoutAllDevices}
+                  disabled={loggingOutAll}
+                  className="flex items-center gap-1.5 text-xs text-[var(--crm-danger)] hover:underline disabled:opacity-50"
                 >
-                  <LogOut className="h-3 w-3" /> Disconnetti da tutti i dispositivi
+                  {loggingOutAll ? <Loader2 className="h-3 w-3 animate-spin" /> : <LogOut className="h-3 w-3" />}
+                  Disconnetti da tutti i dispositivi
                 </button>
               </div>
 
@@ -585,6 +609,10 @@ export default function SettingsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {PLANS.map((plan) => {
                     const isCurrent = orgData?.plan === plan.id.toUpperCase() || (orgData?.plan === "FREE" && plan.id === "starter");
+                    const TIER_ORDER: Record<string, number> = { starter: 0, pro: 1, enterprise: 2 };
+                    const currentTier = orgData?.plan === "PRO" ? 1 : orgData?.plan === "ENTERPRISE" ? 2 : 0;
+                    // Mostra il bottone solo per veri upgrade: il downgrade passa dal portale Stripe in /billing.
+                    const isUpgrade = (TIER_ORDER[plan.id] ?? 0) > currentTier;
                     return (
                       <div key={plan.id} className={`rounded-xl border-2 p-4 transition-colors ${isCurrent ? "border-[var(--crm-primary)] bg-[var(--crm-primary)]/5" : "border-[var(--crm-neutral-100)]"}`}>
                         <div className="flex items-center justify-between mb-2">
@@ -602,11 +630,18 @@ export default function SettingsPage() {
                             </li>
                           ))}
                         </ul>
-                        {!isCurrent && (
+                        {!isCurrent && isUpgrade && (
                           <Button size="sm" variant={plan.id === "enterprise" ? "outline" : "default"}
+                            disabled={upgrading}
                             className={plan.id !== "enterprise" ? "bg-[var(--crm-primary)] hover:bg-[var(--crm-primary-dark)] text-white w-full" : "w-full"}
-                            onClick={() => toast.info(`Contatta il sales per il piano ${plan.name}`)}>
-                            {plan.id === "enterprise" ? "Contatta sales" : "Upgrade"}
+                            onClick={() => {
+                              if (plan.id === "enterprise") {
+                                window.location.href = "mailto:support@pipely.it?subject=Piano%20Enterprise";
+                              } else {
+                                handleUpgrade();
+                              }
+                            }}>
+                            {plan.id === "enterprise" ? "Contatta sales" : upgrading ? "Reindirizzamento…" : "Upgrade"}
                           </Button>
                         )}
                       </div>
@@ -648,9 +683,9 @@ export default function SettingsPage() {
                     <p className="text-xs text-[var(--crm-neutral-500)]">Visualizza, scarica e gestisci le tue fatture</p>
                   </div>
                 </div>
-                <a href="/billing" className="flex items-center gap-1.5 text-xs font-medium text-[var(--crm-primary)] hover:underline whitespace-nowrap flex-shrink-0">
+                <Link href="/billing" className="flex items-center gap-1.5 text-xs font-medium text-[var(--crm-primary)] hover:underline whitespace-nowrap flex-shrink-0">
                   Vai a Billing →
-                </a>
+                </Link>
               </div>
             </div>
           )}
@@ -661,50 +696,19 @@ export default function SettingsPage() {
               <h2 className="text-base font-semibold">Preferenze</h2>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Lingua interfaccia</label>
-                <select value={prefs.language} onChange={(e) => setPrefs(p => ({ ...p, language: e.target.value }))} className={`${inputCls} max-w-xs`}>
-                  <option value="it">Italiano</option>
-                  <option value="en">English</option>
-                </select>
-              </div>
-
-              <div>
                 <label className="block text-sm font-medium mb-2">Tema</label>
                 <div className="flex gap-2">
-                  {["light", "dark", "system"].map((t) => (
-                    <button key={t} onClick={() => setPrefs(p => ({ ...p, theme: t }))}
-                      className={`rounded-lg border-2 px-4 py-2 text-sm capitalize transition-colors ${prefs.theme === t ? "border-[var(--crm-primary)] bg-[var(--crm-primary)]/5" : "border-[var(--crm-neutral-100)]"}`}>
+                  {(["light", "dark", "system"] as const).map((t) => (
+                    <button key={t} onClick={() => setTheme(t)}
+                      className={`rounded-lg border-2 px-4 py-2 text-sm capitalize transition-colors ${theme === t ? "border-[var(--crm-primary)] bg-[var(--crm-primary)]/5" : "border-[var(--crm-neutral-100)]"}`}>
                       {t === "light" ? "Chiaro" : t === "dark" ? "Scuro" : "Sistema"}
                     </button>
                   ))}
                 </div>
+                <p className="text-xs text-[var(--crm-neutral-500)] mt-2">
+                  Applicato subito e memorizzato su questo browser.
+                </p>
               </div>
-
-              <div className="space-y-3">
-                <p className="text-sm font-medium">Notifiche</p>
-                {[
-                  { key: "emailNotif", label: "Notifiche email", desc: "Ricevi aggiornamenti su affari e attività via email" },
-                  { key: "pushNotif", label: "Notifiche push", desc: "Notifiche browser in tempo reale" },
-                  { key: "weeklyReport", label: "Report settimanale", desc: "Riepilogo performance ogni lunedì" },
-                ].map(({ key, label, desc }) => (
-                  <div key={key} className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-medium">{label}</p>
-                      <p className="text-xs text-[var(--crm-neutral-500)]">{desc}</p>
-                    </div>
-                    <button
-                      onClick={() => setPrefs(p => ({ ...p, [key]: !p[key as keyof typeof p] }))}
-                      className={`relative h-5 w-9 rounded-full flex-shrink-0 transition-colors mt-0.5 ${prefs[key as keyof typeof prefs] ? "bg-[var(--crm-primary)]" : "bg-[var(--crm-neutral-200)]"}`}
-                    >
-                      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${prefs[key as keyof typeof prefs] ? "translate-x-4" : "translate-x-0.5"}`} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <Button onClick={() => toast.success("Preferenze salvate")} className="bg-[var(--crm-primary)] hover:bg-[var(--crm-primary-dark)] text-white">
-                <Save className="h-4 w-4 mr-2" /> Salva preferenze
-              </Button>
             </div>
           )}
 
@@ -932,8 +936,8 @@ export default function SettingsPage() {
                     <AlertTriangle className="h-4 w-4" /> Zona pericolosa
                   </h2>
                   <p className="text-sm text-red-600">
-                    Elimina definitivamente l'account e tutti i dati dell'organizzazione (contatti, affari, campagne, ecc.).
-                    Questa operazione è irreversibile ai sensi dell'Art. 17 GDPR.
+                    Elimina definitivamente l&apos;account e tutti i dati dell&apos;organizzazione (contatti, affari, campagne, ecc.).
+                    Questa operazione è irreversibile ai sensi dell&apos;Art. 17 GDPR.
                   </p>
 
                   {!showDeleteZone ? (

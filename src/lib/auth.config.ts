@@ -1,15 +1,14 @@
 import type { NextAuthConfig } from "next-auth";
-import Google from "next-auth/providers/google";
 
 // Edge-safe config: no database imports, no Node.js-only packages.
 // Used by the middleware to validate the JWT session.
+// Nota: il provider Google è stato rimosso — senza adapter/callback signIn che
+// crei l'utente e l'organizzazione in DB, la sessione OAuth veniva invalidata
+// al primo refresh (bottone di fatto decorativo). Da reintrodurre solo insieme
+// al flusso di provisioning completo. (Le credenziali GOOGLE_CLIENT_ID/SECRET
+// restano in uso per l'integrazione Google Calendar, che ha un flusso proprio.)
 export const authConfig: NextAuthConfig = {
-  providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    }),
-  ],
+  providers: [],
   pages: {
     signIn: "/login",
     error: "/login",
