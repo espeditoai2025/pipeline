@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
-  ArrowLeft, User, Building2, Calendar, Trophy, X as LostIcon,
-  Tag, TrendingUp, ExternalLink, Mail, Phone, StickyNote,
+  User, Building2, Calendar, Trophy, X as LostIcon,
+  Tag, TrendingUp, ExternalLink, Mail, Phone,
 } from "lucide-react";
 import { getDealDetail } from "@/server/actions/deals";
 import { getPipeline } from "@/server/actions/pipeline";

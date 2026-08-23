@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
-  ArrowLeft, Building2, Globe, Mail, Phone, MapPin, User,
+  Building2, Globe, Mail, Phone, MapPin, User,
   Users, Briefcase, ExternalLink, Tag, FileText,
 } from "lucide-react";
 import { getCompanyDetail } from "@/server/actions/contacts";

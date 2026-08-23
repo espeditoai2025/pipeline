@@ -89,7 +89,7 @@ export function CreateInvoiceModal({ dealId, contactName, companyName, open, onC
         {/* Form */}
         <div className="px-5 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
           <p className="text-xs text-[var(--crm-neutral-500)]">
-            I dati dell'emittente vengono dalle impostazioni azienda. I prodotti vengono dall'affare.
+            I dati dell&apos;emittente vengono dalle impostazioni azienda. I prodotti vengono dall&apos;affare.
           </p>
 
           <div>

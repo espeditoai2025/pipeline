@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHmac, randomBytes } from "crypto";
+import { createHmac } from "crypto";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { resend, FROM_DEFAULT } from "@/lib/resend";

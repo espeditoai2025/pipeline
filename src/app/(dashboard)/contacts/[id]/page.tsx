@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Mail, Phone, Building2, Briefcase, Calendar, User, ExternalLink } from "lucide-react";
+import { Mail, Phone, Building2, Briefcase, Calendar, User, ExternalLink } from "lucide-react";
 import { getContactDetail, getCompanies } from "@/server/actions/contacts";
 import { ActivityTimeline } from "@/components/shared/ActivityTimeline";
 import { ContactNotePanel } from "@/components/contacts/ContactNotePanel";

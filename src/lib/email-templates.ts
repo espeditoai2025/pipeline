@@ -64,7 +64,6 @@ export function inviteEmailHtml({
   orgName,
   role,
   inviteUrl,
-  appUrl,
 }: {
   inviterName: string;
   orgName: string;

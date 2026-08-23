@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
   Mail, Phone, User, Calendar, Tag, Zap, ExternalLink,
-  ArrowRightCircle, StickyNote,
+  StickyNote,
 } from "lucide-react";
 import { getLeadDetail } from "@/server/actions/leads";
 import { LeadDetailClient } from "@/components/leads/LeadDetailClient";

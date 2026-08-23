@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Trophy, TrendingUp, Target, CheckCircle2, Briefcase, Loader2 } from "lucide-react";
+import { Trophy, Target, CheckCircle2, Briefcase, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getTeamPerformance, type TeamMember } from "@/server/actions/dashboard";
 
