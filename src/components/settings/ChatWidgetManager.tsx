@@ -169,11 +169,17 @@ export function ChatWidgetManager() {
 }
 
 function generateSnippet(orgId: string) {
+  // URL assoluto dell'app Pipely: lo snippet gira su siti terzi, dove
+  // window.location punta al dominio ospite — i messaggi non arriverebbero mai.
+  const appUrl = (
+    process.env.NEXT_PUBLIC_APP_URL ??
+    (typeof window !== "undefined" ? window.location.origin : "")
+  ).replace(/\/+$/, "");
   return `<!-- Pipely Chat Widget -->
 <script>
 (function() {
   var PIPELY_ORG = "${orgId}";
-  var API_URL = window.location.protocol + "//" + window.location.host + "/api/v1/chat-widget";
+  var API_URL = "${appUrl}/api/v1/chat-widget";
 
   // Create widget styles
   var style = document.createElement("style");

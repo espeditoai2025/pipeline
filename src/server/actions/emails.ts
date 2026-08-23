@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { resend, FROM_DEFAULT, isEmailEnabled } from "@/lib/resend";
 import { getOrgPlan, getLimits } from "@/lib/plan";
-import { sendViaSMTP } from "@/server/actions/smtp";
+import { sendViaSMTP } from "@/lib/smtp-send";
 import type { EmailMessage, EmailTemplate } from "@/types/emails";
 
 function getOrgId(s: Session | null) {

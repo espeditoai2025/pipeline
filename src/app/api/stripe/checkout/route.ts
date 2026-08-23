@@ -43,7 +43,7 @@ export async function POST() {
     payment_method_types: ["card"],
     line_items: [{ price: STRIPE_PRO_PRICE_ID, quantity: 1 }],
     success_url: `${APP_URL}/dashboard?upgraded=1`,
-    cancel_url: `${APP_URL}/dashboard/billing`,
+    cancel_url: `${APP_URL}/billing`,
     metadata: { organizationId: org.id },
     subscription_data: {
       metadata: { organizationId: org.id },

@@ -258,6 +258,9 @@ async function attemptDelivery(
       },
       body: payload,
       signal: AbortSignal.timeout(10_000),
+      // No redirect following: a 30x would bypass the SSRF check above
+      // (public URL redirecting to an internal/metadata address).
+      redirect: "manual",
     });
     const response = (await res.text().catch(() => null))?.slice(0, 1000) ?? null;
     return { success: res.ok, statusCode: res.status, response };
@@ -375,6 +378,8 @@ export async function testWebhook(id: string): Promise<{ success: boolean; statu
       },
       body: payload,
       signal: AbortSignal.timeout(10_000),
+      // No redirect following: a 30x would bypass the SSRF check above.
+      redirect: "manual",
     });
 
     await db.webhookDelivery.create({

@@ -123,7 +123,7 @@ export default async function LeadFinderPage() {
               Passa a PRO per ricerche illimitate e fino a 20 candidati per ricerca.
             </p>
           </div>
-          <Link href="/settings/billing"
+          <Link href="/billing"
             className="shrink-0 flex items-center gap-1 rounded-lg bg-[var(--crm-primary)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--crm-primary-dark)] transition-colors">
             <Zap className="h-3 w-3" /> Passa a PRO
           </Link>
