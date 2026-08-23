@@ -1,23 +1,11 @@
 import { db } from "./db";
 import type { Plan } from "../generated/prisma/enums";
+import { getTier, type PlanTier } from "./plan-client";
 
-// ─── Tier mapping (old enum values → current tiers) ──────────────────────────
-
-export type PlanTier = "starter" | "pro" | "enterprise";
-
-const TIER_MAP: Record<string, PlanTier> = {
-  STARTER: "starter",
-  FREE: "starter",
-  ESSENTIAL: "pro",
-  ADVANCED: "pro",
-  PROFESSIONAL: "pro",
-  PRO: "pro",
-  ENTERPRISE: "enterprise",
-};
-
-export function getTier(plan: Plan | string): PlanTier {
-  return TIER_MAP[plan as string] ?? "starter";
-}
+// Tier mapping e getTier vivono in plan-client.ts (client-safe, no import di db)
+// cosi la UI e il server condividono la stessa mappa dei piani legacy.
+export { getTier } from "./plan-client";
+export type { PlanTier } from "./plan-client";
 
 // ─── Limits per tier ─────────────────────────────────────────────────────────
 

@@ -20,6 +20,7 @@ import {
   getMyProfile, updateProfile, logoutAllDevices,
 } from "@/server/actions/settings";
 import { useUIStore } from "@/stores/ui";
+import { getTier, TIER_RANK, type PlanTier } from "@/lib/plan-client";
 import type { ApiKeyPublic } from "@/server/actions/settings";
 import { getSmtpConfig } from "@/server/actions/smtp";
 import dynamic from "next/dynamic";
@@ -156,6 +157,11 @@ export default function SettingsPage() {
   // SMTP
   const [smtpConfig, setSmtpConfig] = useState<SmtpConfigPublic | null>(null);
   const [smtpLoaded, setSmtpLoaded] = useState(false);
+
+  // Ruolo dell'utente corrente: la gestione di piano e fatturazione e riservata
+  // all'OWNER (enforcement reale lato server in src/lib/billing-auth.ts).
+  const currentUserRole = members.find((m) => m.email === session?.user?.email)?.role;
+  const isOwner = currentUserRole === "OWNER";
 
   useEffect(() => {
     getMyProfile().then((p) => { if (p) setProfile(p); });
@@ -608,11 +614,13 @@ export default function SettingsPage() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {PLANS.map((plan) => {
-                    const isCurrent = orgData?.plan === plan.id.toUpperCase() || (orgData?.plan === "FREE" && plan.id === "starter");
-                    const TIER_ORDER: Record<string, number> = { starter: 0, pro: 1, enterprise: 2 };
-                    const currentTier = orgData?.plan === "PRO" ? 1 : orgData?.plan === "ENTERPRISE" ? 2 : 0;
-                    // Mostra il bottone solo per veri upgrade: il downgrade passa dal portale Stripe in /billing.
-                    const isUpgrade = (TIER_ORDER[plan.id] ?? 0) > currentTier;
+                    // getTier mappa anche i piani legacy (ESSENTIAL/ADVANCED/PROFESSIONAL = Pro):
+                    // senza questo un cliente legacy vedrebbe "Upgrade" verso un piano che ha gia.
+                    const currentTier = getTier(orgData?.plan ?? "STARTER");
+                    const isCurrent = currentTier === (plan.id as PlanTier);
+                    // Bottone solo per veri upgrade e solo per l'OWNER (il downgrade e la
+                    // gestione abbonamento passano dal portale Stripe in /billing).
+                    const isUpgrade = TIER_RANK[plan.id as PlanTier] > TIER_RANK[currentTier];
                     return (
                       <div key={plan.id} className={`rounded-xl border-2 p-4 transition-colors ${isCurrent ? "border-[var(--crm-primary)] bg-[var(--crm-primary)]/5" : "border-[var(--crm-neutral-100)]"}`}>
                         <div className="flex items-center justify-between mb-2">
@@ -630,7 +638,7 @@ export default function SettingsPage() {
                             </li>
                           ))}
                         </ul>
-                        {!isCurrent && isUpgrade && (
+                        {!isCurrent && isUpgrade && isOwner && (
                           <Button size="sm" variant={plan.id === "enterprise" ? "outline" : "default"}
                             disabled={upgrading}
                             className={plan.id !== "enterprise" ? "bg-[var(--crm-primary)] hover:bg-[var(--crm-primary-dark)] text-white w-full" : "w-full"}
@@ -648,6 +656,11 @@ export default function SettingsPage() {
                     );
                   })}
                 </div>
+                {!isOwner && (
+                  <p className="text-xs text-[var(--crm-neutral-500)]">
+                    Solo il proprietario dell&apos;organizzazione puo modificare il piano o la fatturazione.
+                  </p>
+                )}
               </div>
 
               {/* Usage reale */}

@@ -2,15 +2,17 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getStripe, APP_URL } from "@/lib/stripe";
+import { assertBillingOwner } from "@/lib/billing-auth";
 
 export async function POST() {
   const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
-  }
 
-  const orgId = (session.user as { organizationId?: string }).organizationId;
-  if (!orgId) return NextResponse.json({ error: "Organizzazione non trovata" }, { status: 400 });
+  // Il portale consente anche la cancellazione dell'abbonamento: solo OWNER.
+  const guard = await assertBillingOwner(session);
+  if ("error" in guard) {
+    return NextResponse.json({ error: guard.error }, { status: guard.status });
+  }
+  const { orgId } = guard;
 
   const org = await db.organization.findUnique({
     where: { id: orgId },
