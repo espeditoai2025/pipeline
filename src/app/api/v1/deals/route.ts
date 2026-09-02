@@ -15,6 +15,7 @@ const createSchema = z.object({
   ownerId: z.string().optional(),
 });
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function serializeDeal(d: any) {
   return {
     id: d.id,
@@ -49,6 +50,7 @@ export async function GET(req: NextRequest) {
   const status = req.nextUrl.searchParams.get("status") ?? undefined;
   const pipelineId = req.nextUrl.searchParams.get("pipeline_id") ?? undefined;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = { organizationId };
   if (status) where.status = status.toUpperCase();
   if (pipelineId) where.pipelineId = pipelineId;

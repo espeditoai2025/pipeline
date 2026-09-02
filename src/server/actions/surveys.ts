@@ -83,7 +83,7 @@ export async function createSurvey(data: {
         create: data.questions.map((q, i) => ({
           text: q.text,
           type: q.type,
-          options: (q.options ?? undefined) as any,
+          options: (q.options ?? undefined) as Parameters<typeof db.survey.create>[0]["data"]["questions"]["create"][0]["options"],
           required: q.required ?? false,
           position: i,
         })),

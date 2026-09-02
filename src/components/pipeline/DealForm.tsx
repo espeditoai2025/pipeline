@@ -103,6 +103,7 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
     );
     getProducts().then((ps) => setProducts(ps.filter((p) => p.isActive)));
     getCustomFields("deal").then(setCustomFields);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCustomValues({});
     if (deal?.id) {
       getCustomFieldValues(deal.id, "deal").then((vals) => {

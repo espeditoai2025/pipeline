@@ -82,6 +82,7 @@ export function ProductForm({ open, onClose, product, onSaved }: Props) {
       : defaultValues,
   });
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const selectedCategory = watch("category");
 
   useEffect(() => {

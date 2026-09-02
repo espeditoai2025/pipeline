@@ -132,6 +132,7 @@ export function SmtpWizard({ initial }: Props) {
       : { provider: "gmail", host: "smtp.gmail.com", port: 587, secure: false, fromEmail: "", fromName: "", username: "", password: "" },
   });
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const provider = watch("provider");
   const preset = provider ? PROVIDERS[provider] : null;
 

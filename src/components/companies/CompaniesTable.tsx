@@ -120,6 +120,7 @@ export function CompaniesTable({ initialCompanies }: Props) {
     }),
   ], [deletingId]);
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data: companies,
     columns,

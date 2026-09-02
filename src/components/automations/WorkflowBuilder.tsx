@@ -61,6 +61,7 @@ export function WorkflowBuilder({ open, onClose, workflow, onSaved }: Props) {
 
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSteps(workflow?.steps ?? []);
       reset(workflow
         ? { name: workflow.name, description: workflow.description ?? "", triggerType: workflow.trigger.type }

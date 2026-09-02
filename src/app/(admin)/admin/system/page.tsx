@@ -26,12 +26,12 @@ export default async function SystemPage() {
             {collected.toLocaleDateString("it-IT")}
           </p>
         </div>
-        <a
+        <Link
           href="/admin/system"
           className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300 hover:bg-white/10 transition-colors"
         >
           <RefreshCw className="h-3 w-3" /> Aggiorna
-        </a>
+        </Link>
       </div>
 
       {/* Servizi configurati */}

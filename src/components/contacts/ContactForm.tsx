@@ -54,6 +54,7 @@ export function ContactForm({ open, onClose, contact, companies, onSaved }: Prop
       ? { firstName: contact.firstName, lastName: contact.lastName ?? "", email: contact.email ?? "", phone: contact.phone ?? "", jobTitle: contact.jobTitle ?? "", companyId: contact.companyId ?? "" }
       : { firstName: "", lastName: "", email: "", phone: "", jobTitle: "", companyId: "" }
     );
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCustomValues({});
     getCustomFields("contact").then(setCustomFields);
     if (contact?.id) {

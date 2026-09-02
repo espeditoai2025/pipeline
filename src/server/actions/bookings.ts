@@ -138,7 +138,7 @@ export async function updateBookingPage(
 
   await db.bookingPage.updateMany({
     where: { id, organizationId: orgId },
-    data: data as any,
+    data: data as Parameters<typeof db.bookingPage.updateMany>[0]["data"],
   });
 
   return { success: true };

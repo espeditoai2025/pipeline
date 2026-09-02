@@ -14,6 +14,7 @@ const createSchema = z.object({
   ownerId: z.string().optional(),
 });
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function serialize(l: any) {
   return {
     id: l.id,
@@ -44,6 +45,7 @@ export async function GET(req: NextRequest) {
   const status = req.nextUrl.searchParams.get("status") ?? undefined;
   const source = req.nextUrl.searchParams.get("source") ?? undefined;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = { organizationId };
   if (status) where.status = status.toUpperCase();
   if (source) where.source = source.toUpperCase();
@@ -89,6 +91,7 @@ export async function POST(req: NextRequest) {
   const lead = await db.lead.create({
     data: {
       ...rest,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data: (data as any) ?? undefined,
       organizationId,
       ownerId: ownerId ?? null,

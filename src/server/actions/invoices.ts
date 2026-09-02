@@ -210,7 +210,7 @@ export async function createInvoiceFromDeal(
     subtotal,
     taxAmount,
     total,
-    items: items as any,
+    items: items as Parameters<typeof db.invoice.create>[0]["data"]["items"],
     notes: input.notes || null,
     paymentMethod: input.paymentMethod || null,
     paymentTerms: input.paymentTerms || null,

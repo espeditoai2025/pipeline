@@ -14,7 +14,7 @@ const createSchema = z.object({
   ownerId: z.string().optional(),
 });
 
-function serialize(c: any) {
+function serialize(c: Record<string, unknown>) {
   return {
     id: c.id,
     firstName: c.firstName,

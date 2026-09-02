@@ -239,6 +239,7 @@ export function LeadsTable({ initialLeads }: Props) {
     }),
   ], [deletingId, updatingStatusId]);
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data: filteredLeads,
     columns,

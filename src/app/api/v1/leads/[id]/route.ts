@@ -84,6 +84,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const lead = await db.lead.update({
     where: { id },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     data: updateData as any,
   });
 

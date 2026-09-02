@@ -31,7 +31,8 @@ function emit(
 
   if (level === "error") console.error(line);
   else if (level === "warn") console.warn(line);
-  else console.log(line);
+  // eslint-disable-next-line no-console
+  else console.info(line);
 }
 
 export const logger = {

@@ -130,6 +130,7 @@ export function ComposeEmailModal({ open, onClose, replyThread, templates, onSen
   }
 
   async function handleSaveDraft() {
+    // eslint-disable-next-line react-hooks/incompatible-library
     const data = watch();
     const result = await saveDraft({
       ...data,

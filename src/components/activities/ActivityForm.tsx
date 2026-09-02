@@ -137,6 +137,7 @@ export function ActivityForm({ open, onClose, activity, defaultType, defaultDueD
     setValue("contactName", found?.label ?? "");
   }
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const selectedDealId = watch("dealId");
   const selectedContactId = watch("contactId");
 

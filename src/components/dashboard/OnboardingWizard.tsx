@@ -155,6 +155,7 @@ export function OnboardingWizard({ status }: Props) {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDismissed(localStorage.getItem(STORAGE_KEY) === "1");
     }
   }, []);
@@ -173,6 +174,7 @@ export function OnboardingWizard({ status }: Props) {
   }, [celebrated]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (allDone && !dismissed) celebrate();
   }, [allDone, dismissed, celebrate]);
 

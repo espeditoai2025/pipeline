@@ -93,6 +93,7 @@ export function DealsListView({ deals, onDealClick }: Props) {
     }),
   ];
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data: deals,
     columns,

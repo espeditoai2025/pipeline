@@ -93,6 +93,7 @@ export function CompanyForm({ open, onClose, company, onSaved }: Props) {
 
   useEffect(() => {
     if (!open) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCustomValues({});
     getCustomFields("company").then(setCustomFields);
     if (company?.id) {

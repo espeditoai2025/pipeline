@@ -13,7 +13,7 @@ const createSchema = z.object({
   industry: z.string().optional(),
 });
 
-function serialize(c: any) {
+function serialize(c: Record<string, unknown>) {
   return {
     id: c.id,
     name: c.name,

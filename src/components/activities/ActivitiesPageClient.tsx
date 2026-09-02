@@ -33,6 +33,7 @@ export function ActivitiesPageClient({ initialActivities, gcalConnected: initial
     const gcal = searchParams.get("gcal");
     if (gcal === "connected") {
       toast.success("Google Calendar connesso con successo!");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setGcalConnected(true);
     } else if (gcal === "error") {
       toast.error("Errore nella connessione a Google Calendar");

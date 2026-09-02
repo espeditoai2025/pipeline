@@ -25,6 +25,7 @@ export function TeamLeaderboard() {
   const [period, setPeriod] = useState(30);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     getTeamPerformance(period).then((data) => {
       setTeam(data);

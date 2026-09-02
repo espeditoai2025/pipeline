@@ -47,6 +47,7 @@ export function ConvertLeadModal({ open, onClose, lead, onConverted }: Props) {
 
   useEffect(() => {
     if (!lead) return;
+    /* eslint-disable react-hooks/set-state-in-effect */
     setDealTitle(lead.title);
     setDealValue(0);
     setCreateContact(!lead.contactId);
@@ -57,6 +58,7 @@ export function ConvertLeadModal({ open, onClose, lead, onConverted }: Props) {
     setContactLastName(nameParts.slice(1).join(" "));
     setContactEmail(lead.email ?? "");
     setContactPhone(lead.phone ?? "");
+    /* eslint-enable react-hooks/set-state-in-effect */
     // Pre-fill company from lead data (Lead Finder candidates store these)
     const hasCompanyData = !!(d.companyName ?? d.website ?? d.sector);
     setCreateCompany(hasCompanyData);

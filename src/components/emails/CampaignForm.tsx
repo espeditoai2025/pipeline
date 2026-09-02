@@ -145,6 +145,7 @@ export function CampaignForm({ open, onClose, campaign, lists, templates, onSave
                     <button
                       key={p.token}
                       type="button"
+                      // eslint-disable-next-line react-hooks/incompatible-library
                       onClick={() => setValue("body", (watch("body") ?? "") + p.token)}
                       className="text-xs px-2 py-0.5 rounded border border-[var(--crm-neutral-200)] text-[var(--crm-neutral-600)] hover:bg-[var(--crm-neutral-50)] transition-colors"
                       title={p.label}

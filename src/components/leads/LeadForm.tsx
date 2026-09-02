@@ -76,6 +76,7 @@ export function LeadForm({ open, onClose, lead, onSaved }: Props) {
     setScoreVal(lead?.score ?? 50);
   }, [open, lead, reset]);
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const watchedScore = watch("score");
   useEffect(() => { setScoreVal(watchedScore); }, [watchedScore]);
 

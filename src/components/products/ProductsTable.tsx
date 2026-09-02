@@ -120,6 +120,7 @@ export function ProductsTable({ products, onEdit, onDeleted, onToggled }: Props)
     }),
   ], [onEdit, onDeleted, onToggled]);
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data: products,
     columns,
