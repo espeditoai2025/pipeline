@@ -38,7 +38,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  ...(process.env.STANDALONE === "true" ? { output: "standalone" } : {}),
   compress: true,
   serverExternalPackages: ["pg", "@prisma/adapter-pg", "@browserbasehq/sdk"],
   images: {

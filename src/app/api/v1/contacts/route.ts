@@ -14,7 +14,8 @@ const createSchema = z.object({
   ownerId: z.string().optional(),
 });
 
-function serialize(c: Record<string, unknown>) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function serialize(c: any) {
   return {
     id: c.id,
     firstName: c.firstName,
