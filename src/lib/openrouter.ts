@@ -1,7 +1,10 @@
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 
-// Default: cheap & multilingual. Override with OPENROUTER_MODEL env var.
-export const DEFAULT_MODEL = process.env.OPENROUTER_MODEL ?? "google/gemini-flash-1.5-8b";
+// Defaults: an empty env var counts as unset, so a blank OPENROUTER_MODEL never reaches the API.
+// Assistant and email drafts: multilingual, cheap, current on OpenRouter. Override with OPENROUTER_MODEL.
+export const DEFAULT_MODEL = process.env.OPENROUTER_MODEL || "google/gemini-3.8-flash";
+// Lead Finder needs a web-search model. Override with OPENROUTER_MODEL_LEADFINDER.
+export const LEADFINDER_MODEL = process.env.OPENROUTER_MODEL_LEADFINDER || "perplexity/sonar";
 
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 

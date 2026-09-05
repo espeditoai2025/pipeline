@@ -367,7 +367,8 @@ async def _scrape_all(location_slug: str, max_results: int, start_page: int = 1)
 
 async def _openrouter_chat(messages: list[dict], max_tokens: int = 800) -> str:
     api_key = os.getenv("OPENROUTER_API_KEY", "")
-    model = os.getenv("OPENROUTER_MODEL", "google/gemini-flash-1.5-8b")
+    # An empty OPENROUTER_MODEL counts as unset; keep in sync with src/lib/openrouter.ts
+    model = os.getenv("OPENROUTER_MODEL") or "google/gemini-3.8-flash"
     async with httpx.AsyncClient() as client:
         r = await client.post(
             "https://openrouter.ai/api/v1/chat/completions",

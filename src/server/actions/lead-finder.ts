@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { chatCompletion } from "@/lib/openrouter";
+import { chatCompletion, LEADFINDER_MODEL } from "@/lib/openrouter";
 import { getOrgPlan, getLimits } from "@/lib/plan";
 import { createLead } from "@/server/actions/leads";
 import type { LeadFinderSearch, LeadCandidate } from "@/types/lead-finder";
@@ -1025,7 +1025,7 @@ REGOLE FONDAMENTALI:
                 content: `Criteri cliente ideale:\n${criteriaText}\n\nAttività da arricchire:\n${companiesList}\n\nJSON array (un oggetto per ogni attività, stesso ordine):\n[{"companyName":"...","contactName":"...","contactRole":"...","email":"...","score":80,"motivation":"..."}]`,
               },
             ],
-            { maxTokens: 2000, temperature: 0.1, model: process.env.OPENROUTER_MODEL_LEADFINDER ?? "perplexity/sonar" }
+            { maxTokens: 2000, temperature: 0.1, model: LEADFINDER_MODEL }
           );
           try { enrichedAll.push(...extractJsonArray(raw)); } catch { /* batch fallback */ }
         } catch { /* batch failure non-fatal */ }
@@ -1120,7 +1120,7 @@ Rispondi SOLO con JSON array:
 Usa email generica (info@, commerciale@) solo se la trovi sul sito reale. Lascia null se non la trovi.`,
           },
         ],
-        { maxTokens: 3000, temperature: 0.2, model: process.env.OPENROUTER_MODEL_LEADFINDER ?? "perplexity/sonar" }
+        { maxTokens: 3000, temperature: 0.2, model: LEADFINDER_MODEL }
       );
 
       const candidates = extractJsonArray(raw);
@@ -1160,7 +1160,7 @@ Usa email generica (info@, commerciale@) solo se la trovi sul sito reale. Lascia
             { role: "system", content: "Cerca sul web email e telefono delle seguenti aziende italiane. NON inventare email — inserisci SOLO quelle che trovi verificate sul sito ufficiale o pagine contatti. Se non trovi nulla, lascia null. Rispondi SOLO con JSON array, zero testo extra." },
             { role: "user", content: `Cerca email e telefono sul sito ufficiale o pagina contatti di queste aziende:\n${enrichPrompt}\n\nJSON array:\n[{"companyName":"...","email":"...","phone":"..."}]` },
           ],
-          { maxTokens: 1500, temperature: 0.2, model: process.env.OPENROUTER_MODEL_LEADFINDER ?? "perplexity/sonar" }
+          { maxTokens: 1500, temperature: 0.2, model: LEADFINDER_MODEL }
         );
         const enrichStripped = enrichRaw.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
         const enrichMatch = enrichStripped.match(/\[[\s\S]*\]/);
