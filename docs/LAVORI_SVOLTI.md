@@ -6,7 +6,7 @@
 
 Corrette incoerenze nei flussi di contatti, importazione/fusione, attività, affari e riferimenti tra organizzazioni. Aggiunte la dashboard “La tua giornata” e l'area “Fatture e incassi”, con scadenzario, acconti, saldi, rettifiche e riepiloghi per valuta.
 
-Verifiche concluse: 94 test unitari, 20 prove browser isolate, TypeScript, ESLint, validazione Prisma e build. Il codice è locale; nessun commit o deploy effettuato nella sessione. La migrazione degli incassi è preparata ma non applicata: il controllo è bloccato perché `DIRECT_URL` e `DATABASE_URL` sono vuote. Lavoro in pausa su richiesta dell'utente.
+Verifiche concluse: 94 test unitari, 20 prove browser isolate, TypeScript, ESLint, validazione Prisma e build, più un collaudo su PostgreSQL 17 locale con dati di prova. In serata, con le credenziali Supabase fornite dall'utente: backup `pg_dump`, verifica dello storico Prisma, commit `0b41120`, push e deploy Vercel con la migrazione `invoice_payments` applicata in produzione. La tabella delle fatture in produzione era vuota. Restano aperti `DATABASE_CA_CERT` e il rate limiting Upstash.
 
 Per il dettaglio delle cose fatte, dei limiti dei test, delle attività da fare e di tutti i file modificati/nuovi, fare riferimento alla [revisione del 5 settembre](REVISIONE-CRM-2026-09-05.md) e alla [procedura di rilascio degli incassi](INCASSI-RILASCIO.md). Le valutazioni e i TODO delle sezioni storiche non sono stati tutti riconfermati da questa revisione.
 

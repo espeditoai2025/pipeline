@@ -1,8 +1,6 @@
 # Verifica e rilascio degli incassi
 
-Il codice è pronto per la prova su un database dedicato. La revisione non ha eseguito migrazioni, invii o modifiche sui dati reali.
-
-**Aggiornamento del 5 settembre 2026, sera: lavoro ripreso su richiesta dell'utente con un collaudo su PostgreSQL locale** (sezione dedicata sotto). Nessuna migrazione e nessun deploy sui dati reali, che restano irraggiungibili senza credenziali. Per risultati, attività da riprendere e inventario dei file consultare [la revisione completa](REVISIONE-CRM-2026-09-05.md).
+**Rilasciato il 5 settembre 2026.** La migrazione `20260905120000_invoice_payments` è stata applicata al database di produzione dal deploy Vercel del commit `0b41120` (sezione "Rilascio" sotto). Questo documento conserva la procedura, il collaudo locale e le note operative. Per risultati, attività successive e inventario dei file consultare [la revisione completa](REVISIONE-CRM-2026-09-05.md).
 
 ## Tentativo di esecuzione del 5 settembre 2026
 
@@ -29,20 +27,30 @@ Note operative emerse:
 - Il dettaglio di una fattura non accessibile risponde HTTP 200 con corpo “Pagina non trovata”, per via dello streaming di Next: nessun dato esposto, ma i controlli automatici devono verificare il contenuto e non lo stato HTTP.
 - Il server di sviluppo richiede `AUTH_SECRET` o `NEXTAUTH_SECRET`: senza, Auth.js registra `MissingSecret` e il login non funziona.
 
-Gli script del collaudo (fixture, verifica dei saldi, test vitest e controllo browser) sono rimasti fuori dal repository. Con le credenziali reali restano da fare: backup, verifica dello storico Prisma del database di destinazione, ripetizione della procedura su una copia dei dati reali e rilascio.
+Gli script del collaudo (fixture, verifica dei saldi, test vitest e controllo browser) sono rimasti fuori dal repository. Backup, verifica dello storico e rilascio sono stati poi eseguiti sul database reale, come descritto nelle sezioni seguenti; la ripetizione su una copia dei dati non è stata necessaria perché la tabella delle fatture era vuota.
 
 ## Database di produzione (dai log Vercel, 5 settembre 2026)
 
 Verificato con gli strumenti Vercel collegati, in sola lettura e senza accesso ai valori delle variabili. Il progetto `pipeline` in produzione (pipely.it) usa un PostgreSQL Supabase nella regione eu-central-1, raggiunto tramite il pooler `aws-1-eu-central-1.pooler.supabase.com:5432`, database `postgres`. `DIRECT_URL` e `DATABASE_URL` sono configurate su Vercel; `DATABASE_CA_CERT` no, come segnala la build.
 
 - Build del 17 giugno 2026: `migrate resolve --applied 0_init` ha registrato il baseline sul database già esistente.
-- Build del 2 settembre 2026 (ultimo deploy, commit 5354372): 5 migrazioni trovate, nessuna pendente. `20260905120000_invoice_payments` non è applicata in produzione.
+- Build del 2 settembre 2026 (commit 5354372): 5 migrazioni trovate, nessuna pendente. `20260905120000_invoice_payments` è stata applicata dal deploy successivo del 5 settembre (vedi "Rilascio").
 - Snapshot del cron di backup del 5 settembre 2026 alle 02:00 UTC: 13 organizzazioni, 15 utenti, 6 contatti, 15 affari, 92 lead, 1 campagna. Il numero di fatture non fa parte dello snapshot.
 - Nessun errore di database nei log di runtime degli ultimi 7 giorni; l'unico gruppo di errori riguarda il rate limiting Upstash non configurato.
 
 Verifica diretta del 5 settembre 2026 in tarda serata, con le credenziali inserite dall'utente in `.env.local`: PostgreSQL 17.6, `prisma migrate status` coerente con i log di build (5 migrazioni applicate, solo `invoice_payments` pendente). Backup con `pg_dump` in `backups/pipely-prod-20260905.sql` (360 KB, 76 tabelle; cartella ignorata da Git). La tabella `Invoice` è vuota: la migrazione non ha saldi iniziali da trasferire e la finestra tra migrazione e nuovo codice non può produrre incoerenze sulle fatture.
 
 Su Vercel `DATABASE_URL`, `DIRECT_URL` e gli altri segreti sono marcati come "Sensitive": `vercel env pull` restituisce soltanto il segnaposto `[SENSITIVE]` e nemmeno il pannello li mostra. Per sbloccare il lavoro locale le stringhe di connessione vanno prese dal progetto Supabase (Connect → pooler in modalità session per `DIRECT_URL`, transaction per `DATABASE_URL`) e incollate in `.env.local`, insieme alla CA del pooler per `DATABASE_CA_CERT`. Reimpostare la password del database su Supabase invalida anche le variabili su Vercel: farlo solo aggiornandole e rideployando. Prima della migrazione eseguire un backup e controllare `prisma migrate status` sul database reale.
+
+## Rilascio del 5 settembre 2026
+
+Sequenza eseguita su richiesta dell'utente, dopo backup e verifica dello storico:
+
+1. Commit `0b41120` su `main` con i 64 file della revisione più `.gitignore` (cartella `backups/` esclusa), push su GitHub.
+2. Deploy Vercel `dpl_CB39GqEBi7U7EPRYqpHZZfRbfcPw`, stato READY, pubblicato su pipely.it. Il log di build alle 20:38 UTC riporta `Applying migration 20260905120000_invoice_payments` e `All migrations have been successfully applied`.
+3. Verifiche successive dal locale: `prisma migrate status` risponde "Database schema is up to date" con 6 migrazioni; in produzione esistono la tabella `InvoicePayment` e la colonna `Invoice.paidAmount`; i conteggi di organizzazioni, utenti, contatti, affari, lead e attività sono invariati e la tabella `Invoice` resta vuota; `/login` risponde 200 e `/invoices` reindirizza al login; nessun errore di runtime nei 15 minuti dopo il rilascio.
+
+Restano aperti, come prima del rilascio: `DATABASE_CA_CERT` non impostata su Vercel, rate limiting Upstash non configurato, e le priorità di prodotto elencate nella revisione.
 
 ## Migrazione
 
