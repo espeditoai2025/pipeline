@@ -30,7 +30,8 @@ function findDuplicates(contacts: Contact[]): DuplicateGroup[] {
   const emailGroups = new Map<string, Contact[]>();
   for (const c of contacts) {
     if (!c.email) continue;
-    const key = c.email.toLowerCase();
+    const key = c.email.trim().toLowerCase();
+    if (!key) continue;
     if (!emailGroups.has(key)) emailGroups.set(key, []);
     emailGroups.get(key)!.push(c);
   }
@@ -271,12 +272,12 @@ export function ContactsTable({ initialContacts, companies }: Props) {
         onImported={refreshContacts}
       />
 
-      <MergeDuplicatesModal
+      {mergeOpen && <MergeDuplicatesModal
         open={mergeOpen}
         onClose={() => setMergeOpen(false)}
         duplicates={duplicates}
         onMerged={refreshContacts}
-      />
+      />}
     </div>
   );
 }

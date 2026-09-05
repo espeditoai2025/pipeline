@@ -14,6 +14,8 @@ import { CrmModeBadge } from "@/components/dashboard/CrmModeBadge";
 import { auth } from "@/lib/auth";
 import { UpgradeBanner } from "@/components/billing/UpgradeBanner";
 import { getOrgPlan } from "@/lib/plan";
+import { getDailyFocus } from "@/server/actions/daily-focus";
+import { DailyFocus } from "@/components/dashboard/DailyFocus";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("dashboard");
@@ -35,9 +37,10 @@ type KpiCardProps = {
   icon: React.ElementType;
   iconColor: string;
   iconBg: string;
+  comparison?: boolean;
 };
 
-function KpiCard({ title, value, sub, change, positive, icon: Icon, iconColor, iconBg }: KpiCardProps) {
+function KpiCard({ title, value, sub, change, positive, icon: Icon, iconColor, iconBg, comparison }: KpiCardProps) {
   const Arrow = positive ? ArrowUpRight : ArrowDownRight;
   return (
     <div className="rounded-xl border border-[var(--crm-neutral-100)] dark:border-white/10 bg-white dark:bg-[#1a1a2e] p-5 shadow-sm">
@@ -54,7 +57,7 @@ function KpiCard({ title, value, sub, change, positive, icon: Icon, iconColor, i
       <div className="mt-3 flex items-center gap-1">
         <Arrow className={`h-3.5 w-3.5 ${positive ? "text-[var(--crm-success)]" : "text-[var(--crm-danger)]"}`} />
         <span className={`text-xs font-medium ${positive ? "text-[var(--crm-success)]" : "text-[var(--crm-danger)]"}`}>{change}</span>
-        <span className="text-xs text-[var(--crm-neutral-500)]">vs periodo precedente</span>
+        {comparison && <span className="text-xs text-[var(--crm-neutral-500)]">vs 30 giorni precedenti</span>}
       </div>
     </div>
   );
@@ -65,8 +68,8 @@ export default async function DashboardPage() {
   const modeSet = await isCrmModeSet();
   if (!modeSet) redirect("/setup");
 
-  const [data, onboarding, crmMode, session, forecastData] = await Promise.all([
-    getDashboardData(), getOnboardingStatus(), getCrmMode(), auth(), getForecastData(),
+  const [data, onboarding, crmMode, session, forecastData, dailyFocus] = await Promise.all([
+    getDashboardData(), getOnboardingStatus(), getCrmMode(), auth(), getForecastData(), getDailyFocus(),
   ]);
 
   const orgId = (session?.user as { organizationId?: string } | undefined)?.organizationId;
@@ -90,18 +93,19 @@ export default async function DashboardPage() {
       icon: Briefcase, iconColor: "text-[var(--crm-primary)]", iconBg: "bg-blue-50 dark:bg-blue-900/20",
     },
     {
-      title: "Revenue (30gg)",
+      title: "Vendite vinte (30 giorni)",
       value: formatEur(kpis.wonValue),
-      sub: `${kpis.wonDeals} affare${kpis.wonDeals === 1 ? "" : "i"} vint${kpis.wonDeals === 1 ? "o" : "i"}`,
-      change: kpis.revenueChange >= 0 ? `+${kpis.revenueChange}%` : `${kpis.revenueChange}%`,
-      positive: kpis.revenueChange >= 0,
+      sub: `${kpis.wonDeals} ${kpis.wonDeals === 1 ? "affare vinto" : "affari vinti"}`,
+      change: kpis.revenueChange === null ? "Nessuna base di confronto" : kpis.revenueChange >= 0 ? `+${kpis.revenueChange}%` : `${kpis.revenueChange}%`,
+      positive: (kpis.revenueChange ?? 0) >= 0,
+      comparison: kpis.revenueChange !== null,
       icon: Euro, iconColor: "text-[var(--crm-success)]", iconBg: "bg-green-50 dark:bg-green-900/20",
     },
     {
-      title: "Win rate (30gg)",
+      title: "Tasso di successo (30 giorni)",
       value: `${kpis.winRate}%`,
-      sub: `${kpis.wonDeals} vinti · Avg ${formatEur(kpis.avgDeal)}`,
-      change: kpis.winRate >= 30 ? "Buon ritmo" : kpis.winRate > 0 ? "In miglioramento" : "Nessuna chiusura",
+      sub: `${kpis.wonDeals} vinti · Media ${formatEur(kpis.avgDeal)}`,
+      change: kpis.winRate >= 30 ? "Buon ritmo" : kpis.winRate > 0 ? "Da monitorare" : "Nessun affare vinto",
       positive: kpis.winRate >= 30,
       icon: Target, iconColor: "text-purple-600", iconBg: "bg-purple-50 dark:bg-purple-900/20",
     },
@@ -126,6 +130,8 @@ export default async function DashboardPage() {
 
       <CrmModeBadge currentMode={crmMode} />
 
+      {dailyFocus && <DailyFocus data={dailyFocus} />}
+
       {onboarding && <OnboardingWizard status={onboarding} />}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -138,16 +144,16 @@ export default async function DashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-3">
             <TrendingUp className="h-5 w-5 text-[var(--crm-primary)]" />
-            <h2 className="text-sm font-semibold text-[var(--crm-neutral-900)] dark:text-white">Forecast Pipeline</h2>
+            <h2 className="text-sm font-semibold text-[var(--crm-neutral-900)] dark:text-white">Previsione vendite</h2>
           </div>
           <div className="flex items-center gap-4 text-right">
             <div>
-              <p className="text-[10px] uppercase tracking-wide text-[var(--crm-neutral-400)]">Forecast</p>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--crm-neutral-400)]">Valore ponderato</p>
               <p className="text-sm sm:text-base font-bold text-[var(--crm-primary)]">{formatEur(forecast)}</p>
             </div>
             <div className="h-6 w-px bg-[var(--crm-neutral-100)]" />
             <div>
-              <p className="text-[10px] uppercase tracking-wide text-[var(--crm-neutral-400)]">Avg deal</p>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--crm-neutral-400)]">Valore medio vinto</p>
               <p className="text-sm sm:text-base font-bold">{formatEur(kpis.avgDeal)}</p>
             </div>
             <div className="h-6 w-px bg-[var(--crm-neutral-100)]" />

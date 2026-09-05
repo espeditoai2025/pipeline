@@ -5,11 +5,19 @@ import { z } from "zod";
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { validateCrmReferences } from "@/lib/crm-references";
 import { dispatchWebhook } from "@/server/actions/webhooks";
 import type { Activity, ActivityType } from "@/types/activities";
 
 function getOrgId(s: Session | null) {
   return (s?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
+}
+
+function refreshActivityPages() {
+  revalidatePath("/activities");
+  revalidatePath("/dashboard");
+  revalidatePath("/deals/[id]", "page");
+  revalidatePath("/contacts/[id]", "page");
 }
 
 function mapActivity(a: {
@@ -60,10 +68,10 @@ export async function getActivities(): Promise<Activity[]> {
 
 const activitySchema = z.object({
   type: z.enum(["CALL", "MEETING", "EMAIL", "TASK", "DEADLINE", "LUNCH"]),
-  subject: z.string().min(1, "Oggetto obbligatorio"),
+  subject: z.string().trim().min(1, "Oggetto obbligatorio").max(300),
   notes: z.string().optional(),
-  dueDate: z.string().optional(),
-  duration: z.number().min(0).optional(),
+  dueDate: z.string().datetime({ offset: true, message: "Data non valida: specifica anche il fuso orario" }).or(z.literal("")).optional(),
+  duration: z.number().int().min(0).max(10080).nullable().optional(),
   dealId: z.string().optional(),
   dealTitle: z.string().optional(),
   contactId: z.string().optional(),
@@ -79,6 +87,8 @@ export async function createActivity(input: z.infer<typeof activitySchema>): Pro
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
 
   try {
+    const referenceError = await validateCrmReferences(orgId, parsed.data);
+    if (referenceError) return { data: null, error: referenceError };
     const row = await db.activity.create({
       data: {
         type: parsed.data.type,
@@ -98,7 +108,7 @@ export async function createActivity(input: z.infer<typeof activitySchema>): Pro
       },
     });
 
-    revalidatePath("/activities");
+    refreshActivityPages();
     dispatchWebhook(orgId, "activity.created", { id: row.id, type: row.type, subject: row.subject, dueDate: row.dueDate?.toISOString() ?? null }).catch(() => {});
     return { data: mapActivity(row), error: null };
   } catch (e) {
@@ -115,16 +125,18 @@ export async function updateActivity(input: z.infer<typeof activitySchema> & { i
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
 
   try {
+    const referenceError = await validateCrmReferences(orgId, parsed.data);
+    if (referenceError) return { data: null, error: referenceError };
     const row = await db.activity.update({
       where: { id: input.id, organizationId: orgId },
       data: {
         type: parsed.data.type,
         subject: parsed.data.subject,
         notes: parsed.data.notes || null,
-        dueDate: parsed.data.dueDate ? new Date(parsed.data.dueDate) : null,
-        duration: parsed.data.duration ?? null,
-        dealId: parsed.data.dealId || null,
-        contactId: parsed.data.contactId || null,
+        dueDate: parsed.data.dueDate === undefined ? undefined : parsed.data.dueDate ? new Date(parsed.data.dueDate) : null,
+        duration: parsed.data.duration,
+        dealId: parsed.data.dealId === undefined ? undefined : parsed.data.dealId || null,
+        contactId: parsed.data.contactId === undefined ? undefined : parsed.data.contactId || null,
       },
       include: {
         user: { select: { id: true, name: true, email: true } },
@@ -133,7 +145,7 @@ export async function updateActivity(input: z.infer<typeof activitySchema> & { i
       },
     });
 
-    revalidatePath("/activities");
+    refreshActivityPages();
     return { data: mapActivity(row), error: null };
   } catch (e) {
     return { data: null, error: e instanceof Error ? e.message : "Errore durante l'aggiornamento" };
@@ -150,7 +162,7 @@ export async function completeActivity(id: string): Promise<{ error: string | nu
       where: { id, organizationId: orgId },
       data: { completedAt: new Date() },
     });
-    revalidatePath("/activities");
+    refreshActivityPages();
     dispatchWebhook(orgId, "activity.completed", { id: row.id, type: row.type, subject: row.subject }).catch(() => {});
     return { error: null };
   } catch (e) {
@@ -165,7 +177,7 @@ export async function deleteActivity(id: string): Promise<{ error: string | null
 
   try {
     await db.activity.delete({ where: { id, organizationId: orgId } });
-    revalidatePath("/activities");
+    refreshActivityPages();
     return { error: null };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Errore durante l'eliminazione" };

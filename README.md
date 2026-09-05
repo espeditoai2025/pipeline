@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Pipely
 
-## Getting Started
+CRM italiano basato su Next.js 16, React 19 e PostgreSQL/Prisma 7. Comprende contatti, aziende, affari, attività, preventivi, scadenzario e incassi, email e automazioni.
 
-First, run the development server:
+## Sviluppo
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+1. Installa le dipendenze con `npm ci`.
+2. Prepara `.env.local` usando `.env.example` e un database dedicato allo sviluppo. `DATABASE_URL` serve all'applicazione; `DIRECT_URL` alle migrazioni. I servizi esterni richiedono le rispettive credenziali.
+3. Genera il client con `npm run db:generate`.
+4. Su un database di sviluppo nuovo applica lo storico con `npx prisma migrate deploy`.
+5. Avvia `npm run dev` e apri [localhost:3000](http://localhost:3000).
+
+Le pagine del CRM richiedono un account e un'organizzazione. `npm run db:seed` è riservato a un database di prova: modifica i dati.
+
+Prima di modificare Next.js leggi `AGENTS.md` e le guide locali in `node_modules/next/dist/docs/`.
+
+## Verifiche
+
+```sh
+npm run test:unit
+npm run test:ui
+npm run lint
+npx tsc --noEmit
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`test:unit` verifica parser, date, regole e azioni server con database simulato. `test:ui` usa componenti reali, dati dimostrativi e azioni simulate; avvia autonomamente un server Vite su `127.0.0.1:4174` e Chromium su desktop e mobile. Non carica autenticazione, database o integrazioni del CRM. Se manca il browser, installalo con `npx playwright install chromium`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+`test:e2e` è una suite separata che usa il CRM su porta 3000 e credenziali di test: eseguirla soltanto con ambiente e database di prova. Non è equivalente alla suite UI isolata.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+La build genera Prisma e compila Next.js; non applica migrazioni. Il primo download dei font richiede accesso a Google Fonts.
 
-## Learn More
+## Rilascio e database esistenti
 
-To learn more about Next.js, take a look at the following resources:
+Vercel esegue `prisma migrate deploy` e poi la build. Non marca automaticamente una migrazione come già applicata e non ignora gli errori delle migrazioni.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Se un database esistente non ha ancora uno storico Prisma, confronta prima il suo schema con `prisma/migrations/0_init/migration.sql`, conserva un backup verificato e registra il baseline soltanto dopo aver confermato la corrispondenza. Un database vuoto deve eseguire la migrazione iniziale, non saltarla.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Configura `DATABASE_CA_CERT` con la CA del provider per la verifica del certificato TLS. Il comportamento attuale di `src/lib/db.ts`, in assenza della CA, cifra la connessione ma non verifica il certificato.
 
-## Deploy on Vercel
+## Revisione del prodotto
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+L'area **Fatture e incassi** si trova nel menu, su `/invoices`. Dall'affare si crea una bozza; dopo l'emissione nel servizio di fatturazione la si segna come inviata. Gli incassi possono essere parziali, con data, metodo e riferimento; una rettifica conserva il movimento e ricalcola il residuo. Ricerca e filtri sono paginati lato server. I totali restano separati per valuta.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Questa versione richiede la migrazione `20260905120000_invoice_payments` prima di essere avviata sul database. Non usare `db push` per sostituirla: la migrazione trasferisce i vecchi stati pagati in movimenti di saldo iniziale. È preparata nel repository, **non applicata ai dati reali durante la revisione**. Vedi [procedura di verifica e rilascio degli incassi](docs/INCASSI-RILASCIO.md).
+
+L'esportazione XML precedente è disabilitata perché inseriva dati fiscali fittizi. Non sono implementati emissione, invio SdI o conservazione: servono dati fiscali completi, validazione e integrazione con un provider.
+
+Vedi [revisione del 5 settembre 2026](docs/REVISIONE-CRM-2026-09-05.md) per correzioni, nuova vista operativa, copertura dei test e priorità per liberi professionisti e microimprese.

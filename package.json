@@ -16,6 +16,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",
+    "test:ui": "playwright test --config playwright.ui.config.ts",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "test": "vitest run && playwright test"

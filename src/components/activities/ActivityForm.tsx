@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { createActivity, updateActivity } from "@/server/actions/activities";
 import { getContacts } from "@/server/actions/contacts";
 import { getDealsForSelect } from "@/server/actions/deals";
+import { toLocalDateTimeInput, fromLocalDateTimeInput } from "@/lib/activity-dates";
 import { ACTIVITY_CONFIG } from "./ActivityTypeIcon";
 import type { Activity, ActivityType } from "@/types/activities";
 
@@ -37,6 +38,10 @@ type Props = {
   activity?: Activity | null;
   defaultType?: ActivityType;
   defaultDueDate?: string;
+  defaultDealId?: string;
+  defaultContactId?: string;
+  defaultSubject?: string;
+  requireDueDate?: boolean;
   onSaved: (a: Activity) => void;
 };
 
@@ -53,7 +58,7 @@ const DURATION_OPTIONS = [
   { value: "180", label: "3 ore" },
 ];
 
-export function ActivityForm({ open, onClose, activity, defaultType, defaultDueDate, onSaved }: Props) {
+export function ActivityForm({ open, onClose, activity, defaultType, defaultDueDate, defaultDealId, defaultContactId, defaultSubject, requireDueDate, onSaved }: Props) {
   const isEditing = !!activity;
 
   const [contacts, setContacts] = useState<ContactOption[]>([]);
@@ -87,7 +92,7 @@ export function ActivityForm({ open, onClose, activity, defaultType, defaultDueD
       )
     );
 
-    getDealsForSelect().then((ds) =>
+    getDealsForSelect(defaultDealId ?? activity?.dealId ?? undefined).then((ds) =>
       setDeals(
         ds.map((d) => ({
           id: d.id,
@@ -101,7 +106,7 @@ export function ActivityForm({ open, onClose, activity, defaultType, defaultDueD
         type: activity.type,
         subject: activity.subject,
         notes: activity.notes ?? "",
-        dueDate: activity.dueDate ? activity.dueDate.slice(0, 16) : "",
+        dueDate: activity.dueDate ? toLocalDateTimeInput(activity.dueDate) : "",
         duration: activity.duration ?? undefined,
         dealId: activity.dealId ?? "",
         dealTitle: activity.dealTitle ?? "",
@@ -111,17 +116,17 @@ export function ActivityForm({ open, onClose, activity, defaultType, defaultDueD
     } else {
       reset({
         type: defaultType ?? "CALL",
-        subject: "",
+        subject: defaultSubject ?? "",
         notes: "",
         dueDate: defaultDueDate ?? "",
         duration: undefined,
-        dealId: "",
+        dealId: defaultDealId ?? "",
         dealTitle: "",
-        contactId: "",
+        contactId: defaultContactId ?? "",
         contactName: "",
       });
     }
-  }, [open, activity, defaultType, defaultDueDate, reset]);
+  }, [open, activity, defaultType, defaultDueDate, defaultDealId, defaultContactId, defaultSubject, reset]);
 
   function handleDealChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const id = e.target.value;
@@ -142,18 +147,20 @@ export function ActivityForm({ open, onClose, activity, defaultType, defaultDueD
   const selectedContactId = watch("contactId");
 
   async function onSubmit(data: FormValues) {
-    const result = isEditing
-      ? await updateActivity({ id: activity!.id, ...data })
-      : await createActivity(data);
-
-    if (result.error) {
-      toast.error(result.error);
-    } else {
-      toast.success(isEditing ? "Attività aggiornata" : "Attività creata");
-      onSaved(result.data!);
-      reset();
-      onClose();
-    }
+    if (requireDueDate && !data.dueDate) { toast.error("Scegli data e ora del ricontatto"); return; }
+    try {
+      const input = { ...data, duration: data.duration ?? null, dueDate: fromLocalDateTimeInput(data.dueDate ?? "") };
+      const result = isEditing
+        ? await updateActivity({ id: activity!.id, ...input })
+        : await createActivity(input);
+      if (result.error) toast.error(result.error);
+      else {
+        toast.success(isEditing ? "Attività aggiornata" : "Attività creata");
+        onSaved(result.data!);
+        reset();
+        onClose();
+      }
+    } catch { toast.error("Impossibile salvare l'attività. Riprova."); }
   }
 
   return (
@@ -187,20 +194,20 @@ export function ActivityForm({ open, onClose, activity, defaultType, defaultDueD
 
             {/* Oggetto */}
             <div>
-              <label className="block text-sm font-medium mb-1">Oggetto *</label>
-              <input {...register("subject")} className={inputCls} placeholder="es. Chiamata di follow-up" />
+              <label htmlFor="activity-subject" className="block text-sm font-medium mb-1">Oggetto *</label>
+              <input id="activity-subject" {...register("subject")} className={inputCls} placeholder="es. Chiamata di follow-up" />
               {errors.subject && <p className="mt-1 text-xs text-[var(--crm-danger)]">{errors.subject.message}</p>}
             </div>
 
             {/* Data e durata */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium mb-1">Data e ora</label>
-                <input type="datetime-local" {...register("dueDate")} className={inputCls} />
+                <label htmlFor="activity-date" className="block text-sm font-medium mb-1">Data e ora{requireDueDate ? " *" : ""}</label>
+                <input id="activity-date" type="datetime-local" required={requireDueDate} {...register("dueDate")} className={inputCls} />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Durata</label>
-                <select {...register("duration", { setValueAs: (v) => v === "" ? undefined : Number(v) })} className={inputCls}>
+                <label htmlFor="activity-duration" className="block text-sm font-medium mb-1">Durata</label>
+                <select id="activity-duration" {...register("duration", { setValueAs: (v) => v === "" ? undefined : Number(v) })} className={inputCls}>
                   {DURATION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
@@ -208,8 +215,9 @@ export function ActivityForm({ open, onClose, activity, defaultType, defaultDueD
 
             {/* Affare collegato */}
             <div>
-              <label className="block text-sm font-medium mb-1">Affare collegato</label>
+              <label htmlFor="activity-deal" className="block text-sm font-medium mb-1">Affare collegato</label>
               <select
+                id="activity-deal"
                 value={selectedDealId ?? ""}
                 onChange={handleDealChange}
                 className={inputCls}
@@ -226,8 +234,9 @@ export function ActivityForm({ open, onClose, activity, defaultType, defaultDueD
 
             {/* Contatto */}
             <div>
-              <label className="block text-sm font-medium mb-1">Contatto</label>
+              <label htmlFor="activity-contact" className="block text-sm font-medium mb-1">Contatto</label>
               <select
+                id="activity-contact"
                 value={selectedContactId ?? ""}
                 onChange={handleContactChange}
                 className={inputCls}
@@ -244,8 +253,8 @@ export function ActivityForm({ open, onClose, activity, defaultType, defaultDueD
 
             {/* Note */}
             <div>
-              <label className="block text-sm font-medium mb-1">Note</label>
-              <textarea {...register("notes")} rows={3} className={`${inputCls} resize-none`} placeholder="Note aggiuntive..." />
+              <label htmlFor="activity-notes" className="block text-sm font-medium mb-1">Note</label>
+              <textarea id="activity-notes" {...register("notes")} rows={3} className={`${inputCls} resize-none`} placeholder="Note aggiuntive..." />
             </div>
 
             {/* Azioni */}

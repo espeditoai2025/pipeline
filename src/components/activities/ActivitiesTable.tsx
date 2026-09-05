@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, type Dispatch, type SetStateAction } from "react";
+import { activityBucket } from "@/lib/activity-dates";
 import { CheckCircle2, Circle, Pencil, Trash2, Plus, Clock, Briefcase, User, CalendarDays, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,8 @@ import { ActivityTypeIcon, ACTIVITY_CONFIG } from "./ActivityTypeIcon";
 import type { Activity, ActivityType } from "@/types/activities";
 
 type Props = {
-  initialActivities: Activity[];
+  activities: Activity[];
+  onActivitiesChange: Dispatch<SetStateAction<Activity[]>>;
   filterDay?: Date | null;
   onClearDay?: () => void;
   gcalConnected?: boolean;
@@ -44,15 +46,6 @@ function isTomorrow(dateStr: string | null) {
   return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
 }
 
-function isThisWeek(dateStr: string | null) {
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  const now = new Date();
-  const endOfWeek = new Date(now);
-  endOfWeek.setDate(now.getDate() + 7);
-  return d > now && d <= endOfWeek;
-}
-
 function formatDueDate(dateStr: string | null) {
   if (!dateStr) return "—";
   const d = new Date(dateStr);
@@ -64,28 +57,21 @@ function formatDueDate(dateStr: string | null) {
 type Group = { label: string; color: string; activities: Activity[] };
 
 function groupActivities(activities: Activity[]): Group[] {
-  const pending = activities.filter(a => !a.completedAt);
-  const done = activities.filter(a => !!a.completedAt);
-
-  const overdue = pending.filter(a => a.dueDate && isOverdue(a));
-  const today = pending.filter(a => isToday(a.dueDate));
-  const tomorrow = pending.filter(a => isTomorrow(a.dueDate));
-  const thisWeek = pending.filter(a => a.dueDate && !isToday(a.dueDate) && !isTomorrow(a.dueDate) && isThisWeek(a.dueDate));
-  const later = pending.filter(a => {
-    if (!a.dueDate) return true;
-    const d = new Date(a.dueDate);
-    const now = new Date();
-    const endOfWeek = new Date(now);
-    endOfWeek.setDate(now.getDate() + 7);
-    return d > endOfWeek;
-  });
-  const noDue = pending.filter(a => !a.dueDate);
+  const now = new Date();
+  const inBucket = (bucket: ReturnType<typeof activityBucket>) => activities.filter(a => activityBucket(a, now) === bucket);
+  const done = inBucket("done");
+  const overdue = inBucket("overdue");
+  const today = inBucket("today");
+  const tomorrow = inBucket("tomorrow");
+  const thisWeek = inBucket("week");
+  const later = inBucket("later");
+  const noDue = inBucket("undated");
 
   const groups: Group[] = [];
   if (overdue.length) groups.push({ label: `In ritardo (${overdue.length})`, color: "text-[var(--crm-danger)]", activities: overdue });
   if (today.length) groups.push({ label: `Oggi (${today.length})`, color: "text-[var(--crm-primary)]", activities: today });
   if (tomorrow.length) groups.push({ label: "Domani", color: "text-[var(--crm-neutral-700)] dark:text-white/80", activities: tomorrow });
-  if (thisWeek.length) groups.push({ label: "Questa settimana", color: "text-[var(--crm-neutral-700)] dark:text-white/80", activities: thisWeek });
+  if (thisWeek.length) groups.push({ label: "Prossimi 7 giorni", color: "text-[var(--crm-neutral-700)] dark:text-white/80", activities: thisWeek });
   if (later.length) groups.push({ label: "Più avanti", color: "text-[var(--crm-neutral-500)]", activities: later });
   if (noDue.length) groups.push({ label: "Senza data", color: "text-[var(--crm-neutral-500)]", activities: noDue });
   if (done.length) groups.push({ label: `Completate (${done.length})`, color: "text-[var(--crm-success)]", activities: done });
@@ -97,8 +83,7 @@ function sameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-export function ActivitiesTable({ initialActivities, filterDay, onClearDay, gcalConnected }: Props) {
-  const [activities, setActivities] = useState(initialActivities);
+export function ActivitiesTable({ activities, onActivitiesChange: setActivities, filterDay, onClearDay, gcalConnected }: Props) {
   const [filter, setFilter] = useState<Filter>({ type: "", completed: "all", search: "" });
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Activity | null>(null);
@@ -143,7 +128,7 @@ export function ActivitiesTable({ initialActivities, filterDay, onClearDay, gcal
   }
 
   return (
-    <div className="space-y-4">
+    <div role="region" aria-label="Elenco attività" className="space-y-4">
       {/* Filters + button */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex gap-2 flex-wrap">

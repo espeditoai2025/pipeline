@@ -67,7 +67,7 @@ export async function getDashboardData() {
   // Revenue change %
   const revenueChange = prevWonValue > 0
     ? Math.round(((wonValue - prevWonValue) / prevWonValue) * 100)
-    : wonValue > 0 ? 100 : 0;
+    : wonValue > 0 ? null : 0;
 
   // Forecast ponderato
   const stageProb = new Map(stages.map((s) => [s.id, s.probability ?? 0]));
@@ -293,4 +293,3 @@ export async function getTeamPerformance(days: number = 30): Promise<TeamMember[
     })
     .sort((a, b) => b.revenue - a.revenue);
 }
-

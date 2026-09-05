@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { authenticateApiKey } from "@/lib/api-auth";
+import { validateCrmReferences } from "@/lib/crm-references";
 
 type Params = { params: Promise<{ id: string }> };
 
 const updateSchema = z.object({
-  firstName: z.string().min(1).optional(),
+  firstName: z.string().trim().min(1).max(150).optional(),
   lastName: z.string().nullable().optional(),
-  email: z.string().email().nullable().optional(),
+  email: z.string().trim().toLowerCase().email().nullable().optional(),
   phone: z.string().nullable().optional(),
   jobTitle: z.string().nullable().optional(),
   companyId: z.string().nullable().optional(),
@@ -67,7 +68,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const existing = await db.contact.findFirst({ where: { id, organizationId }, select: { id: true } });
   if (!existing) return NextResponse.json({ error: "Contact not found" }, { status: 404 });
 
-  const contact = await db.contact.update({ where: { id }, data: parsed.data });
+  const referenceError = await validateCrmReferences(organizationId, parsed.data);
+  if (referenceError) return NextResponse.json({ error: referenceError }, { status: 422 });
+  const contact = await db.contact.update({ where: { id, organizationId }, data: parsed.data });
 
   return NextResponse.json({
     data: {
@@ -90,6 +93,6 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   const existing = await db.contact.findFirst({ where: { id, organizationId }, select: { id: true } });
   if (!existing) return NextResponse.json({ error: "Contact not found" }, { status: 404 });
 
-  await db.contact.delete({ where: { id } });
+  await db.contact.delete({ where: { id, organizationId } });
   return NextResponse.json({ data: { id, deleted: true } });
 }

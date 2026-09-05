@@ -1,6 +1,14 @@
 # Pipely — Lavori Svolti
 
-> Ultima modifica: 2026-05-20
+> Ultimo aggiornamento del registro: 2026-09-05. Le sezioni di maggio sotto sono conservate come storico.
+
+## Sessione del 2026-09-05 — CRM per professionisti e microimprese
+
+Corrette incoerenze nei flussi di contatti, importazione/fusione, attività, affari e riferimenti tra organizzazioni. Aggiunte la dashboard “La tua giornata” e l'area “Fatture e incassi”, con scadenzario, acconti, saldi, rettifiche e riepiloghi per valuta.
+
+Verifiche concluse: 94 test unitari, 20 prove browser isolate, TypeScript, ESLint, validazione Prisma e build. Il codice è locale; nessun commit o deploy effettuato nella sessione. La migrazione degli incassi è preparata ma non applicata: il controllo è bloccato perché `DIRECT_URL` e `DATABASE_URL` sono vuote. Lavoro in pausa su richiesta dell'utente.
+
+Per il dettaglio delle cose fatte, dei limiti dei test, delle attività da fare e di tutti i file modificati/nuovi, fare riferimento alla [revisione del 5 settembre](REVISIONE-CRM-2026-09-05.md) e alla [procedura di rilascio degli incassi](INCASSI-RILASCIO.md). Le valutazioni e i TODO delle sezioni storiche non sono stati tutti riconfermati da questa revisione.
 
 ---
 

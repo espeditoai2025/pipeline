@@ -1,4 +1,5 @@
 "use client";
+import { toLocalDateTimeInput, fromLocalDateTimeInput } from "@/lib/activity-dates";
 
 import { useState } from "react";
 import { Phone, Users, Mail, CheckSquare, Clock, UtensilsCrossed, Plus, CheckCircle2, Circle, Loader2, Pencil, Trash2, X, Check } from "lucide-react";
@@ -81,7 +82,7 @@ export function ActivityTimeline({ activities: initial, entityId, entityType }: 
       type,
       subject: subject.trim(),
       notes: notes.trim() || undefined,
-      dueDate: dueDate || undefined,
+      dueDate: fromLocalDateTimeInput(dueDate),
       ...(entityType === "contact" ? { contactId: entityId } : { dealId: entityId }),
     });
     setSaving(false);
@@ -109,7 +110,7 @@ export function ActivityTimeline({ activities: initial, entityId, entityType }: 
     setEditType(a.type as ActivityType);
     setEditSubject(a.subject);
     setEditNotes(a.notes ?? "");
-    setEditDueDate(a.dueDate ? new Date(a.dueDate).toISOString().slice(0, 16) : "");
+    setEditDueDate(a.dueDate ? toLocalDateTimeInput(a.dueDate) : "");
   }
 
   async function handleUpdate(id: string) {
@@ -120,7 +121,7 @@ export function ActivityTimeline({ activities: initial, entityId, entityType }: 
       type: editType,
       subject: editSubject.trim(),
       notes: editNotes.trim() || undefined,
-      dueDate: editDueDate || undefined,
+      dueDate: fromLocalDateTimeInput(editDueDate),
       ...(entityType === "contact" ? { contactId: entityId } : { dealId: entityId }),
     });
     setSaving(false);

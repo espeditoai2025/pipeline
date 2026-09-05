@@ -2,6 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { contactInputSchema, contactImportSchema, deduplicateContactImport, type ContactImportRow } from "@/lib/contact-import";
+import { validateCrmReferences } from "@/lib/crm-references";
+import { mergeContactRecords, mergeContactSchema, type MergeContactOverrides } from "@/lib/merge-contacts";
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -242,14 +245,7 @@ export async function createContactNote(contactId: string, content: string): Pro
 
 // ── SCHEMAS ─────────────────────────────────────────────────────────────────
 
-const contactSchema = z.object({
-  firstName: z.string().min(1, "Nome obbligatorio"),
-  lastName: z.string().optional(),
-  email: z.string().email("Email non valida").optional().or(z.literal("")),
-  phone: z.string().optional(),
-  jobTitle: z.string().optional(),
-  companyId: z.string().optional(),
-});
+const contactSchema = contactInputSchema;
 
 const companySchema = z.object({
   name: z.string().min(1, "Nome obbligatorio"),
@@ -286,6 +282,8 @@ export async function createContact(input: z.infer<typeof contactSchema>): Promi
   if (limitError) return { data: null, error: limitError };
 
   try {
+    const referenceError = await validateCrmReferences(orgId, parsed.data);
+    if (referenceError) return { data: null, error: referenceError };
     const row = await db.contact.create({
       data: {
         firstName: parsed.data.firstName,
@@ -345,6 +343,8 @@ export async function updateContact(input: z.infer<typeof contactSchema> & { id:
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
 
   try {
+    const referenceError = await validateCrmReferences(orgId, parsed.data);
+    if (referenceError) return { data: null, error: referenceError };
     const row = await db.contact.update({
       where: { id: input.id, organizationId: orgId },
       data: {
@@ -406,130 +406,93 @@ export async function deleteContact(id: string): Promise<{ error: string | null 
 export async function mergeContacts(
   primaryId: string,
   duplicateId: string,
-  overrides: { firstName?: string; lastName?: string; email?: string; phone?: string; jobTitle?: string; companyId?: string | null },
+  overrides: MergeContactOverrides,
 ): Promise<{ error: string | null }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
-
+  if (!orgId || !session?.user?.id) return { error: "Non autorizzato" };
+  if (!primaryId || !duplicateId) return { error: "Contatto non valido" };
   if (primaryId === duplicateId) return { error: "Non puoi unire un contatto con se stesso" };
+  const parsed = mergeContactSchema.safeParse(overrides);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Dati non validi" };
 
   try {
-    // Verify both contacts belong to this org
-    const [primary, duplicate] = await Promise.all([
-      db.contact.findFirst({ where: { id: primaryId, organizationId: orgId } }),
-      db.contact.findFirst({ where: { id: duplicateId, organizationId: orgId } }),
-    ]);
-    if (!primary || !duplicate) return { error: "Contatto non trovato" };
-
-    // Reassign all relations from duplicate to primary
-    await db.$transaction([
-      db.deal.updateMany({ where: { contactId: duplicateId }, data: { contactId: primaryId } }),
-      db.activity.updateMany({ where: { contactId: duplicateId }, data: { contactId: primaryId } }),
-      db.email.updateMany({ where: { contactId: duplicateId }, data: { contactId: primaryId } }),
-      db.note.updateMany({ where: { contactId: duplicateId }, data: { contactId: primaryId } }),
-      db.lead.updateMany({ where: { contactId: duplicateId }, data: { contactId: primaryId } }),
-      db.customFieldValue.deleteMany({ where: { contactId: duplicateId } }),
-      // Update primary contact with chosen overrides
-      db.contact.update({
-        where: { id: primaryId },
-        data: {
-          firstName: overrides.firstName ?? primary.firstName,
-          lastName: overrides.lastName !== undefined ? overrides.lastName : primary.lastName,
-          email: overrides.email !== undefined ? overrides.email : primary.email,
-          phone: overrides.phone !== undefined ? overrides.phone : primary.phone,
-          jobTitle: overrides.jobTitle !== undefined ? overrides.jobTitle : primary.jobTitle,
-          companyId: overrides.companyId !== undefined ? overrides.companyId : primary.companyId,
-        },
-      }),
-      // Delete the duplicate
-      db.contact.delete({ where: { id: duplicateId } }),
-    ]);
-
+    await db.$transaction(
+      (tx) => mergeContactRecords(tx, orgId, session.user!.id!, primaryId, duplicateId, parsed.data),
+      { isolationLevel: "Serializable" },
+    );
     revalidatePath("/contacts");
+    revalidatePath("/contacts/[id]", "page");
+    revalidatePath("/companies/[id]", "page");
+    revalidatePath("/deals");
+    revalidatePath("/deals/[id]", "page");
+    revalidatePath("/leads");
+    revalidatePath("/leads/[id]", "page");
+    revalidatePath("/emails");
+    revalidatePath("/activities");
+    revalidatePath("/dashboard");
     return { error: null };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Errore durante l'unione" };
   }
 }
 
-export async function importContacts(rows: Array<{ firstName: string; lastName?: string; email?: string; phone?: string; jobTitle?: string; companyName?: string }>): Promise<{ imported: number; duplicates: number; error: string | null }> {
+export async function importContacts(rows: ContactImportRow[]): Promise<{ imported: number; duplicates: number; companies?: number; error: string | null }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!session || !orgId) return { imported: 0, duplicates: 0, error: "Non autorizzato" };
+  if (!session?.user?.id || !orgId) return { imported: 0, duplicates: 0, error: "Non autorizzato" };
+  const parsed = contactImportSchema.safeParse(rows);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const row = typeof issue?.path[0] === "number" ? `Riga ${issue.path[0] + 2}: ` : "";
+    return { imported: 0, duplicates: 0, error: `${row}${issue?.message ?? "Dati non validi"}` };
+  }
 
-  const plan = await getOrgPlan(orgId);
-  const currentCount = await db.contact.count({ where: { organizationId: orgId } });
-  const limitError = checkContactLimit(plan, currentCount, rows.length);
-  if (limitError) return { imported: 0, duplicates: 0, error: limitError };
+  try {
+    const plan = await getOrgPlan(orgId);
+    const result = await db.$transaction(async (tx) => {
+      const existing = await tx.contact.findMany({ where: { organizationId: orgId }, select: { email: true } });
+      const { contacts, duplicates } = deduplicateContactImport(parsed.data, existing.map((contact) => contact.email));
+      if (!contacts.length) return { imported: 0, duplicates, companies: 0 };
+      const limitError = checkContactLimit(plan, existing.length, contacts.length);
+      if (limitError) throw new Error(limitError);
 
-  // Existing emails for duplicate detection
-  const existingEmails = new Set(
-    (await db.contact.findMany({ where: { organizationId: orgId }, select: { email: true } }))
-      .map((c) => c.email?.toLowerCase())
-      .filter(Boolean) as string[]
-  );
-
-  // Build company name → id cache (find-or-create)
-  const companyCache = new Map<string, string>();
-  const uniqueCompanyNames = [...new Set(rows.map((r) => r.companyName?.trim()).filter(Boolean) as string[])];
-  if (uniqueCompanyNames.length > 0) {
-    const existing = await db.company.findMany({
-      where: { organizationId: orgId, name: { in: uniqueCompanyNames } },
-      select: { id: true, name: true },
-    });
-    for (const c of existing) companyCache.set(c.name, c.id);
-
-    // Create missing companies in batch
-    const missing = uniqueCompanyNames.filter((n) => !companyCache.has(n));
-    if (missing.length > 0) {
-      await db.company.createMany({
-        data: missing.map((name) => ({ name, organizationId: orgId })),
-        skipDuplicates: true,
-      });
-      const created = await db.company.findMany({
-        where: { organizationId: orgId, name: { in: missing } },
+      const names = [...new Set(contacts.map((row) => row.companyName).filter((name): name is string => !!name))];
+      const companies = names.length ? await tx.company.findMany({
+        where: { organizationId: orgId, OR: names.map((name) => ({ name: { equals: name, mode: "insensitive" as const } })) },
         select: { id: true, name: true },
-      });
-      for (const c of created) companyCache.set(c.name, c.id);
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      }) : [];
+      const cache = new Map<string, string>();
+      for (const company of companies) {
+        const key = company.name.trim().toLowerCase();
+        if (!cache.has(key)) cache.set(key, company.id);
+      }
+      for (const name of names) {
+        const key = name.toLowerCase();
+        if (!cache.has(key)) {
+          const company = await tx.company.create({ data: { name, organizationId: orgId }, select: { id: true } });
+          cache.set(key, company.id);
+        }
+      }
+      await tx.contact.createMany({ data: contacts.map((row) => ({
+        firstName: row.firstName, lastName: row.lastName || null, email: row.email || null,
+        phone: row.phone || null, jobTitle: row.jobTitle || null,
+        companyId: row.companyName ? cache.get(row.companyName.toLowerCase())! : null,
+        organizationId: orgId, ownerId: session.user!.id!,
+      })) });
+      return { imported: contacts.length, duplicates, companies: cache.size };
+    }, { isolationLevel: "Serializable", timeout: 30_000 });
+    revalidatePath("/contacts");
+    revalidatePath("/companies");
+    revalidatePath("/dashboard");
+    return { ...result, error: null };
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "P2034") {
+      return { imported: 0, duplicates: 0, error: "I contatti sono stati modificati durante l'importazione. Riprova: nessun dato è stato importato." };
     }
+    return { imported: 0, duplicates: 0, error: error instanceof Error ? error.message : "Importazione non riuscita. Nessun dato è stato importato." };
   }
-
-  // Separate valid rows from duplicates
-  const toCreate: typeof rows = [];
-  let duplicates = 0;
-
-  for (const row of rows) {
-    const emailLower = row.email?.toLowerCase();
-    if (emailLower && existingEmails.has(emailLower)) {
-      duplicates++;
-    } else {
-      toCreate.push(row);
-      if (emailLower) existingEmails.add(emailLower);
-    }
-  }
-
-  // Batch insert
-  if (toCreate.length > 0) {
-    await db.contact.createMany({
-      data: toCreate.map((row) => {
-        const companyId = row.companyName?.trim() ? (companyCache.get(row.companyName.trim()) ?? null) : null;
-        return {
-          firstName: row.firstName,
-          lastName: row.lastName || null,
-          email: row.email || null,
-          phone: row.phone || null,
-          jobTitle: row.jobTitle || null,
-          companyId,
-          organizationId: orgId,
-          ownerId: session.user!.id!,
-        };
-      }),
-    });
-  }
-
-  revalidatePath("/contacts");
-  return { imported: toCreate.length, duplicates, error: null };
 }
 
 // ── COMPANIES CRUD ───────────────────────────────────────────────────────────

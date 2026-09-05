@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { validateCrmReferences } from "@/lib/crm-references";
 import { runWorkflows } from "@/lib/workflow-engine";
 import { dispatchWebhook } from "@/server/actions/webhooks";
 
@@ -31,8 +32,17 @@ export async function moveDeal(input: z.infer<typeof moveSchema>) {
   const { dealId, newStageId } = parsed.data;
 
   try {
+    const previous = await db.deal.findFirst({
+      where: { id: dealId, organizationId: orgId, status: "OPEN" },
+      select: { pipelineId: true, stageId: true },
+    });
+    if (!previous) return { error: "Affare non disponibile" };
+    if (previous.stageId !== parsed.data.oldStageId) return { error: "L'affare è già stato spostato. Aggiorna la pagina." };
+    const referenceError = await validateCrmReferences(orgId, { stageId: newStageId, pipelineId: previous.pipelineId });
+    if (referenceError) return { error: referenceError };
+    if (previous.stageId === newStageId) return { ok: true };
     const deal = await db.deal.update({
-      where: { id: dealId, organizationId: orgId },
+      where: { id: dealId, organizationId: orgId, stageId: previous.stageId, status: "OPEN" },
       data: { stageId: newStageId, updatedAt: new Date() },
       select: { id: true, title: true, ownerId: true, contactId: true },
     });
@@ -52,11 +62,11 @@ export async function moveDeal(input: z.infer<typeof moveSchema>) {
 
 const updateSchema = z.object({
   id: z.string(),
-  title: z.string().min(1).optional(),
+  title: z.string().trim().min(1).max(300).optional(),
   value: z.number().min(0).optional(),
-  currency: z.string().optional(),
-  stageId: z.string().optional(),
-  expectedClose: z.string().nullable().optional(),
+  currency: z.string().regex(/^[A-Z]{3}$/).optional(),
+  stageId: z.string().min(1).optional(),
+  expectedClose: z.string().date().or(z.string().datetime({ offset: true })).or(z.literal("")).nullable().optional(),
   status: z.enum(["OPEN", "WON", "LOST"]).optional(),
   lostReason: z.string().nullable().optional(),
   contactId: z.string().nullable().optional(),
@@ -76,15 +86,20 @@ export async function updateDeal(input: z.infer<typeof updateSchema>) {
   const { id, expectedClose, status, ...rest } = parsed.data;
 
   try {
-    const prev = await db.deal.findUnique({ where: { id, organizationId: orgId }, select: { value: true, title: true, ownerId: true, contactId: true } });
+    const prev = await db.deal.findFirst({ where: { id, organizationId: orgId, status: { not: "DELETED" } }, select: { value: true, status: true, stageId: true, pipelineId: true } });
+    if (!prev) return { error: "Affare non disponibile" };
+    const referenceError = await validateCrmReferences(orgId, { ...rest, pipelineId: rest.stageId ? prev.pipelineId : undefined });
+    if (referenceError) return { error: referenceError };
+    const statusChanged = status !== undefined && status !== prev.status;
 
     const updated = await db.deal.update({
-      where: { id, organizationId: orgId },
+      where: { id, organizationId: orgId, status: prev.status, stageId: prev.stageId },
       data: {
         ...rest,
-        expectedClose: expectedClose ? new Date(expectedClose) : expectedClose === null ? null : undefined,
+        expectedClose: expectedClose === undefined ? undefined : expectedClose ? new Date(expectedClose) : null,
         status: status ?? undefined,
-        closedAt: status === "WON" || status === "LOST" ? new Date() : status === "OPEN" ? null : undefined,
+        closedAt: statusChanged ? (status === "OPEN" ? null : new Date()) : undefined,
+        ...(statusChanged && status !== "LOST" ? { lostReason: null } : {}),
         updatedAt: new Date(),
       },
       select: { id: true, title: true, value: true, ownerId: true, contactId: true },
@@ -93,10 +108,10 @@ export async function updateDeal(input: z.infer<typeof updateSchema>) {
     revalidatePath("/deals");
 
     const base = { orgId, dealId: updated.id, dealTitle: updated.title, ownerId: updated.ownerId, contactId: updated.contactId ?? undefined };
-    if (status === "WON") {
+    if (statusChanged && status === "WON") {
       runWorkflows({ trigger: "DEAL_WON", ...base, dealValue: Number(updated.value) }).catch(console.error);
       dispatchWebhook(orgId, "deal.won", { id: updated.id, title: updated.title, value: Number(updated.value) }).catch(() => {});
-    } else if (status === "LOST") {
+    } else if (statusChanged && status === "LOST") {
       runWorkflows({ trigger: "DEAL_LOST", ...base }).catch(console.error);
       dispatchWebhook(orgId, "deal.lost", { id: updated.id, title: updated.title }).catch(() => {});
     } else if (rest.value !== undefined && prev && Number(rest.value) !== Number(prev.value)) {
@@ -111,12 +126,12 @@ export async function updateDeal(input: z.infer<typeof updateSchema>) {
 }
 
 const createSchema = z.object({
-  title: z.string().min(1),
+  title: z.string().trim().min(1).max(300),
   value: z.number().min(0),
-  currency: z.string().default("EUR"),
-  stageId: z.string(),
-  pipelineId: z.string(),
-  expectedClose: z.string().optional(),
+  currency: z.string().regex(/^[A-Z]{3}$/).default("EUR"),
+  stageId: z.string().min(1),
+  pipelineId: z.string().min(1),
+  expectedClose: z.string().date().or(z.string().datetime({ offset: true })).or(z.literal("")).optional(),
   contactId: z.string().optional(),
   companyId: z.string().optional(),
 });
@@ -135,9 +150,13 @@ export async function createDeal(input: z.infer<typeof createSchema>) {
   const { expectedClose, ...rest } = parsed.data;
 
   try {
+    const referenceError = await validateCrmReferences(orgId, rest);
+    if (referenceError) return { error: referenceError };
     const deal = await db.deal.create({
       data: {
         ...rest,
+        contactId: rest.contactId || null,
+        companyId: rest.companyId || null,
         organizationId: orgId,
         ownerId,
         expectedClose: expectedClose ? new Date(expectedClose) : undefined,
@@ -333,11 +352,12 @@ export async function updateDealsStatus(
   const session = await auth();
   const orgId = getOrgId(session);
   if (!orgId) return { count: 0, error: "Non autorizzato" };
+  if (!z.enum(["OPEN", "WON", "LOST"]).safeParse(status).success) return { count: 0, error: "Stato non valido" };
   if (!ids.length) return { count: 0 };
 
   try {
     const result = await db.deal.updateMany({
-      where: { id: { in: ids }, organizationId: orgId },
+      where: { id: { in: ids }, organizationId: orgId, status: { notIn: [status, "DELETED"] } },
       data: {
         status,
         closedAt: status === "WON" || status === "LOST" ? new Date() : null,
@@ -351,7 +371,7 @@ export async function updateDealsStatus(
   }
 }
 
-export async function getDealsForSelect(): Promise<{ id: string; title: string; value: number; currency: string }[]> {
+export async function getDealsForSelect(selectedId?: string): Promise<{ id: string; title: string; value: number; currency: string }[]> {
   const session = await auth();
   if (!session) return [];
 
@@ -365,6 +385,13 @@ export async function getDealsForSelect(): Promise<{ id: string; title: string; 
       orderBy: { updatedAt: "desc" },
       take: 100,
     });
+    if (selectedId && !deals.some(deal => deal.id === selectedId)) {
+      const selected = await db.deal.findFirst({
+        where: { id: selectedId, organizationId: orgId, status: { not: "DELETED" } },
+        select: { id: true, title: true, value: true, currency: true },
+      });
+      if (selected) deals.unshift(selected);
+    }
     return deals.map((d) => ({ ...d, value: Number(d.value) }));
   } catch {
     return [];

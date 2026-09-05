@@ -86,7 +86,7 @@ export async function validateOrgForeignKeys(
   if (refs.companyId) checks.push(db.company.findFirst({ where: { id: refs.companyId, organizationId }, select: { id: true } }).then((r) => ({ ok: !!r, field: "companyId" })));
   if (refs.ownerId) checks.push(db.user.findFirst({ where: { id: refs.ownerId, organizationId }, select: { id: true } }).then((r) => ({ ok: !!r, field: "ownerId" })));
   if (refs.pipelineId) checks.push(db.pipeline.findFirst({ where: { id: refs.pipelineId, organizationId }, select: { id: true } }).then((r) => ({ ok: !!r, field: "pipelineId" })));
-  if (refs.stageId) checks.push(db.stage.findFirst({ where: { id: refs.stageId, pipeline: { organizationId } }, select: { id: true } }).then((r) => ({ ok: !!r, field: "stageId" })));
+  if (refs.stageId) checks.push(db.stage.findFirst({ where: { id: refs.stageId, pipeline: { organizationId }, ...(refs.pipelineId ? { pipelineId: refs.pipelineId } : {}) }, select: { id: true } }).then((r) => ({ ok: !!r, field: "stageId" })));
 
   const results = await Promise.all(checks);
   const invalid = results.find((r) => !r.ok);

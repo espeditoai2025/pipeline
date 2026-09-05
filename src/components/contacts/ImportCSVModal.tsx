@@ -8,21 +8,12 @@ import { Sheet, SheetContent, SheetHeader, SheetBody, SheetTitle } from "@/compo
 import { Button } from "@/components/ui/button";
 import { importContacts } from "@/server/actions/contacts";
 import type { ImportRow } from "@/types/contacts";
+import { parseContactCSV, resolveContactHeader, validateContactHeaders, contactImportSchema, MAX_CONTACT_IMPORT_ROWS } from "@/lib/contact-import";
 
 type Props = {
   open: boolean;
   onClose: () => void;
   onImported: () => void;
-};
-
-// Column aliases accepted for each field
-const ALIASES: Record<string, string[]> = {
-  firstName:   ["firstname", "nome", "first_name", "firstname", "name"],
-  lastName:    ["lastname", "cognome", "last_name", "lastname", "surname"],
-  email:       ["email", "mail", "e-mail"],
-  phone:       ["phone", "telefono", "tel", "cellulare", "mobile"],
-  jobTitle:    ["jobtitle", "ruolo", "title", "job_title", "posizione"],
-  companyName: ["company", "azienda", "companyname", "company_name", "ragionesociale"],
 };
 
 const TEMPLATE_HEADERS = ["firstName", "lastName", "email", "phone", "jobTitle", "companyName"];
@@ -32,49 +23,14 @@ const TEMPLATE_ROWS = [
   ["Luca", "Verdi", "luca.verdi@esempio.it", "", "Account Manager", "Acme S.r.l."],
 ];
 
-function resolveHeader(raw: string): string {
-  const norm = raw.trim().toLowerCase().replace(/[\s_-]+/g, "");
-  for (const [field, aliases] of Object.entries(ALIASES)) {
-    if (aliases.some((a) => a.replace(/[\s_-]+/g, "") === norm)) return field;
-  }
-  return raw.trim();
-}
-
-function parseCSVText(text: string): ImportRow[] {
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2) return [];
-  const headers = lines[0]!.split(",").map(resolveHeader);
-  return lines.slice(1).filter(Boolean).map((line) => {
-    const values = line.split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
-    return Object.fromEntries(headers.map((h, i) => [h, values[i] ?? ""])) as ImportRow;
-  });
-}
-
 function parseXLSXBuffer(buffer: ArrayBuffer): ImportRow[] {
-  const wb = XLSX.read(buffer, { type: "array" });
+  const wb = XLSX.read(buffer, { type: "array", sheetRows: MAX_CONTACT_IMPORT_ROWS + 2 });
   const sheet = wb.Sheets[wb.SheetNames[0]!];
   if (!sheet) return [];
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
-  return rows.map((r) => {
-    const out: ImportRow = {};
-    for (const [rawKey, val] of Object.entries(r)) {
-      out[resolveHeader(rawKey)] = String(val ?? "").trim();
-    }
-    return out;
-  });
-}
-
-function normalizeRow(row: ImportRow) {
-  const firstName = row["firstName"] as string | undefined;
-  if (!firstName) return null;
-  return {
-    firstName,
-    lastName:    (row["lastName"]    as string) || undefined,
-    email:       (row["email"]       as string) || undefined,
-    phone:       (row["phone"]       as string) || undefined,
-    jobTitle:    (row["jobTitle"]    as string) || undefined,
-    companyName: (row["companyName"] as string) || undefined,
-  };
+  const rows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, defval: "", raw: false, blankrows: false });
+  const headers = (rows.shift() ?? []).map(resolveContactHeader);
+  validateContactHeaders(headers);
+  return rows.map((row) => Object.fromEntries(headers.map((header, i) => [header, String(row[i] ?? "").trim()])));
 }
 
 function downloadTemplate() {
@@ -95,20 +51,29 @@ export function ImportCSVModal({ open, onClose, onImported }: Props) {
   const parsedRowsRef = useRef<ImportRow[]>([]);
 
   async function handleFile(file: File) {
-    setFileName(file.name);
-    let rows: ImportRow[] = [];
-
-    if (/\.(xlsx|xls)$/i.test(file.name)) {
-      const buffer = await file.arrayBuffer();
-      rows = parseXLSXBuffer(buffer);
-    } else {
-      const text = await file.text();
-      rows = parseCSVText(text);
-    }
-
-    parsedRowsRef.current = rows;
-    setRowCount(rows.length);
-    setPreview(rows.slice(0, 5));
+    if (loading) return;
+    setLoading(true);
+    setFileName(""); setRowCount(0); setPreview([]); setResult(null);
+    parsedRowsRef.current = [];
+    try {
+      if (!/\.(csv|tsv|xlsx|xls)$/i.test(file.name)) throw new Error("Seleziona un file CSV, TSV o Excel");
+      if (file.size > 5 * 1024 * 1024) throw new Error("Il file supera il limite di 5 MB");
+      const rows = /\.(xlsx|xls)$/i.test(file.name)
+        ? parseXLSXBuffer(await file.arrayBuffer())
+        : parseContactCSV(await file.text());
+      const parsed = contactImportSchema.safeParse(rows);
+      if (!parsed.success) {
+        const issue = parsed.error.issues[0];
+        const position = typeof issue?.path[0] === "number" ? `Riga ${issue.path[0] + 2}: ` : "";
+        throw new Error(`${position}${issue?.message ?? "Dati non validi"}`);
+      }
+      parsedRowsRef.current = rows;
+      setFileName(file.name);
+      setRowCount(rows.length);
+      setPreview(rows.slice(0, 5));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Impossibile leggere il file");
+    } finally { setLoading(false); }
   }
 
   function onDrop(e: React.DragEvent) {
@@ -121,20 +86,20 @@ export function ImportCSVModal({ open, onClose, onImported }: Props) {
     const rows = parsedRowsRef.current;
     if (!rows.length) return;
     setLoading(true);
-    const normalized = rows.map(normalizeRow).filter((r): r is NonNullable<typeof r> => r !== null);
-    const uniqueCompanies = new Set(normalized.map((r) => r.companyName?.trim()).filter(Boolean)).size;
-    const res = await importContacts(normalized);
-    setLoading(false);
-    if (res.error) {
-      toast.error(res.error);
-    } else {
-      setResult({ imported: res.imported, duplicates: res.duplicates, companies: uniqueCompanies });
-      toast.success(`Importati ${res.imported} contatti`);
-      onImported();
-    }
+    try {
+      const res = await importContacts(contactImportSchema.parse(rows));
+      if (res.error) toast.error(res.error);
+      else {
+        setResult({ imported: res.imported, duplicates: res.duplicates, companies: res.companies });
+        toast.success(`Importati ${res.imported} contatti`);
+        onImported();
+      }
+    } catch { toast.error("Importazione non riuscita. Riprova."); }
+    finally { setLoading(false); }
   }
 
   function handleClose() {
+    if (loading) return;
     setPreview([]);
     setFileName("");
     setRowCount(0);
@@ -178,7 +143,7 @@ export function ImportCSVModal({ open, onClose, onImported }: Props) {
                 ))}
               </div>
               <p className="text-xs text-[var(--crm-neutral-400)]">
-                Accetta anche: nome, cognome, telefono, ruolo, azienda — sia in italiano che in inglese
+                Intestazioni in italiano o inglese. CSV con virgola o punto e virgola, TSV ed Excel. Massimo 2.000 contatti e 5 MB. Le righe non valide vengono segnalate prima dell&apos;importazione.
               </p>
             </div>
 
@@ -208,7 +173,7 @@ export function ImportCSVModal({ open, onClose, onImported }: Props) {
                   <input
                     ref={fileRef}
                     type="file"
-                    accept=".csv,.xls,.xlsx"
+                    accept=".csv,.tsv,.xls,.xlsx"
                     className="hidden"
                     onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
                   />
@@ -267,7 +232,7 @@ export function ImportCSVModal({ open, onClose, onImported }: Props) {
         </SheetBody>
 
         <div className="px-6 py-4 border-t border-[var(--crm-neutral-100)] dark:border-white/10 flex gap-3">
-          <Button type="button" variant="outline" className="flex-1" onClick={handleClose}>
+          <Button type="button" variant="outline" className="flex-1" onClick={handleClose} disabled={loading}>
             {result ? "Chiudi" : "Annulla"}
           </Button>
           {!result && (

@@ -61,6 +61,7 @@ model Organization {
   apiKeys             ApiKey[]
   webhooks            Webhook[]
   invoices            Invoice[]
+  invoicePayments     InvoicePayment[]
   bookingPages        BookingPage[]
   surveys             Survey[]
   chatMessages        ChatMessage[]
@@ -115,6 +116,8 @@ model User {
   notifications  Notification[]
   apiKeys        ApiKey[]
   invoicesCreated Invoice[]    @relation("InvoiceCreator")
+  paymentsRecorded InvoicePayment[] @relation("PaymentRecorder")
+  paymentsVoided   InvoicePayment[] @relation("PaymentVoider")
   bookingPages    BookingPage[]
 
   @@index([organizationId])
@@ -736,6 +739,8 @@ model Invoice {
   issueDate        DateTime      @default(now())
   dueDate          DateTime?
   paidAt           DateTime?
+  paidAmount       Decimal       @default(0)
+  payments         InvoicePayment[]
 
   // Emittente (org)
   senderName       String
@@ -778,7 +783,31 @@ model Invoice {
 
   @@unique([organizationId, year, progressive])
   @@index([organizationId, status])
+  @@index([organizationId, status, dueDate])
   @@index([dealId])
+}
+
+model InvoicePayment {
+  id             String @id @default(cuid())
+  invoiceId      String
+  invoice        Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  requestId      String
+  amount         Decimal
+  paidAt         DateTime
+  method         String
+  reference      String?
+  createdById    String
+  createdBy      User @relation("PaymentRecorder", fields: [createdById], references: [id])
+  createdAt      DateTime @default(now())
+  voidedAt       DateTime?
+  voidReason     String?
+  voidedById     String?
+  voidedBy       User? @relation("PaymentVoider", fields: [voidedById], references: [id])
+
+  @@unique([organizationId, requestId])
+  @@index([invoiceId, voidedAt])
 }
 
 enum InvoiceStatus {

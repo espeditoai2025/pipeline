@@ -59,11 +59,6 @@ const nextConfig: NextConfig = {
         source: "/(.*)",
         headers: securityHeaders,
       },
-      // Long-term cache for immutable Next.js static chunks
-      {
-        source: "/_next/static/(.*)",
-        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
-      },
       // Cache public static assets (fonts, icons, images) for 30 days
       {
         source: "/(.*)\\.(svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|eot)$",
@@ -89,6 +84,8 @@ const withIntl = withNextIntl(nextConfig);
 export default withSentryConfig(withIntl, {
   // Sentry organization and project (set via SENTRY_ORG and SENTRY_PROJECT env vars in CI)
   silent: true,
-  disableLogger: true,
-  automaticVercelMonitors: false,
+  webpack: {
+    treeshake: { removeDebugLogging: true },
+    automaticVercelMonitors: false,
+  },
 });

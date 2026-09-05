@@ -41,6 +41,9 @@ yarn-error.log*
 # prisma generated
 src/generated/
 
+# database dumps (never commit)
+backups/
+
 # vercel
 .vercel
 

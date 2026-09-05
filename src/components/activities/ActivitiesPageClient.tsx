@@ -5,6 +5,7 @@ import { Activity as ActivityIcon, CalendarDays, CheckCircle, Clock, Unlink, Lis
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { activityBucket, toLocalDateTimeInput } from "@/lib/activity-dates";
 import { ActivitiesTable } from "./ActivitiesTable";
 import { ActivitiesCalendar } from "./ActivitiesCalendar";
 import { ActivityForm } from "./ActivityForm";
@@ -41,14 +42,20 @@ export function ActivitiesPageClient({ initialActivities, gcalConnected: initial
   }, [searchParams]);
 
   async function handleDisconnect() {
-    await fetch("/api/google-calendar/disconnect", { method: "POST" });
-    setGcalConnected(false);
-    toast.success("Google Calendar disconnesso");
+    try {
+      const response = await fetch("/api/google-calendar/disconnect", { method: "POST" });
+      if (!response.ok) throw new Error("Disconnessione non riuscita");
+      setGcalConnected(false);
+      toast.success("Google Calendar disconnesso");
+    } catch {
+      toast.error("Impossibile disconnettere Google Calendar. Riprova.");
+    }
   }
 
   const pendingCount = activities.filter(a => !a.completedAt).length;
-  const todayCount = activities.filter(a => !a.completedAt && a.dueDate && isToday(a.dueDate)).length;
-  const overdueCount = activities.filter(a => !a.completedAt && a.dueDate && new Date(a.dueDate) < new Date() && !isToday(a.dueDate)).length;
+  const now = new Date();
+  const todayCount = activities.filter(a => activityBucket(a, now) === "today").length;
+  const overdueCount = activities.filter(a => activityBucket(a, now) === "overdue").length;
 
   return (
     <div className="space-y-4">
@@ -140,7 +147,8 @@ export function ActivitiesPageClient({ initialActivities, gcalConnected: initial
       {view === "list" ? (
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-6 items-start">
           <ActivitiesTable
-            initialActivities={activities}
+            activities={activities}
+            onActivitiesChange={setActivities}
             filterDay={selectedDay}
             onClearDay={() => setSelectedDay(null)}
             gcalConnected={gcalConnected}
@@ -160,7 +168,7 @@ export function ActivitiesPageClient({ initialActivities, gcalConnected: initial
             onActivityClick={(a) => { setCalEditing(a); setCalFormOpen(true); }}
             onNewActivity={(date) => {
               setCalEditing(null);
-              setCalNewDate(date.toISOString().slice(0, 16));
+              setCalNewDate(toLocalDateTimeInput(date.toISOString()));
               setCalFormOpen(true);
             }}
           />
@@ -179,11 +187,4 @@ export function ActivitiesPageClient({ initialActivities, gcalConnected: initial
       )}
     </div>
   );
-}
-
-function isToday(dateStr: string | null) {
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  const n = new Date();
-  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
 }

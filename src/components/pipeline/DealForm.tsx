@@ -206,7 +206,7 @@ export function DealForm({ open, onClose, deal, stages, pipelineId, defaultStage
     let newDealId: string | undefined;
 
     if (isEditing) {
-      const result = await updateDeal({ id: deal!.id, ...payload });
+      const result = await updateDeal({ id: deal!.id, ...payload, contactId: data.contactId || null, expectedClose: data.expectedClose || null });
       if (result.error) { toast.error(result.error); return; }
     } else {
       const result = await createDeal({ ...payload, pipelineId });
