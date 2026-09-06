@@ -16,7 +16,9 @@ Nuovo registro per destinatario (`CampaignDelivery`, migrazione `20260906100000_
 
 Verifiche: 133 test unitari (15 nuovi fra `mailer` e `campaign-sender`, compresa la prova che una ripresa non genera doppioni), TypeScript, ESLint e build di produzione puliti; la SQL della migrazione coincide con quella canonica generata da Prisma. Il collaudo su database reale non è stato eseguito perché Docker non era avviato.
 
-Resta da fare fuori dal codice: verificare un dominio su Resend e impostare `RESEND_FROM`. Finché non accade, nessuna email parte comunque — ma ora ogni fallimento è tracciato nei log.
+Rilasciato con il commit `e2fbf61`: la build ha applicato la migrazione `campaign_delivery` (otto migrazioni in tutto).
+
+**Posta attivata la notte del 6 settembre.** L'utente ha aggiunto su Aruba i tre record indicati da Resend: MX `feedback-smtp.eu-west-1.amazonses.com` e TXT `v=spf1 include:amazonses.com ~all` su `send.pipely.it`, TXT DKIM su `resend._domainkey.pipely.it`. La posizione del DKIM dice che il dominio registrato su Resend è `pipely.it`, non il sottodominio: `send.pipely.it` è solo il percorso di ritorno per SPF, quindi il mittente va sul dominio principale e la posta Aruba in ingresso resta intatta (l'MX all'apice non è stato toccato). Impostata `RESEND_FROM` su Vercel a `Pipely CRM <noreply@pipely.it>` e fatto il redeploy. Prova reale in produzione: una richiesta di reset password ha generato il token e **nessun errore del mailer nei log**, cioè Resend ha accettato il messaggio — lo stesso tentativo prima della correzione sarebbe fallito in silenzio.
 
 ## Sessione del 2026-09-05 — CRM per professionisti e microimprese
 
