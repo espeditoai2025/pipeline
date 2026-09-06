@@ -1,10 +1,15 @@
 /**
  * Rate limiting via Upstash Redis.
  *
- * If UPSTASH_REDIS_REST_URL/TOKEN are not configured the limiter falls back to
- * allow-all so local development works without Redis — but in PRODUCTION this
- * fallback is logged loudly (fail-loud) so a misconfiguration that silently
- * disables throttling on auth/API endpoints is visible.
+ * Se le credenziali non sono configurate il limitatore lascia passare tutto, così
+ * lo sviluppo locale funziona senza Redis — ma in PRODUZIONE il ripiego viene
+ * registrato a voce alta, perché una configurazione mancante disattiva in
+ * silenzio la protezione su autenticazione e API.
+ *
+ * I nomi delle variabili sono due perché l'integrazione Upstash del marketplace
+ * Vercel crea `KV_REST_API_URL`/`KV_REST_API_TOKEN`, mentre una configurazione
+ * manuale usa i nomi nativi di Upstash: accettarli entrambi evita di duplicare
+ * gli stessi segreti sotto due nomi.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -24,8 +29,8 @@ let _warnedNoRedis = false;
 async function getLimiters(): Promise<{ auth: RateLimiter; api: RateLimiter; key: RateLimiter }> {
   if (!_initialized) {
     _initialized = true;
-    const url = process.env.UPSTASH_REDIS_REST_URL;
-    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+    const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+    const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
 
     if (url && token) {
       try {
@@ -62,7 +67,7 @@ async function getLimiters(): Promise<{ auth: RateLimiter; api: RateLimiter; key
   if ((!_authLimiter || !_apiLimiter) && !_warnedNoRedis) {
     _warnedNoRedis = true;
     if (process.env.NODE_ENV === "production") {
-      logger.error("rate-limit", "UPSTASH non configurato in produzione: rate limiting DISATTIVO su auth/API (fail-open)");
+      logger.error("rate-limit", "Redis non configurato in produzione: rate limiting DISATTIVO su auth/API (fail-open). Attese UPSTASH_REDIS_REST_URL/TOKEN oppure KV_REST_API_URL/TOKEN");
     }
   }
 
@@ -95,10 +100,26 @@ function tooMany(message: string, reset: number): NextResponse {
   );
 }
 
+/**
+ * Interroga il limitatore senza mai far cadere la richiesta: se Redis non
+ * risponde (guasto, quota esaurita, rete) si lascia passare e si registra
+ * l'errore. Prima l'eccezione risaliva fino alla rotta, quindi un problema del
+ * limitatore avrebbe reso inaccessibili login, registrazione e reset password.
+ */
+async function check(limiter: RateLimiter, identifier: string, scope: string): Promise<{ success: boolean; reset: number }> {
+  try {
+    const { success, reset } = await limiter.limit(identifier);
+    return { success, reset };
+  } catch (err) {
+    logger.error("rate-limit", `Limitatore non raggiungibile (${scope}): richiesta lasciata passare`, { error: String(err) });
+    return { success: true, reset: 0 };
+  }
+}
+
 /** Applies auth rate limit (per IP). Returns a 429 response if exceeded, else null. */
 export async function withAuthRateLimit(req: NextRequest): Promise<NextResponse | null> {
   const { auth } = await getLimiters();
-  const { success, reset } = await auth.limit(getClientIp(req));
+  const { success, reset } = await check(auth, getClientIp(req), "auth");
   if (!success) return tooMany("Troppe richieste. Riprova tra qualche minuto.", reset);
   return null;
 }
@@ -106,7 +127,7 @@ export async function withAuthRateLimit(req: NextRequest): Promise<NextResponse 
 /** Applies general API rate limit (per IP). */
 export async function withApiRateLimit(req: NextRequest): Promise<NextResponse | null> {
   const { api } = await getLimiters();
-  const { success, reset } = await api.limit(getClientIp(req));
+  const { success, reset } = await check(api, getClientIp(req), "api");
   if (!success) return tooMany("Limite richieste raggiunto. Riprova tra qualche minuto.", reset);
   return null;
 }
@@ -117,7 +138,7 @@ export async function withApiRateLimit(req: NextRequest): Promise<NextResponse |
  */
 export async function withApiKeyRateLimit(apiKeyId: string): Promise<NextResponse | null> {
   const { key } = await getLimiters();
-  const { success, reset } = await key.limit(apiKeyId);
+  const { success, reset } = await check(key, apiKeyId, "api-key");
   if (!success) return tooMany("Limite richieste API raggiunto. Riprova tra poco.", reset);
   return null;
 }
