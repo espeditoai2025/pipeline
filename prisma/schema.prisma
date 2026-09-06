@@ -628,6 +628,10 @@ model LeadCandidate {
   nDipendenti    String?
   formaGiuridica String?
   annoFondazione String?
+  // Origine di ogni contatto: "sito" | "pec" | "maps" | "registro" | "ai" | "ai-verificato"
+  emailSource    String?
+  phoneSource    String?
+  websiteSource  String?
   score          Int              @default(0)
   source         String           @default("AI")
   motivation     String?

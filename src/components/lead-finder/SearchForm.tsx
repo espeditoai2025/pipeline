@@ -161,9 +161,14 @@ export function SearchForm({ maxResultsLimit = 20, isStarter = false }: SearchFo
 
       if (createErr || !search) { setError(createErr ?? "Errore creazione ricerca"); return; }
 
-      const { error: runErr } = await runSearch(search.id);
-      if (runErr) { setError(runErr); return; }
-
+      // La pagina della ricerca mostra lo stato reale (in corso, fallita con "Riprova", completata),
+      // quindi ci si arriva anche quando l'esecuzione fallisce o la connessione si interrompe.
+      try {
+        const { error: runErr } = await runSearch(search.id);
+        if (runErr && !/già in corso/i.test(runErr)) { setError(`${runErr}. Puoi riprovare dalla pagina della ricerca.`); }
+      } catch {
+        // timeout o rete: la ricerca potrebbe essere ancora in esecuzione lato server
+      }
       window.location.href = `/lead-finder/${search.id}`;
     });
   }
@@ -285,7 +290,7 @@ export function SearchForm({ maxResultsLimit = 20, isStarter = false }: SearchFo
         {isPending ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
-            Ricerca in corso… (può richiedere 10-20 secondi)
+            Ricerca in corso… può richiedere qualche minuto
           </>
         ) : (
           <>

@@ -5,7 +5,32 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, XCircle, ExternalLink, Loader2, Building2, User, MapPin, Users, Trash2, Phone, Hash, Briefcase, Calendar, DownloadCloud } from "lucide-react";
 import { approveCandidate, rejectCandidate, rejectBelowScore, approveAllCandidates } from "@/server/actions/lead-finder";
+import { formatPhoneForDisplay } from "@/lib/lead-finder-utils";
 import type { LeadCandidate } from "@/types/lead-finder";
+
+// Fonti che hanno restituito il dato da una pagina reale; tutto il resto è una proposta del modello.
+const VERIFIED_SOURCES = new Set(["sito", "pec", "maps", "registro", "ai-verificato"]);
+const SOURCE_LABEL: Record<string, string> = {
+  sito: "Trovato sul sito aziendale",
+  pec: "PEC dal registro INI-PEC",
+  maps: "Da Google Maps",
+  registro: "Dal registro CCIAA",
+  ai: "Proposto dall'AI: non verificato, controlla prima di usarlo",
+  "ai-verificato": "Proposto dall'AI: il sito risponde",
+};
+
+function SourceBadge({ source }: { source: string | null }) {
+  if (!source) return null;
+  const ok = VERIFIED_SOURCES.has(source);
+  return (
+    <span
+      title={SOURCE_LABEL[source] ?? source}
+      className={`ml-1 inline-flex shrink-0 items-center rounded px-1 py-px text-[10px] font-medium ${ok ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300" : "bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"}`}
+    >
+      {ok ? "verificato" : "da verificare"}
+    </span>
+  );
+}
 
 function ScoreBar({ score }: { score: number }) {
   const color = score >= 70 ? "bg-emerald-500" : score >= 40 ? "bg-amber-400" : "bg-red-400";
@@ -88,6 +113,7 @@ function CandidateRow({ candidate }: { candidate: LeadCandidate }) {
                 {candidate.website} <ExternalLink className="h-2.5 w-2.5 shrink-0" />
               </a>
             )}
+            {candidate.website && <SourceBadge source={candidate.websiteSource} />}
           </div>
         </div>
       </td>
@@ -105,7 +131,7 @@ function CandidateRow({ candidate }: { candidate: LeadCandidate }) {
           )}
           {candidate.phone && (
             <p className="flex items-center gap-1 text-xs text-[var(--crm-neutral-500)]">
-              <Phone className="h-3 w-3" /> {candidate.phone}
+              <Phone className="h-3 w-3" /> {formatPhoneForDisplay(candidate.phone)} <SourceBadge source={candidate.phoneSource} />
             </p>
           )}
           {candidate.piva && (
@@ -132,15 +158,19 @@ function CandidateRow({ candidate }: { candidate: LeadCandidate }) {
         </div>
       </td>
 
-      {/* Referente */}
+      {/* Referente e email: l'email si mostra anche senza referente */}
       <td className="px-4 py-3">
-        {candidate.contactName ? (
+        {candidate.contactName || candidate.email ? (
           <div className="flex items-start gap-1.5">
             <User className="h-3.5 w-3.5 text-[var(--crm-neutral-400)] mt-0.5 shrink-0" />
             <div className="min-w-0">
-              <p className="text-xs font-medium text-[var(--crm-neutral-900)] dark:text-white truncate">{candidate.contactName}</p>
+              {candidate.contactName && <p className="text-xs font-medium text-[var(--crm-neutral-900)] dark:text-white truncate">{candidate.contactName}</p>}
               {candidate.contactRole && <p className="text-xs text-[var(--crm-neutral-500)] truncate">{candidate.contactRole}</p>}
-              {candidate.email && <p className="text-xs text-[var(--crm-neutral-500)] truncate">{candidate.email}</p>}
+              {candidate.email && (
+                <p className="flex items-center text-xs text-[var(--crm-neutral-500)]">
+                  <span className="truncate">{candidate.email}</span> <SourceBadge source={candidate.emailSource} />
+                </p>
+              )}
             </div>
           </div>
         ) : (

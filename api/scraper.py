@@ -62,6 +62,9 @@ class Company(BaseModel):
     n_dipendenti: Optional[str] = None
     forma_giuridica: Optional[str] = None
     anno_fondazione: Optional[str] = None
+    revenue: Optional[str] = None
+    email_source: Optional[str] = None  # "pec" | "sito"
+    website_source: Optional[str] = None  # "ai" when proposed by the scorer (the caller verifies it)
     score: int = 50
     motivation: Optional[str] = None
 
@@ -110,26 +113,53 @@ def _slug_to_piva(slug: str) -> Optional[str]:
     return m.group(1) if m else None
 
 
-def _field_from_detail(soup: BeautifulSoup, label: str) -> Optional[str]:
+_PARTICLES = {"di", "del", "della", "dei", "degli", "delle", "da", "in", "e", "&", "a", "al", "allo", "alla", "dal", "dallo", "dalla", "sul", "per", "con"}
+
+
+def _title_case(name: str) -> str:
+    """'DALMINE SPA' -> 'Dalmine Spa'; le particelle restano minuscole, le sigle di 1-2 lettere maiuscole."""
+    def cap(part: str) -> str:
+        return part[:1].upper() + part[1:].lower() if part else part
+
+    words = []
+    for i, w in enumerate(name.strip().split()):
+        lw = w.lower()
+        if i > 0 and lw in _PARTICLES:
+            words.append(lw)
+        elif len(w) <= 2 and w.isalpha():
+            words.append(w.upper())
+        else:
+            # Maiuscola anche dopo trattino, apostrofo e punto: "DEUTZ-FAHR" -> "Deutz-Fahr", "S.P.A." -> "S.P.A."
+            words.append(re.sub(r"[^-'.]+", lambda m: cap(m.group(0)), w))
+    return " ".join(words)
+
+
+def _detail_fields(soup: BeautifulSoup) -> dict:
     """
-    Estrae un campo dalla pagina dettaglio.
-    Pattern: <div class="col-xs-5"><p><b>LABEL</b></p></div>
-              <div class="col-xs-7"><p>[<a>]VALUE[</a>]</p></div>
+    Scheda azienda (settembre 2026): tabella "Dati aziendali" con <th scope="row">Etichetta</th><td>Valore</td>
+    e una lista <dt>/<dd> con gli stessi dati. Le etichette sono confrontate in minuscolo.
     """
-    for b in soup.find_all("b"):
-        if b.get_text(strip=True) == label:
-            col5 = b.find_parent("div", class_="col-xs-5")
-            if not col5:
-                continue
-            col7 = col5.find_next_sibling("div", class_="col-xs-7")
-            if not col7:
-                continue
-            p = col7.find("p")
-            if not p:
-                continue
-            a = p.find("a")
-            text = (a or p).get_text(strip=True)
-            return text or None
+    fields: dict = {}
+    missing = re.compile(r"^(n/?d|n\.d\.|-|non disponibile)$", re.I)  # il sito scrive "N/D" per i dati mancanti
+
+    def put(label, node) -> None:
+        key = label.get_text(" ", strip=True).lower()
+        value = re.sub(r"\s+", " ", node.get_text(" ", strip=True)) if node else ""
+        if key and value and not missing.match(value) and key not in fields:
+            fields[key] = value
+
+    for th in soup.find_all("th", attrs={"scope": "row"}):
+        put(th, th.find_next_sibling("td"))
+    for dt in soup.find_all("dt"):
+        put(dt, dt.find_next_sibling("dd"))
+    return fields
+
+
+def _first(fields: dict, *keys: str) -> Optional[str]:
+    for k in keys:
+        v = fields.get(k)
+        if v:
+            return v
     return None
 
 
@@ -144,77 +174,53 @@ async def _fetch_detail(client: httpx.AsyncClient, slug: str) -> dict:
         if r.status_code != 200:
             return {}
         soup = BeautifulSoup(r.text, "html.parser")
+        fields = _detail_fields(soup)
+        if not fields:
+            return {}
 
-        # Scarta aziende non attive
-        stato = _field_from_detail(soup, "Stato Attività")
-        if stato and not re.search(r"attiv", stato, re.I):
+        # Scarta aziende non attive: solo "Attiva" passa (non "Inattiva", "Cessata", "In liquidazione")
+        stato = _first(fields, "stato attività", "stato attivita", "stato")
+        if stato and not re.match(r"^attiva", stato, re.I):
             return {"_inactive": True}
 
-        via = _field_from_detail(soup, "Indirizzo")
-        citta = _field_from_detail(soup, "Città")
-        provincia = _field_from_detail(soup, "Provincia")
-        address = ", ".join(p for p in [via, citta, provincia] if p) or None
+        via = _first(fields, "indirizzo")
+        if via:
+            via = _title_case(via)  # il registro scrive gli indirizzi in maiuscolo
+        comune = _first(fields, "comune", "città", "citta")
+        provincia = _first(fields, "provincia")
+        place = f"{comune} ({provincia})" if comune and provincia else (comune or provincia)
+        address = ", ".join(p for p in [via, place] if p) or None
 
-        attivita = _field_from_detail(soup, "Attività prevalente")
-        ateco_code = _field_from_detail(soup, "ATECO")
+        ateco_full = _first(fields, "ateco") or ""
+        ateco_code = _first(fields, "codice ateco") or (ateco_full.split(" - ")[0].strip() if ateco_full else None)
+        attivita = _first(fields, "attività prevalente", "attivita prevalente") or (
+            " - ".join(ateco_full.split(" - ")[1:]).strip() if " - " in ateco_full else None
+        )
         sector = attivita or (f"ATECO {ateco_code}" if ateco_code else None)
 
-        n_dip = _field_from_detail(soup, "N. Dipendenti")
-        forma = _field_from_detail(soup, "Forma giuridica")
-        anno = _field_from_detail(soup, "Anno Fondazione")
+        n_dip = _first(fields, "n. dipendenti", "dipendenti")
+        forma = _first(fields, "forma giuridica")
+        anno = _first(fields, "anno fondazione", "anno di fondazione")
+        piva_digits = re.sub(r"\D", "", _first(fields, "partita iva", "p.iva") or "")
+        piva = piva_digits if len(piva_digits) == 11 else None
+        revenue_key = next((k for k in fields if k.startswith("fatturato")), None)
+        revenue = None
+        if revenue_key:
+            year = revenue_key.replace("fatturato", "").strip()
+            revenue = fields[revenue_key] + (f" ({year})" if year else "")
 
-        # Telefono: link tel: oppure pattern numeri italiani
-        # Esclude numeri di 11 cifre consecutive senza separatori (probabile P.IVA)
-        piva_str = re.sub(r"\D", "", _slug_to_piva(slug) or "")
-        phone: Optional[str] = None
-        for a in soup.find_all("a", href=re.compile(r"^tel:", re.I)):
-            raw = a["href"].replace("tel:", "").strip()
-            digits = re.sub(r"\D", "", raw)
-            if 6 <= len(digits) <= 13 and digits != piva_str:
-                phone = raw
-                break
-        if not phone:
-            # Pattern fisso italiano: deve avere separatori oppure non essere 11 cifre bare
-            for pat in [
-                r"\b((?:\+39[\s.-]?)?0\d{1,3}[\s.-]\d{4,8})\b",  # con separatore obbligatorio
-                r"\b(\+39\s?0\d{1,3}[\s.-]?\d{4,8})\b",            # con +39
-                r"\b(3\d{2}[\s.-]\d{3}[\s.-]\d{4})\b",              # mobile con separatori
-                r"\b(3\d{9})\b",                                      # mobile senza separatori
-            ]:
-                m = re.search(pat, r.text)
-                if m:
-                    digits = re.sub(r"\D", "", m.group(1))
-                    if digits != piva_str:
-                        phone = m.group(1).strip()
-                        break
-
-        # Sito web: primo link esterno non di navigazione
-        SKIP_WEBSITE = re.compile(
-            r"fatturatoitalia\.it|google\.|facebook\.|linkedin\.|twitter\.|"
-            r"instagram\.|youtube\.|googleapis\.|gstatic\.|cloudflare\.|"
-            r"amazonaws\.|cdn\.|apple\.com|apps\.apple|play\.google|"
-            r"numeroverde\.com|adcapital\.it|whatsapp\.",
-            re.I,
-        )
-        website: Optional[str] = None
-        for a in soup.find_all("a", href=True):
-            href: str = a["href"]
-            if not href.startswith("http"):
-                continue
-            if SKIP_WEBSITE.search(href) or "?" in href or href.count("/") > 4:
-                continue
-            website = href.rstrip("/")
-            break
-
+        # Telefono e sito non sono più nella scheda gratuita: li cerca il modello con ricerca web.
         return {
             "address": address,
             "sector": sector,
             "ateco": ateco_code,
-            "phone": _sanitize_phone(phone),
-            "website": website,
+            "phone": None,
+            "website": None,
             "n_dipendenti": n_dip,
             "forma_giuridica": forma,
             "anno_fondazione": anno,
+            "piva_detail": piva,
+            "revenue": revenue,
         }
     except Exception:
         return {}
@@ -228,15 +234,43 @@ async def _scrape_listing(client: httpx.AsyncClient, url: str) -> list[dict]:
         soup = BeautifulSoup(r.text, "html.parser")
         companies = []
         seen: set[str] = set()
-        for a in soup.find_all("a", href=re.compile(r"fatturatoitalia\.it/[a-z0-9][a-z0-9_-]*-\d{11}$")):
-            slug = a["href"].rstrip("/").split("/")[-1]
-            if slug in seen:
-                continue
-            name = a.get_text(strip=True)
-            if not name or len(name) < 2:
-                continue
+        # Listing (settembre 2026): <article class="fi-geo-company-row"> con nome (link relativo,
+        # maiuscolo), fatturato e comune (provincia). Si accettano anche link assoluti.
+        link_re = re.compile(r"^(?:https?://www\.fatturatoitalia\.it)?/([a-z0-9][a-z0-9_-]*-\d{11})/?$")
+
+        def add(a, row) -> None:
+            m = link_re.match(a.get("href", ""))
+            if not m:
+                return
+            slug = m.group(1)
+            name = a.get_text(" ", strip=True)
+            if slug in seen or not name or len(name) < 2:
+                return
             seen.add(slug)
-            companies.append({"name": name, "piva": _slug_to_piva(slug), "slug": slug})
+            entry = {"name": _title_case(name), "piva": _slug_to_piva(slug), "slug": slug}
+            if row is not None:
+                rev = row.find("span", class_="fi-geo-company-revenue")
+                loc = row.find("span", class_="fi-geo-company-location")
+                if rev and rev.get_text(strip=True):
+                    entry["revenue"] = re.sub(r"\s+", " ", rev.get_text(" ", strip=True))
+                if loc:
+                    comune = loc.find("a", href=re.compile(r"^/comune/"))
+                    prov = loc.find("a", href=re.compile(r"^/provincia/"))
+                    if comune:
+                        entry["location"] = comune.get_text(strip=True) + (f" ({prov.get_text(strip=True)})" if prov else "")
+            companies.append(entry)
+
+        rows = soup.find_all("article", class_="fi-geo-company-row")
+        if rows:
+            for row in rows:
+                name_span = row.find("span", class_="nome_azienda")
+                a = (name_span or row).find("a", href=link_re)
+                if a:
+                    add(a, row)
+        else:
+            # Ripiego se il markup cambia ancora: qualsiasi link azienda nella pagina
+            for a in soup.find_all("a", href=link_re):
+                add(a, None)
         return companies
     except Exception:
         return []
@@ -338,15 +372,25 @@ async def _scrape_all(location_slug: str, max_results: int, start_page: int = 1)
             for entry, detail in zip(batch, details):
                 if detail.get("_inactive"):
                     continue
-                enriched.append({**entry, **detail})
+                # La scheda prevale sul listing, ma i None non cancellano dati già raccolti
+                merged = {**entry, **{k: v for k, v in detail.items() if v is not None}}
+                if detail.get("piva_detail"):
+                    merged["piva"] = detail["piva_detail"]  # P.IVA reale: lo slug contiene il codice fiscale
+                if not merged.get("address") and entry.get("location"):
+                    merged["address"] = entry["location"]
+                enriched.append(merged)
 
-        # Fase 3: INI-PEC (batch parallelo)
+        # Fase 3: INI-PEC (batch parallelo). Il portale oggi non restituisce PEC alle richieste
+        # automatiche: se il primo lotto è vuoto si evita di aspettare i timeout degli altri.
         for i in range(0, len(enriched), CONCURRENCY):
             batch = enriched[i: i + CONCURRENCY]
             pecs = await asyncio.gather(*[_get_pec(client, c.get("piva")) for c in batch])
             for company, pec in zip(batch, pecs):
                 if pec:
                     company["email"] = pec
+                    company["email_source"] = "pec"
+            if i == 0 and not any(pecs):
+                break
 
         # Fase 4: email dal sito aziendale (per aziende con website ma senza email)
         # Più affidabile di INI-PEC quando i server governativi bloccano le richieste cloud
@@ -359,11 +403,61 @@ async def _scrape_all(location_slug: str, max_results: int, start_page: int = 1)
             for company, email in zip(batch, emails):
                 if email:
                     company["email"] = email
+                    company["email_source"] = "sito"
 
     return enriched
 
 
 # ─── AI scoring via OpenRouter ────────────────────────────────────────────────
+
+def _parse_json_array(raw: str) -> list[dict]:
+    """Array JSON dalla risposta del modello; se troncato recupera gli oggetti chiusi prima del taglio."""
+    text = re.sub(r"```(?:json)?\s*", "", raw).replace("```", "").strip()
+    start = text.find("[")
+    if start < 0:
+        raise ValueError("nessun array JSON nella risposta")
+    end = text.rfind("]")
+    if end > start:
+        try:
+            parsed = json.loads(text[start:end + 1])
+            if isinstance(parsed, list):
+                return [x for x in parsed if isinstance(x, dict)]
+        except json.JSONDecodeError:
+            pass
+    objects: list[dict] = []
+    depth, in_string, escaped, obj_start = 0, False, False, -1
+    for i in range(start + 1, len(text)):
+        ch = text[i]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            if depth == 0:
+                obj_start = i
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0 and obj_start >= 0:
+                try:
+                    obj = json.loads(text[obj_start:i + 1])
+                    if isinstance(obj, dict):
+                        objects.append(obj)
+                except json.JSONDecodeError:
+                    pass
+                obj_start = -1
+        elif ch == "]" and depth == 0:
+            break
+    if not objects:
+        raise ValueError("JSON malformato nella risposta")
+    return objects
+
 
 async def _openrouter_chat(messages: list[dict], max_tokens: int = 800) -> str:
     api_key = os.getenv("OPENROUTER_API_KEY", "")
@@ -383,11 +477,26 @@ async def _openrouter_chat(messages: list[dict], max_tokens: int = 800) -> str:
                 "messages": messages,
                 "max_tokens": max_tokens,
                 "temperature": 0.3,
+                # Hidden reasoning counts against max_tokens: at the default effort Gemini Flash cut the JSON off (see src/lib/openrouter.ts)
+                "reasoning": {"effort": "low"},
             },
             timeout=25,
         )
         data = r.json()
         return data["choices"][0]["message"]["content"].strip()
+
+
+_NOT_A_COMPANY_SITE = re.compile(r"(facebook|instagram|linkedin|twitter|x\.com|youtube|tiktok|paginegialle|paginebianche|virgilio|wikipedia|google|ufficiocamerale|fatturatoitalia|registroimprese|reportaziende|informazione-aziende|aziende\.it|trovaimprese|cylex|europages|kompass)")
+
+
+def _plausible_website(value) -> Optional[str]:
+    """Keeps only a bare company domain proposed by the model; the caller visits it before trusting it."""
+    if not isinstance(value, str):
+        return None
+    m = re.match(r"^(?:https?://)?(?:www\.)?([a-z0-9-]+(?:\.[a-z0-9-]+)+)", value.strip().lower())
+    if not m or _NOT_A_COMPANY_SITE.search(m.group(1)):
+        return None
+    return f"https://{m.group(1)}"
 
 
 async def _score_companies(companies: list[dict], params: dict) -> list[dict]:
@@ -429,6 +538,7 @@ async def _score_companies(companies: list[dict], params: dict) -> list[dict]:
                     "has_phone": bool(c.get("phone")),
                     "has_website": bool(c.get("website")),
                     "n_dipendenti": c.get("n_dipendenti"),
+                    "fatturato": c.get("revenue"),
                 }
                 for idx, c in enumerate(batch)
             ],
@@ -446,24 +556,42 @@ Aziende:
 {companies_json}
 
 Rispondi SOLO con JSON array:
-[{{"id": 0, "score": 75, "motivation": "..."}}]
-Score 0-100. Motivation max 120 caratteri in italiano."""
+[{{"id": 0, "score": 75, "motivation": "...", "website": "https://www.azienda.it"}}]
+Score 0-100. Motivation max 120 caratteri in italiano.
+Website: il sito ufficiale SOLO se lo conosci con certezza, altrimenti null (verrà verificato; un sito sbagliato è peggio di nessun sito)."""
 
         try:
-            raw = await _openrouter_chat([{"role": "user", "content": prompt}], 500)
-            arr = re.search(r"\[[\s\S]*\]", raw)
-            if not arr:
-                raise ValueError
-            scores = json.loads(arr.group(0))
-            score_map = {item["id"]: item for item in scores}
+            # 10 aziende con motivazione da 120 caratteri superano i 500 token: con un limite basso
+            # il JSON arrivava troncato e l'intero lotto ricadeva sul punteggio di completezza.
+            raw = await _openrouter_chat([{"role": "user", "content": prompt}], 1500)
+            scores = _parse_json_array(raw)
+            score_map = {}
+            for item in scores:
+                try:
+                    score_map[int(item.get("id"))] = item
+                except (TypeError, ValueError):
+                    continue
             for idx, c in enumerate(batch):
-                item = score_map.get(idx, {})
-                c["score"] = max(0, min(100, int(item.get("score", 50))))
-                c["motivation"] = str(item.get("motivation", ""))[:200]
-        except Exception:
+                item = score_map.get(idx)
+                if item is None:
+                    c["score"] = _completeness_score(c)
+                    c["motivation"] = None
+                    continue
+                try:
+                    c["score"] = max(0, min(100, int(round(float(item.get("score", 50))))))
+                except (TypeError, ValueError):
+                    c["score"] = _completeness_score(c)
+                motivation = str(item.get("motivation") or "").strip()
+                c["motivation"] = motivation[:200] or None
+                site = _plausible_website(item.get("website"))
+                if site and not c.get("website"):
+                    c["website"] = site
+                    c["website_source"] = "ai"
+        except Exception as e:
+            print(f"[scraper] AI scoring non riuscito: {type(e).__name__}: {str(e)[:200]}")
             for c in batch:
                 c["score"] = _completeness_score(c)
-                c["motivation"] = ""
+                c["motivation"] = None
 
     return companies
 
@@ -512,6 +640,9 @@ async def search(req: SearchRequest, request: Request):
             n_dipendenti=c.get("n_dipendenti"),
             forma_giuridica=c.get("forma_giuridica"),
             anno_fondazione=c.get("anno_fondazione"),
+            revenue=c.get("revenue"),
+            email_source=c.get("email_source"),
+            website_source=c.get("website_source"),
             score=c.get("score", 50),
             motivation=c.get("motivation"),
         ).model_dump()

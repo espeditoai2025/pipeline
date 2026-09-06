@@ -21,6 +21,10 @@ export type LeadCandidate = {
   nDipendenti: string | null;
   formaGiuridica: string | null;
   annoFondazione: string | null;
+  // Origine dei contatti: "sito" | "pec" | "maps" | "registro" | "ai" | "ai-verificato"
+  emailSource: string | null;
+  phoneSource: string | null;
+  websiteSource: string | null;
   score: number;
   source: string;
   motivation: string | null;

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ChevronLeft, AlertTriangle, Telescope, MapPin, Building2, Users, Tag, Lightbulb } from "lucide-react";
 import { getCandidates } from "@/server/actions/lead-finder";
 import { CandidatesTable } from "@/components/lead-finder/CandidatesTable";
+import { SearchStatusNotice } from "@/components/lead-finder/SearchStatusNotice";
 
 type Props = { params: Promise<{ searchId: string }> };
 
@@ -73,13 +74,8 @@ export default async function SearchResultsPage({ params }: Props) {
         </div>
       )}
 
-      {/* Error state */}
-      {search.status === "FAILED" && search.error && (
-        <div className="rounded-xl border border-red-200 dark:border-red-700/40 bg-red-50 dark:bg-red-900/20 px-4 py-3">
-          <p className="text-sm font-semibold text-red-700 dark:text-red-300">Ricerca fallita</p>
-          <p className="text-xs text-red-600 dark:text-red-400 mt-1">{search.error}</p>
-        </div>
-      )}
+      {/* Stato ricerca: aggiornamento automatico mentre gira, riavvio se fallita o mai partita */}
+      <SearchStatusNotice searchId={searchId} status={search.status} error={search.error} />
 
       {/* Candidates table */}
       <CandidatesTable candidates={candidates} searchId={searchId} />
