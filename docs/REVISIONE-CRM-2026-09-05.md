@@ -250,4 +250,4 @@ Directory di lavoro: `C:/Users/Pcs Hp/Desktop/Pipeline/Pipely`. I collegamenti s
 
 ## Punto da cui riprendere
 
-Migrazione, collaudo e rilascio sono completati il 5 settembre 2026; la procedura e le verifiche sono in [INCASSI-RILASCIO.md](<C:/Users/Pcs Hp/Desktop/Pipeline/Pipely/docs/INCASSI-RILASCIO.md>). Ripartire dalle voci ancora aperte: rate limiting Upstash, prova degli incassi in produzione con la prima fattura reale, poi le priorità di prodotto indicate sopra.
+Migrazione, collaudo e rilascio sono completati il 5 settembre 2026; la procedura e le verifiche sono in [INCASSI-RILASCIO.md](<C:/Users/Pcs Hp/Desktop/Pipeline/Pipely/docs/INCASSI-RILASCIO.md>). Ripartire dalle voci ancora aperte: prova degli incassi in produzione con la prima fattura reale, poi le priorità di prodotto indicate sopra.

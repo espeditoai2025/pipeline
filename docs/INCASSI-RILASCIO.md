@@ -36,7 +36,7 @@ Verificato con gli strumenti Vercel collegati, in sola lettura e senza accesso a
 - Build del 17 giugno 2026: `migrate resolve --applied 0_init` ha registrato il baseline sul database già esistente.
 - Build del 2 settembre 2026 (commit 5354372): 5 migrazioni trovate, nessuna pendente. `20260905120000_invoice_payments` è stata applicata dal deploy successivo del 5 settembre (vedi "Rilascio").
 - Snapshot del cron di backup del 5 settembre 2026 alle 02:00 UTC: 13 organizzazioni, 15 utenti, 6 contatti, 15 affari, 92 lead, 1 campagna. Il numero di fatture non fa parte dello snapshot.
-- Nessun errore di database nei log di runtime degli ultimi 7 giorni; l'unico gruppo di errori riguarda il rate limiting Upstash non configurato.
+- Nessun errore di database nei log di runtime degli ultimi 7 giorni; l'unico gruppo di errori riguardava il rate limiting Upstash non configurato, risolto il 6 settembre.
 
 Verifica diretta del 5 settembre 2026 in tarda serata, con le credenziali inserite dall'utente in `.env.local`: PostgreSQL 17.6, `prisma migrate status` coerente con i log di build (5 migrazioni applicate, solo `invoice_payments` pendente). Backup con `pg_dump` in `backups/pipely-prod-20260905.sql` (360 KB, 76 tabelle; cartella ignorata da Git). La tabella `Invoice` è vuota: la migrazione non ha saldi iniziali da trasferire e la finestra tra migrazione e nuovo codice non può produrre incoerenze sulle fatture.
 
@@ -50,7 +50,7 @@ Sequenza eseguita su richiesta dell'utente, dopo backup e verifica dello storico
 2. Deploy Vercel `dpl_CB39GqEBi7U7EPRYqpHZZfRbfcPw`, stato READY, pubblicato su pipely.it. Il log di build alle 20:38 UTC riporta `Applying migration 20260905120000_invoice_payments` e `All migrations have been successfully applied`.
 3. Verifiche successive dal locale: `prisma migrate status` risponde "Database schema is up to date" con 6 migrazioni; in produzione esistono la tabella `InvoicePayment` e la colonna `Invoice.paidAmount`; i conteggi di organizzazioni, utenti, contatti, affari, lead e attività sono invariati e la tabella `Invoice` resta vuota; `/login` risponde 200 e `/invoices` reindirizza al login; nessun errore di runtime nei 15 minuti dopo il rilascio.
 
-Restano aperti: rate limiting Upstash non configurato e le priorità di prodotto elencate nella revisione. `DATABASE_CA_CERT` è stata configurata il 6 settembre su Vercel e in locale.
+Restano aperte le priorità di prodotto elencate nella revisione. `DATABASE_CA_CERT` e il rate limiting Upstash sono stati configurati il 6 settembre su Vercel e in locale.
 
 ## Migrazione
 
