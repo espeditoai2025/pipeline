@@ -11,7 +11,7 @@ Target scelto: **liberi professionisti e microimprese**. Il lavoro si concentra 
 | Correzioni CRM e dashboard “La tua giornata” | Implementate nel codice locale e verificate con le prove descritte sotto. |
 | Fatture e incassi | Implementati interfaccia, azioni server, schema e test; rilasciati in produzione il 5 settembre con la migrazione applicata. |
 | Migrazione `20260905120000_invoice_payments` | **Applicata in produzione** dal deploy Vercel del commit `0b41120` (5 settembre, 20:38 UTC), dopo backup `pg_dump` e verifica dello storico. La tabella delle fatture era vuota. |
-| Connessione | `DIRECT_URL` e `DATABASE_URL` inserite dall'utente in `.env.local` la sera del 5 settembre (Supabase, pooler eu-central-1); `DATABASE_CA_CERT` ancora assente in locale e su Vercel. `NEXTAUTH_URL` e un `NEXTAUTH_SECRET` locale impostati per lo sviluppo. |
+| Connessione | `DIRECT_URL` e `DATABASE_URL` inserite dall'utente in `.env.local` la sera del 5 settembre (Supabase, pooler eu-central-1); `DATABASE_CA_CERT` configurata il 6 settembre in locale e su Vercel con la CA `Supabase Root 2021 CA` (verifica TLS completa). `NEXTAUTH_URL` e un `NEXTAUTH_SECRET` locale impostati per lo sviluppo. |
 | Verifiche | 94 test unitari e 20 prove browser isolate superati; TypeScript, ESLint, schema Prisma e build verificati. Collaudo successivo su PostgreSQL 17 locale con dati di prova: migrazione, saldi iniziali, concorrenza, ruoli, organizzazioni e pagine autenticate (vedi [INCASSI-RILASCIO.md](INCASSI-RILASCIO.md)). Nessun collaudo sui dati reali. |
 | Rilascio e Git | Commit `0b41120` su `main` con i 64 file dell'inventario più `.gitignore`, push e deploy Vercel `dpl_CB39GqEBi7U7EPRYqpHZZfRbfcPw` in stato READY su pipely.it. Verifiche dopo il rilascio in [INCASSI-RILASCIO.md](INCASSI-RILASCIO.md). |
 
@@ -74,7 +74,7 @@ I test non verificano transazioni contro PostgreSQL reale, concorrenza fra conne
 
 Il primo tentativo di eseguire la migrazione, il 5 settembre, era bloccato perché `DIRECT_URL` e `DATABASE_URL` erano vuote. In serata l'utente ha inserito le credenziali Supabase in `.env.local`; lo storico del database di produzione è risultato coerente (5 migrazioni applicate, una pendente), è stato fatto un backup con `pg_dump` e la migrazione è stata applicata dal deploy Vercel. Dettagli in [INCASSI-RILASCIO.md](INCASSI-RILASCIO.md).
 
-La build segnala ancora `DATABASE_CA_CERT` assente: la connessione al database è cifrata ma non verifica la catena TLS. Occorre configurare la CA del pooler Supabase su Vercel e in locale, e provarne la connessione.
+Aggiornamento del 6 settembre: `DATABASE_CA_CERT` è configurata in locale e su Vercel con la CA `Supabase Root 2021 CA` scaricata dal pannello Supabase; la catena del pooler è stata verificata con `pg` e il redeploy ha fatto sparire l'avviso dalla build e dai log runtime (dettagli in LAVORI_SVOLTI.md).
 
 ## Priorità successive per il target scelto
 
@@ -82,7 +82,7 @@ Le attività seguenti sono **da fare**, non risultati già ottenuti. La ripresa 
 
 | Priorità | Attività | Risultato da verificare |
 | --- | --- | --- |
-| P0 — connessione | **Fatto il 5 settembre** per `DIRECT_URL` e `DATABASE_URL`. Resta da configurare `DATABASE_CA_CERT` su Vercel e in locale. | Connessione verificata con `prisma migrate status`. Credenziali solo in `.env.local`, mai nei documenti o in Git. |
+| P0 — connessione | **Fatto il 5 settembre** per `DIRECT_URL` e `DATABASE_URL`. `DATABASE_CA_CERT` configurata il 6 settembre su Vercel e in locale. | Connessione verificata con `prisma migrate status`. Credenziali solo in `.env.local`, mai nei documenti o in Git. |
 | P0 — dati | **Fatto il 5 settembre**: storico Prisma verificato, backup `pg_dump` in `backups/`, migrazione applicata in produzione. | Tabella delle fatture vuota al momento della migrazione: nessun saldo iniziale da trasferire. Non usare `db push` al posto delle migrazioni. |
 | P0 — collaudo | Ripetere sulla copia dei dati reali il collaudo già eseguito su PostgreSQL locale con dati di prova: più connessioni, autenticazione reale, due organizzazioni e un ruolo lettore. | Pagamenti concorrenti, retry, rettifiche e residui coerenti; impossibilità di leggere o modificare dati di altre organizzazioni nei flussi revisionati. Verificare anche la compatibilità delle nuove relazioni con la cancellazione dell'organizzazione. |
 | P0 — rilascio | **Fatto il 5 settembre**: commit `0b41120`, deploy Vercel READY, migrazione applicata durante la build. | Da completare con una prova autenticata delle pagine incassi in produzione, con un account reale, appena esiste la prima fattura. |
@@ -250,4 +250,4 @@ Directory di lavoro: `C:/Users/Pcs Hp/Desktop/Pipeline/Pipely`. I collegamenti s
 
 ## Punto da cui riprendere
 
-Migrazione, collaudo e rilascio sono completati il 5 settembre 2026; la procedura e le verifiche sono in [INCASSI-RILASCIO.md](<C:/Users/Pcs Hp/Desktop/Pipeline/Pipely/docs/INCASSI-RILASCIO.md>). Ripartire dalle voci ancora aperte: `DATABASE_CA_CERT`, rate limiting Upstash, prova degli incassi in produzione con la prima fattura reale, poi le priorità di prodotto indicate sopra.
+Migrazione, collaudo e rilascio sono completati il 5 settembre 2026; la procedura e le verifiche sono in [INCASSI-RILASCIO.md](<C:/Users/Pcs Hp/Desktop/Pipeline/Pipely/docs/INCASSI-RILASCIO.md>). Ripartire dalle voci ancora aperte: rate limiting Upstash, prova degli incassi in produzione con la prima fattura reale, poi le priorità di prodotto indicate sopra.

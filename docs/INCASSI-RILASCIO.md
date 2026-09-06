@@ -31,7 +31,7 @@ Gli script del collaudo (fixture, verifica dei saldi, test vitest e controllo br
 
 ## Database di produzione (dai log Vercel, 5 settembre 2026)
 
-Verificato con gli strumenti Vercel collegati, in sola lettura e senza accesso ai valori delle variabili. Il progetto `pipeline` in produzione (pipely.it) usa un PostgreSQL Supabase nella regione eu-central-1, raggiunto tramite il pooler `aws-1-eu-central-1.pooler.supabase.com:5432`, database `postgres`. `DIRECT_URL` e `DATABASE_URL` sono configurate su Vercel; `DATABASE_CA_CERT` no, come segnala la build.
+Verificato con gli strumenti Vercel collegati, in sola lettura e senza accesso ai valori delle variabili. Il progetto `pipeline` in produzione (pipely.it) usa un PostgreSQL Supabase nella regione eu-central-1, raggiunto tramite il pooler `aws-1-eu-central-1.pooler.supabase.com:5432`, database `postgres`. `DIRECT_URL` e `DATABASE_URL` sono configurate su Vercel; `DATABASE_CA_CERT` è stata aggiunta il 6 settembre.
 
 - Build del 17 giugno 2026: `migrate resolve --applied 0_init` ha registrato il baseline sul database già esistente.
 - Build del 2 settembre 2026 (commit 5354372): 5 migrazioni trovate, nessuna pendente. `20260905120000_invoice_payments` è stata applicata dal deploy successivo del 5 settembre (vedi "Rilascio").
@@ -50,7 +50,7 @@ Sequenza eseguita su richiesta dell'utente, dopo backup e verifica dello storico
 2. Deploy Vercel `dpl_CB39GqEBi7U7EPRYqpHZZfRbfcPw`, stato READY, pubblicato su pipely.it. Il log di build alle 20:38 UTC riporta `Applying migration 20260905120000_invoice_payments` e `All migrations have been successfully applied`.
 3. Verifiche successive dal locale: `prisma migrate status` risponde "Database schema is up to date" con 6 migrazioni; in produzione esistono la tabella `InvoicePayment` e la colonna `Invoice.paidAmount`; i conteggi di organizzazioni, utenti, contatti, affari, lead e attività sono invariati e la tabella `Invoice` resta vuota; `/login` risponde 200 e `/invoices` reindirizza al login; nessun errore di runtime nei 15 minuti dopo il rilascio.
 
-Restano aperti, come prima del rilascio: `DATABASE_CA_CERT` non impostata su Vercel, rate limiting Upstash non configurato, e le priorità di prodotto elencate nella revisione.
+Restano aperti: rate limiting Upstash non configurato e le priorità di prodotto elencate nella revisione. `DATABASE_CA_CERT` è stata configurata il 6 settembre su Vercel e in locale.
 
 ## Migrazione
 
@@ -78,6 +78,6 @@ Le unit test coprono le regole con un database simulato; le prove UI usano un'ap
 
 Conservare un backup verificato e controllare lo storico Prisma prima del rilascio. Fermare le vecchie istanze che possono modificare lo stato delle fatture durante il trasferimento dei saldi: il vecchio codice non aggiorna `paidAmount`. Applicare la migrazione e poi avviare la nuova versione. Il comando Vercel applica le migrazioni prima della build; pianificare la transizione per evitare scritture dal vecchio codice nel frattempo.
 
-La CA per la connessione PostgreSQL resta da configurare tramite `DATABASE_CA_CERT`. L'XML precedente è disabilitato; completare dati fiscali, validazione e integrazione col provider prima di ripristinare l'esportazione. Stato “inviata” significa registrazione manuale nel CRM, non una ricevuta del servizio di fatturazione.
+La CA per la connessione PostgreSQL è configurata dal 6 settembre tramite `DATABASE_CA_CERT`. L'XML precedente è disabilitato; completare dati fiscali, validazione e integrazione col provider prima di ripristinare l'esportazione. Stato “inviata” significa registrazione manuale nel CRM, non una ricevuta del servizio di fatturazione.
 
 Per un eventuale rollback non eliminare i movimenti e non riavviare il vecchio writer senza un piano di riconciliazione: perderebbe la relazione fra incassi, saldo e stato. La migrazione è additiva; lo storico va conservato.

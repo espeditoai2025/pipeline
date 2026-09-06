@@ -9,7 +9,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { resend, FROM_DEFAULT } from "@/lib/resend";
+import { isEmailEnabled } from "@/lib/resend";
+import { sendPlatformMail } from "@/lib/mailer";
 import { logger } from "@/lib/logger";
 import { runWorkflows, runStepsFrom, type WorkflowPayload } from "@/lib/workflow-engine";
 import { processWebhookRetries } from "@/server/actions/webhooks";
@@ -60,11 +61,10 @@ export async function GET(req: NextRequest) {
 
     // Send summary email to admin
     const adminEmail = process.env.ADMIN_EMAIL;
-    if (resend && adminEmail) {
+    if (isEmailEnabled() && adminEmail) {
       const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://www.pipely.it").replace(/\/$/, "");
 
-      await resend.emails.send({
-        from: FROM_DEFAULT,
+      await sendPlatformMail("snapshot-giornaliero", {
         to: adminEmail,
         subject: `[Pipely] Snapshot giornaliero — ${snapshot.date}`,
         html: `

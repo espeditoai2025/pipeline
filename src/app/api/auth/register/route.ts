@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { resend, FROM_DEFAULT } from "@/lib/resend";
+import { sendPlatformMail } from "@/lib/mailer";
 import { welcomeEmailHtml } from "@/lib/email-templates";
 import { withAuthRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
@@ -71,14 +71,14 @@ export async function POST(req: NextRequest) {
 
       logger.info("register", "Utente invitato registrato", { email: normalizedEmail, orgId: invitation.organizationId });
 
-      // Welcome email (fire-and-forget)
-      if (resend) {
-        resend.emails.send({
-          from: FROM_DEFAULT,
+      // Welcome email (fire-and-forget: un fallimento non blocca la registrazione,
+      // ma finisce nei log invece di sparire)
+      {
+        void sendPlatformMail("registrazione-invito", {
           to: normalizedEmail,
           subject: `Benvenuto su Pipely, ${name}!`,
           html: welcomeEmailHtml({ name, orgName: invitation.organization.name, appUrl }),
-        }).catch((err: unknown) => logger.warn("register", "Welcome email fallita", { error: String(err) }));
+        });
       }
 
       return NextResponse.json({ ok: true }, { status: 201 });
@@ -116,15 +116,13 @@ export async function POST(req: NextRequest) {
 
     logger.info("register", "Nuova organizzazione registrata", { email: normalizedEmail, orgName });
 
-    // Welcome email (fire-and-forget)
-    if (resend) {
-      resend.emails.send({
-        from: FROM_DEFAULT,
-        to: normalizedEmail,
-        subject: `Benvenuto su Pipely, ${name}!`,
-        html: welcomeEmailHtml({ name, orgName, appUrl }),
-      }).catch((err: unknown) => logger.warn("register", "Welcome email fallita", { error: String(err) }));
-    }
+    // Welcome email (fire-and-forget: un fallimento non blocca la registrazione,
+    // ma finisce nei log invece di sparire)
+    void sendPlatformMail("registrazione", {
+      to: normalizedEmail,
+      subject: `Benvenuto su Pipely, ${name}!`,
+      html: welcomeEmailHtml({ name, orgName, appUrl }),
+    });
 
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (err) {

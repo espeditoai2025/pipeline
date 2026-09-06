@@ -7,9 +7,8 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
 import { compare, hash } from "bcryptjs";
-import { resend, FROM_DEFAULT } from "@/lib/resend";
 import { inviteEmailHtml } from "@/lib/email-templates";
-import { logger } from "@/lib/logger";
+import { sendPlatformMail } from "@/lib/mailer";
 type Role = "OWNER" | "ADMIN" | "MANAGER" | "SALES" | "VIEWER";
 
 function getIds(s: Session | null) {
@@ -142,14 +141,13 @@ export async function inviteTeamMember(email: string, role: Role) {
     db.organization.findUnique({ where: { id: orgId }, select: { name: true } }),
   ]);
 
-  if (resend && inviter && org) {
+  if (inviter && org) {
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://www.pipely.it").replace(/\/$/, "");
     const inviteUrl = `${appUrl}/register?invite=${token}`;
     const ROLE_LABELS: Record<string, string> = {
       ADMIN: "Admin", MANAGER: "Manager", SALES: "Sales", VIEWER: "Viewer",
     };
-    resend.emails.send({
-      from: FROM_DEFAULT,
+    void sendPlatformMail("invito-team", {
       to: normalizedEmail,
       subject: `${inviter.name ?? "Il tuo collega"} ti ha invitato su Pipely`,
       html: inviteEmailHtml({
@@ -159,7 +157,7 @@ export async function inviteTeamMember(email: string, role: Role) {
         inviteUrl,
         appUrl,
       }),
-    }).catch((err: unknown) => logger.warn("invite", "Email invito fallita", { error: String(err), to: normalizedEmail }));
+    });
   }
 
   revalidatePath("/settings");

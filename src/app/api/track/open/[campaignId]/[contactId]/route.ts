@@ -19,10 +19,19 @@ export async function GET(
   // Always return the pixel regardless, so the email renders normally.
   if (verifyEmailToken(tokenPayload.open(campaignId, contactId), sig)) {
     try {
-      await db.emailCampaign.update({
-        where: { id: campaignId },
-        data: { totalOpened: { increment: 1 } },
+      // Una apertura per destinatario: il filtro su openedAt rende la prima
+      // scrittura vincente anche con piu' caricamenti in parallelo (i proxy
+      // immagini dei client di posta ricaricano il pixel piu' volte).
+      const first = await db.campaignDelivery.updateMany({
+        where: { campaignId, contactId, openedAt: null },
+        data: { openedAt: new Date() },
       });
+      if (first.count > 0) {
+        await db.emailCampaign.update({
+          where: { id: campaignId },
+          data: { totalOpened: { increment: 1 } },
+        });
+      }
     } catch {
       // Campaign deleted or ID invalid — ignore silently
     }

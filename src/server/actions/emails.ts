@@ -5,9 +5,9 @@ import { z } from "zod";
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { resend, FROM_DEFAULT, isEmailEnabled } from "@/lib/resend";
 import { getOrgPlan, getLimits } from "@/lib/plan";
-import { sendViaSMTP } from "@/lib/smtp-send";
+import { sendOrgMail } from "@/lib/mailer";
+import { logger } from "@/lib/logger";
 import type { EmailMessage, EmailTemplate } from "@/types/emails";
 
 function getOrgId(s: Session | null) {
@@ -134,36 +134,23 @@ export async function sendEmail(input: z.infer<typeof composeSchema>): Promise<{
   const threadId = `thread-${Date.now()}`;
   const now = new Date();
 
-  // Attempt a real send: Resend first, then the org's SMTP config. Track whether
-  // an email actually left so we don't persist a misleading "SENT" status (H15).
+  // L'invio passa da sendOrgMail, che sceglie il canale (SMTP dell'organizzazione
+  // se verificato, altrimenti Resend) e soprattutto legge l'errore restituito
+  // dall'API: prima un rifiuto di Resend veniva salvato come "SENT" (H15).
   const htmlBody = body.replace(/\n/g, "<br>");
-  let didSend = false;
-
-  if (isEmailEnabled() && resend) {
-    try {
-      await resend.emails.send({
-        from: FROM_DEFAULT,
-        to: [to],
-        cc: cc ? [cc] : undefined,
-        subject,
-        html: htmlBody,
-        replyTo: fromAddress,
-      });
-      didSend = true;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Errore invio email";
-      console.error("[sendEmail] Resend error:", msg);
-      return { data: null, error: `Errore invio: ${msg}` };
-    }
-  } else {
-    const r = await sendViaSMTP(orgId, { to, subject, html: htmlBody, fromName });
-    if (r.ok) {
-      didSend = true;
-    } else {
-      // No working provider — surface the failure instead of faking a send.
-      return { data: null, error: r.error ?? "Nessun provider email configurato (Resend o SMTP)." };
-    }
+  const result = await sendOrgMail(orgId, {
+    to,
+    cc: cc ? [cc] : undefined,
+    subject,
+    html: htmlBody,
+    replyTo: fromAddress,
+    fromName,
+  });
+  if (!result.ok) {
+    logger.error("send-email", "Invio email non riuscito", { error: result.error, orgId });
+    return { data: null, error: `Errore invio: ${result.error}` };
   }
+  const didSend = true;
 
   // Save to DB (status reflects reality)
   const row = await db.email.create({

@@ -1,6 +1,5 @@
 import { db } from "@/lib/db";
-import { resend, FROM_DEFAULT } from "@/lib/resend";
-import { sendViaSMTP } from "@/lib/smtp-send";
+import { resolveOrgChannel, sendOrgMail } from "@/lib/mailer";
 import { signEmailToken, tokenPayload } from "@/lib/email-tokens";
 import { getOrgPlan, checkFeature } from "@/lib/plan";
 import { logger } from "@/lib/logger";
@@ -48,20 +47,26 @@ export async function deliverCampaign(campaignId: string, orgId: string): Promis
     return { sent: 0, failed: 0, error: "Campagna non trovata" };
   }
 
-  if (!resend) {
-    const smtp = await db.smtpConfig.findUnique({ where: { organizationId: orgId } });
-    if (!smtp?.isVerified) {
-      // Rilascia il claim: senza provider la campagna torna in Bozza (evita che
-      // resti SENDING o che intasi la coda del cron restando SCHEDULED).
-      await db.emailCampaign.update({ where: { id: campaignId }, data: { status: "DRAFT" } }).catch(() => {});
-      return { sent: 0, failed: 0, error: "Configura un provider email (SMTP o Resend) prima di inviare campagne." };
-    }
+  // Canale risolto una volta sola per tutta la campagna: l'SMTP verificato
+  // dell'organizzazione ha la precedenza, così la posta esce dal dominio del
+  // cliente invece che da quello di piattaforma.
+  const channel = await resolveOrgChannel(orgId);
+  if (!channel) {
+    // Rilascia il claim: senza provider la campagna torna in Bozza (evita che
+    // resti SENDING o che intasi la coda del cron restando SCHEDULED).
+    await db.emailCampaign.update({ where: { id: campaignId }, data: { status: "DRAFT" } }).catch(() => {});
+    return { sent: 0, failed: 0, error: "Configura un provider email (SMTP verificato o Resend) prima di inviare campagne." };
   }
 
-  const contacts = campaign.list.contacts;
+  // Chi ha gia' ricevuto in un tentativo precedente (invio interrotto da un
+  // timeout della function) non viene riscritto.
+  const already = new Set(
+    (await db.campaignDelivery.findMany({ where: { campaignId }, select: { contactId: true } }))
+      .map((d) => d.contactId)
+  );
+  const contacts = campaign.list.contacts.filter((c) => !already.has(c.id));
   let sent = 0;
   let failed = 0;
-  const from = FROM_DEFAULT;
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
   const orgName = escapeHtml(campaign.list?.organization?.name ?? "Pipely");
@@ -108,42 +113,40 @@ export async function deliverCampaign(campaignId: string, orgId: string): Promis
     // List-Unsubscribe header (RFC 2369 + RFC 8058) — punta all'endpoint POST one-click.
     const listUnsubscribeHeader = `<mailto:unsubscribe@pipely.it?subject=unsubscribe&body=${contact.id}>, <${appUrl}/api/emails/unsubscribe?${unsubscribeQs}>`;
 
-    try {
-      if (resend) {
-        // resend.emails.send non lancia sugli errori API: ritorna { data, error }.
-        const r = await resend.emails.send({
-          from,
-          to: contact.email,
-          subject: campaign.subject,
-          html,
-          headers: {
-            "List-Unsubscribe": listUnsubscribeHeader,
-            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-          },
-        });
-        if (r.error) throw new Error(r.error.message);
-      } else {
-        // No Resend → send via the org's verified SMTP config.
-        const r = await sendViaSMTP(orgId, {
-          to: contact.email,
-          subject: campaign.subject,
-          html,
-          fromName: campaign.fromName ?? undefined,
-        });
-        if (!r.ok) throw new Error(r.error ?? "Invio SMTP fallito");
-      }
+    const result = await sendOrgMail(orgId, {
+      to: contact.email,
+      subject: campaign.subject,
+      html,
+      fromName: campaign.fromName ?? undefined,
+      headers: {
+        "List-Unsubscribe": listUnsubscribeHeader,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
+    }, channel);
+
+    if (result.ok) {
       sent++;
-    } catch {
+      // Traccia il destinatario servito: rende ripetibile l'invio senza duplicati
+      // e permette di contare aperture e clic una volta sola per persona.
+      await db.campaignDelivery.create({ data: { campaignId, contactId: contact.id } }).catch(() => {});
+    } else {
       failed++;
+      if (failed === 1) {
+        logger.error("campaign-sender", `Invio campagna non riuscito: ${result.error}`, { campaignId });
+      }
     }
   }
+
+  // Il totale è il numero di righe nel registro, non solo gli invii di questo
+  // giro: una campagna ripresa dopo un'interruzione somma i due tentativi.
+  const totalSent = await db.campaignDelivery.count({ where: { campaignId } });
 
   // Only mark SENT if at least one email actually went out; otherwise revert to
   // DRAFT so the user can retry (avoids "ghost sent" campaigns where 0 mail left).
   await db.emailCampaign.update({
     where: { id: campaignId },
-    data: sent > 0
-      ? { status: "SENT", sentAt: new Date(), totalSent: sent }
+    data: totalSent > 0
+      ? { status: "SENT", sentAt: new Date(), totalSent }
       : { status: "DRAFT", totalSent: 0 },
   });
 

@@ -1,7 +1,8 @@
 "use server";
 
 import { z } from "zod";
-import { resend, FROM_DEFAULT } from "@/lib/resend";
+import { isEmailEnabled } from "@/lib/resend";
+import { sendPlatformMail } from "@/lib/mailer";
 
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL ?? "support@pipely.it";
 
@@ -54,7 +55,7 @@ export async function submitContactForm(data: unknown): Promise<ContactFormResul
   const { name, email, subject, message } = parsed.data;
   const subjectLabel = SUBJECT_LABELS[subject];
 
-  if (!resend) {
+  if (!isEmailEnabled()) {
     console.warn(
       `[contact-form] RESEND_API_KEY non configurato. Messaggio ricevuto ma non inviato.\n` +
       `Da: ${email} (${name}) | Argomento: ${subjectLabel}\n${message}`
@@ -62,8 +63,9 @@ export async function submitContactForm(data: unknown): Promise<ContactFormResul
     return { success: true };
   }
 
-  await resend.emails.send({
-    from: FROM_DEFAULT,
+  // Il messaggio al supporto è l'unico che conta: se non parte, chi ha scritto
+  // deve saperlo invece di ricevere una conferma per un messaggio mai arrivato.
+  const toSupport = await sendPlatformMail("modulo-contatti", {
     to: SUPPORT_EMAIL,
     replyTo: email,
     subject: `[Pipely Contatti] ${subjectLabel} — ${esc(name)}`,
@@ -81,8 +83,12 @@ export async function submitContactForm(data: unknown): Promise<ContactFormResul
     `,
   });
 
-  await resend.emails.send({
-    from: FROM_DEFAULT,
+  if (!toSupport.ok) {
+    return { success: false, error: "Non siamo riusciti a inviare il messaggio. Riprova o scrivici direttamente." };
+  }
+
+  // Conferma di cortesia: un fallimento qui non cambia l'esito per l'utente.
+  void sendPlatformMail("modulo-contatti-conferma", {
     to: email,
     subject: "Abbiamo ricevuto il tuo messaggio — Pipely",
     html: `

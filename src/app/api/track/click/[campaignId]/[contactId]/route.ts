@@ -33,10 +33,17 @@ export async function GET(
   }
 
   try {
-    await db.emailCampaign.update({
-      where: { id: campaignId },
-      data: { totalClicked: { increment: 1 } },
+    // Un clic per destinatario: chi riapre l'email e riclicca non conta due volte.
+    const first = await db.campaignDelivery.updateMany({
+      where: { campaignId, contactId, clickedAt: null },
+      data: { clickedAt: new Date() },
     });
+    if (first.count > 0) {
+      await db.emailCampaign.update({
+        where: { id: campaignId },
+        data: { totalClicked: { increment: 1 } },
+      });
+    }
   } catch {
     // Campaign deleted or ID invalid — ignore silently
   }

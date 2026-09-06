@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHmac } from "crypto";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { resend, FROM_DEFAULT } from "@/lib/resend";
+import { sendPlatformMail } from "@/lib/mailer";
 import { withAuthRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 
@@ -56,9 +56,10 @@ export async function POST(req: NextRequest) {
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://www.pipely.it").replace(/\/$/, "");
     const resetUrl = `${appUrl}/reset-password?token=${token}`;
 
-    if (resend) {
-      await resend.emails.send({
-        from: FROM_DEFAULT,
+    {
+      // Il reset è inutile se l'email non parte: l'esito va nei log (la risposta
+      // resta 200 per non rivelare quali indirizzi esistono).
+      await sendPlatformMail("reset-password", {
         to: email,
         subject: "Reimposta la tua password Pipely",
         html: `
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
               Il link scade tra 1 ora. Se non hai richiesto il reset, ignora questa email.
             </p>
           </div>`,
-      }).catch((err: unknown) => logger.warn("forgot-password", "Email reset fallita", { error: String(err) }));
+      });
     }
 
     logger.info("forgot-password", "Reset token generato", { userId: user.id });

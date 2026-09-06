@@ -548,6 +548,7 @@ model EmailListContact {
   lastName     String?
   unsubscribed Boolean   @default(false)
   createdAt    DateTime  @default(now())
+  deliveries   CampaignDelivery[]
 
   @@unique([listId, email])
   @@index([listId])
@@ -569,11 +570,29 @@ model EmailCampaign {
   totalClicked   Int            @default(0)
   organizationId String
   organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deliveries     CampaignDelivery[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
   @@index([organizationId])
   @@index([listId])
+}
+
+/// Una riga per destinatario effettivamente servito da una campagna.
+/// Serve a due cose: riprendere un invio interrotto senza riscrivere a chi ha
+/// gia' ricevuto, e contare aperture e clic una volta sola per persona.
+model CampaignDelivery {
+  id         String           @id @default(cuid())
+  campaignId String
+  campaign   EmailCampaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId  String
+  contact    EmailListContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  sentAt     DateTime         @default(now())
+  openedAt   DateTime?
+  clickedAt  DateTime?
+
+  @@unique([campaignId, contactId])
+  @@index([campaignId])
 }
 
 enum CampaignStatus {

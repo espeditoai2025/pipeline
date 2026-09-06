@@ -5,9 +5,7 @@
  */
 
 import { db } from "./db";
-import { resend, FROM_DEFAULT } from "./resend";
-import { decrypt } from "./crypto";
-import nodemailer from "nodemailer";
+import { sendOrgMail } from "./mailer";
 import type { TriggerConfig, WorkflowStep } from "@/types/workflows";
 
 function esc(s: string): string {
@@ -48,30 +46,12 @@ function triggerMatches(cfg: TriggerConfig, payload: WorkflowPayload): boolean {
   return true;
 }
 
-// ─── Email sender (SMTP preferred, Resend fallback) ───────────────────────────
+// ─── Email sender (SMTP dell'organizzazione, altrimenti Resend) ───────────────
 
+/** Lancia se il messaggio non è partito, così lo step del workflow risulta fallito. */
 async function sendMail(orgId: string, opts: { to: string; subject: string; html: string }): Promise<void> {
-  const smtp = await db.smtpConfig.findUnique({ where: { organizationId: orgId } });
-  if (smtp?.isVerified) {
-    let password: string;
-    try { password = decrypt(smtp.passwordEnc); } catch { throw new Error("Errore decifratura SMTP"); }
-    const transporter = nodemailer.createTransport({
-      host: smtp.host, port: smtp.port, secure: smtp.secure,
-      auth: { user: smtp.username, pass: password },
-    });
-    await transporter.sendMail({
-      from: `"${smtp.fromName ?? smtp.fromEmail}" <${smtp.fromEmail}>`,
-      to: opts.to, subject: opts.subject, html: opts.html,
-    });
-    return;
-  }
-
-  if (resend) {
-    await resend.emails.send({ from: FROM_DEFAULT, to: opts.to, subject: opts.subject, html: opts.html });
-    return;
-  }
-
-  throw new Error("Nessun provider email configurato");
+  const result = await sendOrgMail(orgId, opts);
+  if (!result.ok) throw new Error(result.error);
 }
 
 // ─── Step executor ────────────────────────────────────────────────────────────
