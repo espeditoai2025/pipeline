@@ -84,6 +84,8 @@ export async function updateInvoiceDueDate(input: { invoiceId: string; dueDate: 
     await db.$transaction(async tx => {
       const inv = await lockInvoice(tx, input.invoiceId, orgId);
       if (!["DRAFT", "SENT"].includes(inv.status)) throw new InvoiceError("La scadenza si modifica solo per bozze o fatture aperte");
+      const exported = await tx.invoiceExport.findUnique({ where: { invoiceId: inv.id } });
+      if (exported && !["PREPARED", "FAILED"].includes(exported.status)) throw new InvoiceError("Documento collegato: modifica la scadenza nel gestionale. La sincronizzazione delle scadenze non è ancora disponibile.");
       await tx.invoice.update({ where: { id: inv.id }, data: { dueDate: new Date(`${input.dueDate}T00:00:00Z`) } });
     });
     refresh(input.invoiceId);

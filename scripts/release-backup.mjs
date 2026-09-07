@@ -5,12 +5,16 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { lookup } from "node:dns/promises";
 
 dotenv.config({ path: ".env.local", quiet: true });
 const action = process.argv[2];
 if (!["backup", "verify"].includes(action)) throw new Error("Use backup or verify");
+const label = process.argv[3] ?? "workflow";
+if (!/^[a-z0-9-]{1,40}$/.test(label)) throw new Error("Invalid backup label");
 const backupDir = path.resolve("backups");
-const dumpName = "pipely-prod-20260907-pre-workflow.dump";
+const dumpName = `pipely-prod-20260907-pre-${label}.dump`;
+const manifestName = label === "workflow" ? "release-20260907-manifest.json" : `release-20260907-${label}-manifest.json`;
 const connection = new URL(process.env.DIRECT_URL);
 if (!process.env.DATABASE_CA_CERT) throw new Error("Verified CA required");
 const ca = process.env.DATABASE_CA_CERT.replace(/\\n/g, "\n");
@@ -26,7 +30,7 @@ function docker(args, env = process.env, input) {
     env,
     input,
     encoding: "utf8",
-    timeout: 180000,
+    timeout: 600000,
     maxBuffer: 16 * 1024 * 1024,
     windowsHide: true,
   });
@@ -86,6 +90,8 @@ try {
     const env = {
       ...process.env,
       PGHOST: connection.hostname,
+      PGHOSTADDR: (await lookup(connection.hostname, { family: 4 })).address,
+      PGCONNECT_TIMEOUT: "15",
       PGPORT: connection.port || "5432",
       PGUSER: decodeURIComponent(connection.username),
       PGPASSWORD: decodeURIComponent(connection.password),
@@ -97,12 +103,14 @@ try {
       "run",
       "--rm",
       "--name",
-      "pipely-release-backup-20260907",
+      `pipely-release-backup-20260907-${label}`,
       "--mount",
       `type=bind,source=${backupDir},target=/backup`,
     ];
     for (const key of [
       "PGHOST",
+      "PGHOSTADDR",
+      "PGCONNECT_TIMEOUT",
       "PGPORT",
       "PGUSER",
       "PGPASSWORD",
@@ -146,7 +154,7 @@ try {
       tableDataEntries: toc.split("\n").filter((l) => l.includes("TABLE DATA")).length,
     };
     await fs.writeFile(
-      path.join(backupDir, "release-20260907-manifest.json"),
+      path.join(backupDir, manifestName),
       JSON.stringify(manifest, null, 2),
     );
     process.stdout.write(
@@ -163,7 +171,7 @@ try {
     );
   } else {
     const before = JSON.parse(
-      await fs.readFile(path.join(backupDir, "release-20260907-manifest.json"), "utf8"),
+      await fs.readFile(path.join(backupDir, manifestName), "utf8"),
     );
     const changed = Object.entries(before.counts)
       .filter(([table, count]) => counts[table] !== count)

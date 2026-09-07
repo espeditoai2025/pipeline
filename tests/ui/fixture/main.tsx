@@ -14,6 +14,11 @@ import { contacts, fixture, fixtureInvoice } from "./actions";
 import { InvoiceDetailClient } from "@/components/invoices/InvoiceDetailClient";
 import { InvoiceWorkspace } from "@/components/invoices/InvoiceWorkspace";
 import { CreateInvoiceModal } from "@/components/invoices/CreateInvoiceModal";
+import { VoiceWorkspace } from "@/components/voice/VoiceWorkspace";
+import { CompanyAutofill } from "@/components/companies/CompanyAutofill";
+import { InvoiceCloudPanel } from "@/components/invoices/InvoiceCloudPanel";
+import { InvoicingSettings } from "@/components/settings/InvoicingSettings";
+import type { CompanySuggestion } from "@/lib/company-autofill";
 import type { Activity } from "@/types/activities";
 import "@/app/globals.css";
 
@@ -26,6 +31,7 @@ const activity: Activity = {
 };
 function App() {
   const [, render] = useState(0);
+  const [companyFields, setCompanyFields] = useState<CompanySuggestion["fields"]>({ name: "Nome già compilato" });
   const [savedWorkflow, setSavedWorkflow] = useState("");
   const [open, setOpen] = useState(true);
   const params = new URLSearchParams(location.search);
@@ -38,7 +44,11 @@ function App() {
   if (view === "home") return <LandingPage />;
   return <main className="mx-auto min-h-screen max-w-6xl bg-[var(--crm-neutral-50)] p-4 text-[var(--crm-neutral-900)] sm:p-8" style={{ fontFamily: "Arial, sans-serif" }}>
     <Toaster />
-    {view === "workflow" ? <><p data-testid="saved-workflow">{savedWorkflow}</p><WorkflowBuilder open={open} onClose={() => setOpen(false)} workflow={fixtureWorkflow} onSaved={row => setSavedWorkflow(JSON.stringify(row))} /></>
+    {view === "voice" ? <VoiceWorkspace initialNotes={[]} canWrite={params.get("role") !== "viewer"} canManage userId="test-user" ai={params.get("plan") !== "starter"} maxNotes={100} />
+    : view === "company-autofill" ? <><p data-testid="company-fields">{JSON.stringify(companyFields)}</p><CompanyAutofill current={() => companyFields} onApply={fields => setCompanyFields(prev => ({ ...prev, ...fields }))} /></>
+    : view === "invoice-cloud" ? <InvoiceCloudPanel invoice={{ ...fixtureInvoice, status: "DRAFT", recipientVat: "12345678903" }} canWrite />
+    : view === "invoicing-settings" ? <InvoicingSettings initial={{ configured: false, connected: false, connection: null, available: true, canManage: true }} />
+    : view === "workflow" ? <><p data-testid="saved-workflow">{savedWorkflow}</p><WorkflowBuilder open={open} onClose={() => setOpen(false)} workflow={fixtureWorkflow} onSaved={row => setSavedWorkflow(JSON.stringify(row))} /></>
     : view === "workflow-logs" ? <AutomationLogView logs={fixtureLogs} />
     : view === "billing" ? <BillingClient canManage org={{ plan: params.get("plan") ?? "ESSENTIAL", stripeCustomerId: null, stripeSubscriptionId: null, stripeCurrentPeriodEnd: null }} />
     : view === "merge" ? <><p>Unioni eseguite: {fixture.mergeCount}</p>{open && <MergeDuplicatesModal open onClose={() => setOpen(false)} duplicates={[{ key: "mario@example.it", contacts }]} onMerged={() => render(value => value + 1)} />}</>

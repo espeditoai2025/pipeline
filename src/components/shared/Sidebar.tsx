@@ -21,6 +21,7 @@ import {
   Workflow,
   Zap,
   BookOpen,
+  Mic,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui";
@@ -37,6 +38,7 @@ const navItems = [
   { key: "leads", href: "/leads", icon: Zap },
   { key: "leadFinder", href: "/lead-finder", icon: Telescope },
   { key: "activities", href: "/activities", icon: Calendar },
+  { key: "voice", href: "/voice", icon: Mic },
   { key: "invoices", href: "/invoices", icon: Receipt },
   { key: "emails", href: "/emails", icon: Mail },
   { key: "reports", href: "/reports", icon: BarChart3 },

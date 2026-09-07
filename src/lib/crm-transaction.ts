@@ -4,6 +4,18 @@ import { checkContactLimit, checkPipelineLimit } from "@/lib/plan";
 
 export class CrmError extends Error {}
 
+function isTransactionConflict(error: unknown) {
+  const failure = error as {
+    code?: string;
+    meta?: { code?: string; driverAdapterError?: { cause?: { originalCode?: string } } };
+  } | null;
+  if (failure?.code === "P2034") return true;
+  // Prisma's PostgreSQL adapter wraps conflicts from $queryRaw (including
+  // SELECT FOR UPDATE) in P2010 instead of P2034. Retry the whole transaction.
+  const sqlState = failure?.meta?.code ?? failure?.meta?.driverAdapterError?.cause?.originalCode;
+  return failure?.code === "P2010" && (sqlState === "40001" || sqlState === "40P01");
+}
+
 /** Count, validate and write within one serializable transaction; retry serialization conflicts. */
 export async function crmTransaction<T>(
   work: (tx: Prisma.TransactionClient) => Promise<T>,
@@ -12,7 +24,7 @@ export async function crmTransaction<T>(
     try {
       return await db.$transaction(work, { isolationLevel: "Serializable", timeout: 30000 });
     } catch (error) {
-      if (attempt < 2 && (error as { code?: string })?.code === "P2034") continue;
+      if (attempt < 2 && isTransactionConflict(error)) continue;
       throw error;
     }
   }

@@ -1040,7 +1040,7 @@ export default function SettingsPage() {
 
           {tab === "webhooks" && <WebhooksManager />}
 
-          {tab === "invoices" && <InvoicesManager />}
+          {tab === "invoices" && <div className="space-y-4"><Link href="/settings/invoicing" className="inline-flex rounded-lg border px-4 py-2 text-sm">Collega Fatture in Cloud</Link><InvoicesManager /></div>}
 
           {tab === "bookings" && <BookingPagesManager />}
 

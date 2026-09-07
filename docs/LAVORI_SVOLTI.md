@@ -2,6 +2,10 @@
 
 > Ultimo aggiornamento del registro: 2026-09-07. Le sezioni precedenti sono conservate come storico.
 
+## Sessione del 2026-09-07 — Nuove funzioni, implementazione locale
+
+Aggiunti note vocali nel browser, trascrizione, comandi CRM con anteprima e conferma, compilazione aziendale da testo o dati della stessa organizzazione senza API esterne e connettore OAuth Fatture in Cloud. Configurati controlli di piano, ruolo e concorrenza, quote e protezione dai duplicati. Trascrizione collaudata realmente con audio sintetico; connettore fiscale verificato con API simulate, in attesa dell’app OAuth non ancora creata. Migrazione additiva provata in Docker, senza rilascio o modifiche al database di produzione. Rapporto, risultati, limiti e inventario: [FUNZIONALITA-CRM-2026-09-07.md](FUNZIONALITA-CRM-2026-09-07.md). Attivazione: [FATTURE-IN-CLOUD.md](FATTURE-IN-CLOUD.md).
+
 ## Sessione del 2026-09-07 — Rilascio delle correzioni
 
 Commit applicativo 343db83 pubblicato su main; deploy Vercel READY e nona migrazione applicata. Docker riavviato, backup delle 44 tabelle CRM ripristinato e migrazione provata sulla copia; tutte le 27 prove di integrazione superate anche su PostgreSQL 17 con otto connessioni. Il cron reale delle 09:45 UTC ha completato due automazioni, creando attività e notifica interna e inviando un’email alla casella di simulazione ufficiale Resend. Fixture e container di prova rimossi; conteggi CRM originali preservati, backup conservato. Home, login, protezioni e log verificati. Restano SMTP personale, recapito su casella dell’utente e collaudo Stripe in modalità test. Rapporto: [RILASCIO-CRM-2026-09-07.md](RILASCIO-CRM-2026-09-07.md).

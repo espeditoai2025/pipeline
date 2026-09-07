@@ -1,0 +1,9 @@
+{
+  "checkedAt": "2026-09-07T12:44:19.452Z",
+  "model": "openai/whisper-large-v3",
+  "source": "Sintesi vocale locale, frase di test senza dati personali",
+  "expected": "Richiama il cliente domani alle dieci.",
+  "transcript": "Richiama il cliente domani alle 10.00.",
+  "matched": true,
+  "audioBytes": 134504
+}

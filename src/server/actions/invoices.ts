@@ -289,6 +289,8 @@ export async function updateInvoiceStatus(
       if (inv.status === status) return;
       // Cancellation here only discards a draft; sent documents retain history.
       if (inv.status !== "DRAFT") throw new InvoiceError("Solo una bozza può essere segnata come inviata o annullata");
+      const exported = await tx.invoiceExport.findUnique({ where: { invoiceId: id } });
+      if (exported && !["PREPARED", "FAILED"].includes(exported.status)) throw new InvoiceError("Documento collegato a Fatture in Cloud: gestisci l’emissione e le rettifiche dal collegamento.");
       await tx.invoice.update({ where: { id }, data: { status } });
     });
     revalidatePath("/settings");
@@ -310,6 +312,8 @@ export async function deleteInvoice(id: string): Promise<{ error: string | null 
     await db.$transaction(async tx => {
       const inv = await lockInvoice(tx, id, orgId);
       if (inv.status !== "DRAFT") throw new InvoiceError("Puoi eliminare soltanto una bozza");
+      const exported = await tx.invoiceExport.findUnique({ where: { invoiceId: id } });
+      if (exported && !["PREPARED", "FAILED"].includes(exported.status)) throw new InvoiceError("Documento collegato a Fatture in Cloud: verifica o rettifica il documento nel gestionale.");
       // Keep the progressive reserved, including when this is the latest draft.
       await tx.invoice.update({ where: { id }, data: { status: "CANCELLED" } });
     });

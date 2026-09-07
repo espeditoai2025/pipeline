@@ -10,6 +10,7 @@ import { recordInvoicePayment, updateInvoiceDueDate, voidInvoicePayment } from "
 import { updateInvoiceStatus, type InvoiceDetail } from "@/server/actions/invoices";
 import { currencyDigits, invoiceDate, invoiceMoney, paymentMethods, todayInItaly } from "@/lib/invoice-utils";
 import { InvoiceStatus } from "./InvoiceWorkspace";
+import { InvoiceCloudPanel } from "./InvoiceCloudPanel";
 
 const inputClass = "w-full rounded-lg border border-[var(--crm-neutral-100)] bg-transparent px-3 py-2 text-sm";
 const primaryClass = "inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--crm-primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50";
@@ -82,6 +83,7 @@ export function InvoiceDetailClient({ invoice, canWrite }: { invoice: InvoiceDet
       <div className="flex flex-wrap justify-between gap-2"><div><p className={`font-semibold ${payment.voidedAt ? "line-through text-[var(--crm-neutral-400)]" : ""}`}>{invoiceMoney(payment.amount, invoice.currency)}{payment.voidedAt && <span className="ml-2 text-xs no-underline">Annullato</span>}</p><p className="mt-1 text-sm">{invoiceDate(payment.paidAt)} · {paymentMethods[payment.method as keyof typeof paymentMethods] ?? payment.method.replaceAll("_", " ")}</p></div>{canWrite && !payment.voidedAt && <button disabled={busy} onClick={() => { setVoiding(payment.id); setReason(""); }} className="text-sm text-[var(--crm-neutral-500)] underline" aria-label={`Rettifica incasso di ${invoiceMoney(payment.amount, invoice.currency)}`}>Rettifica</button>}</div>
       {payment.reference && <p className="break-words text-sm">{payment.reference}</p>}<p className="text-xs text-[var(--crm-neutral-500)]">Registrato da {payment.createdBy} il {invoiceDate(payment.createdAt)}</p>{payment.voidedAt && <p className="text-sm text-rose-600 dark:text-rose-300">{payment.voidReason} · {payment.voidedBy ?? "Utente"}, {invoiceDate(payment.voidedAt)}</p>}
     </li>)}</ul>}</section>
+    <InvoiceCloudPanel invoice={invoice} canWrite={canWrite} />
     {invoice.notes && <section><h2 className="mb-2 font-semibold">Note</h2><p className="whitespace-pre-wrap text-sm">{invoice.notes}</p></section>}
     {paymentOpen && <PaymentForm invoice={invoice} onClose={() => setPaymentOpen(false)} />}
     {voiding && <Sheet open onOpenChange={open => { if (!open && !busy) setVoiding(null); }}><SheetContent className="w-full sm:max-w-lg" showCloseButton={!busy}><SheetHeader><SheetTitle>Rettifica incasso</SheetTitle><SheetDescription>Il movimento resta nello storico come annullato. Il saldo residuo viene ricalcolato.</SheetDescription></SheetHeader><SheetBody><form className="space-y-4" onSubmit={e => { e.preventDefault(); void run(() => voidInvoicePayment({ invoiceId: invoice.id, paymentId: voiding, reason }), "Incasso rettificato"); }}><label className="block space-y-1 text-sm">Motivo della rettifica<textarea autoFocus required minLength={5} maxLength={500} value={reason} onChange={e => setReason(e.target.value)} className={inputClass} /></label><button disabled={busy} className={primaryClass}>Conferma rettifica</button></form></SheetBody></SheetContent></Sheet>}

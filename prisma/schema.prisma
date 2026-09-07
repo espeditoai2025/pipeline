@@ -66,6 +66,11 @@ model Organization {
   bookingPages        BookingPage[]
   surveys             Survey[]
   chatMessages        ChatMessage[]
+  voiceNotes          VoiceNote[]
+  crmCommands         CrmCommand[]
+  invoicingConnection InvoicingConnection?
+  invoiceExports      InvoiceExport[]
+  aiUsageDays         AiUsageDay[]
 }
 
 model Invitation {
@@ -781,6 +786,7 @@ model Invoice {
   paidAt           DateTime?
   paidAmount       Decimal       @default(0)
   payments         InvoicePayment[]
+  externalExport   InvoiceExport?
 
   // Emittente (org)
   senderName       String
@@ -960,4 +966,77 @@ model ProcessedStripeEvent {
   id        String   @id // Stripe event id (evt_...)
   type      String
   createdAt DateTime @default(now())
+}
+
+model VoiceNote {
+  id String @id
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  authorId String
+  title String
+  audio Bytes
+  mimeType String
+  byteSize Int
+  duration Int
+  transcript String @default("") @db.Text
+  transcribingAt DateTime?
+  dealId String?
+  contactId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([organizationId, createdAt], map: "VoiceNote_org_created")
+}
+
+model CrmCommand {
+  id String @id @default(cuid())
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  authorId String
+  input String @db.Text
+  proposal Json
+  context Json
+  result Json?
+  expiresAt DateTime
+  executedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([organizationId, authorId, createdAt], map: "CrmCommand_org_author_created")
+}
+
+model InvoicingConnection {
+  organizationId String @id
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  accessToken String
+  refreshToken String?
+  expiresAt DateTime?
+  companyId Int?
+  companyName String?
+  companyVat String?
+  updatedAt DateTime @updatedAt
+}
+
+model InvoiceExport {
+  invoiceId String @id
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  companyId Int
+  documentId Int?
+  status String @default("PREPARING")
+  remoteNumber String?
+  eInvoiceStatus String?
+  remoteTotal Decimal?
+  payload Json
+  error String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([organizationId, companyId, documentId], map: "InvoiceExport_company_document")
+  @@index([organizationId, status], map: "InvoiceExport_org_status")
+}
+
+model AiUsageDay {
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  day String
+  calls Int @default(0)
+  @@id([organizationId, day])
 }

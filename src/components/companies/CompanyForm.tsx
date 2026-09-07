@@ -13,6 +13,8 @@ import { getCustomFields, getCustomFieldValues, saveCustomFieldValues } from "@/
 import { CustomFieldsSection } from "@/components/shared/CustomFieldsSection";
 import type { Company } from "@/types/contacts";
 import type { CustomField } from "@/types/custom-fields";
+import { CompanyAutofill } from "./CompanyAutofill";
+import type { CompanyField } from "@/lib/company-autofill";
 
 const schema = z.object({
   name: z.string().min(1, "Nome obbligatorio"),
@@ -64,7 +66,7 @@ export function CompanyForm({ open, onClose, company, onSaved }: Props) {
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [customValues, setCustomValues] = useState<Record<string, string>>({});
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({
+  const { register, handleSubmit, reset, getValues, setValue, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: company ? {
       name: company.name,
@@ -160,6 +162,9 @@ export function CompanyForm({ open, onClose, company, onSaved }: Props) {
             {/* ── GENERALE ─────────────────────────────────────── */}
             {activeTab === "generale" && (
               <div className="space-y-4">
+                <CompanyAutofill current={getValues} onApply={fields => {
+                  for (const [key, value] of Object.entries(fields)) setValue(key as CompanyField, value ?? "", { shouldDirty: true, shouldValidate: true });
+                }} />
                 <div>
                   <label className={labelCls}>Nome azienda *</label>
                   <input {...register("name")} className={inputCls} placeholder="Acme S.r.l." />

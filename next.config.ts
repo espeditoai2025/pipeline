@@ -15,6 +15,8 @@ const csp = [
   "font-src 'self' https://fonts.gstatic.com",
   // Img: self + data URIs + Stripe + Uploadthing + opengraph
   "img-src 'self' data: blob: https://*.stripe.com https://uploadthing.com https://*.uploadthing.com https://www.pipely.it",
+  // Registrazioni private e anteprima audio locale.
+  "media-src 'self' blob:",
   // Connessioni API/fetch
   "connect-src 'self' https://api.stripe.com https://app.posthog.com https://eu.posthog.com https://*.sentry.io https://o*.ingest.sentry.io wss://*.inngest.com",
   // Frame: Stripe Checkout iframe
@@ -32,7 +34,7 @@ const securityHeaders = [
   { key: "X-Frame-Options",           value: "SAMEORIGIN" },
   { key: "X-XSS-Protection",         value: "1; mode=block" },
   { key: "Referrer-Policy",           value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy",        value: "camera=(), microphone=(), geolocation=()" },
+  { key: "Permissions-Policy",        value: "camera=(), microphone=(self), geolocation=()" },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
   { key: "Content-Security-Policy",   value: csp },
 ];

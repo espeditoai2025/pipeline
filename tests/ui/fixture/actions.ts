@@ -64,3 +64,23 @@ export const voidInvoicePayment = async (input: { paymentId: string; reason: str
 export const updateInvoiceDueDate = async (input: { dueDate: string }) => { fixtureInvoice.dueDate = `${input.dueDate}T00:00:00Z`; return { error: null }; };
 export const updateInvoiceStatus = async (_id: string, status: string) => { fixtureInvoice.status = status; return { error: null }; };
 export const createInvoiceFromDeal = async (_input: unknown) => { fixtureInvoice.status = "DRAFT"; return { data: { id: fixtureInvoice.id, number: fixtureInvoice.number }, error: null }; };
+
+// Voice / invoicing UI fixtures: server behaviour is tested separately on PostgreSQL.
+export const findCompanySuggestions = async () => ({ data: [{ source: 'Azienda già in Pipely: Studio Cliente', fields: { name: 'Studio Cliente', vatNumber: '12345678903', city: 'Milano' }, warnings: [] }] });
+export const listVoiceNotes = async () => ({ data: [] });
+export const saveVoiceTranscript = async () => ({ ok: true });
+export const deleteVoiceNote = async () => ({ ok: true });
+export const searchVoiceTargets = async () => ({ data: [{ id: 'deal-1', kind: 'deal' as const, name: 'Consulenza Rossi' }] });
+export const prepareCrmCommand = async () => ({ data: { id: 'command-1', targetName: 'Consulenza Rossi', actions: ['Aggiorna affare: stato Vinto', 'Crea attività: Richiama Rossi domani alle 10:00'], expiresAt: new Date(Date.now() + 600000).toISOString() } });
+export const executeCrmCommand = async () => { document.documentElement.dataset.commands = String(Number(document.documentElement.dataset.commands ?? 0) + 1); return { ok: true, message: 'Comando eseguito: 2 operazioni.' }; };
+export const getInvoicingSettings = async () => ({ data: { configured: true, connected: true, connection: { companyId: 10, companyName: 'Studio Emittente', companyVat: '12345678903' }, canManage: true, available: true } });
+export const listInvoicingCompanies = async () => ({ data: [{ id: 10, name: 'Studio Emittente', vatNumber: '12345678903' }] });
+export const selectInvoicingCompany = async () => ({ ok: true });
+export const disconnectInvoicing = async () => ({ ok: true });
+let cloudStatus: import('@/lib/invoicing-schema').InvoiceExportStatus | null = null;
+export const getInvoiceExport = async () => ({ data: cloudStatus });
+export const getInvoiceVatOptions = async () => ({ data: [{ id: 1, value: 22, e_invoice: true, description: 'IVA ordinaria' }] });
+export const prepareInvoiceExport = async (input: import('@/lib/invoicing-schema').InvoiceExportInput) => { document.documentElement.dataset.invoicePreview = JSON.stringify(input); return { data: { invoiceId: 'inv-test', previewId: '00000000-0000-4000-a000-000000000001', recipient: input.recipientName, company: 'Studio Emittente', total: 1220, currency: 'EUR' } }; };
+export const createInvoiceInCloud = async () => { document.documentElement.dataset.invoiceCreated = 'true'; cloudStatus = { documentId: 100, remoteNumber: '8/P', status: 'CREATED', eInvoiceStatus: 'not_sent', remoteTotal: 1220, error: null, updatedAt: new Date().toISOString() }; return { ok: true }; };
+export const refreshInvoiceExport = async () => ({ ok: true });
+export const sendInvoiceToSdi = async () => { document.documentElement.dataset.invoiceSent = 'true'; cloudStatus = { ...cloudStatus!, status: 'SENT', eInvoiceStatus: 'pending' }; return { ok: true }; };

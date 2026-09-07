@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { StickyNote, Plus, Loader2, Pencil, Trash2, X, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,7 @@ export function DealNotePanel({ dealId, initialNotes }: Props) {
 
   return (
     <div className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] p-5 space-y-3">
+      <Link className="block text-xs text-[var(--crm-primary)] underline" href={"/voice?dealId=" + encodeURIComponent(dealId)}>Nota vocale o comando per questo affare</Link>
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-[var(--crm-neutral-700)] flex items-center gap-2">
           <StickyNote className="h-4 w-4 text-[var(--crm-primary)]" />

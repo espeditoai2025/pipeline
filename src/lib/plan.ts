@@ -16,6 +16,8 @@ export type PlanLimits = {
   automations: boolean;
   emailCampaigns: boolean;
   smtp: boolean;
+  invoicing: boolean;
+  maxVoiceNotes: number;
   leadFinderPerDay: number | null; // null = unlimited; 0 = no access
   leadFinderMaxResults: number;
 };
@@ -28,6 +30,8 @@ export const LIMITS: Record<PlanTier, PlanLimits> = {
     automations: false,
     emailCampaigns: false,
     smtp: false,
+    invoicing: false,
+    maxVoiceNotes: 10,
     leadFinderPerDay: 1,
     leadFinderMaxResults: 10,
   },
@@ -38,6 +42,8 @@ export const LIMITS: Record<PlanTier, PlanLimits> = {
     automations: true,
     emailCampaigns: true,
     smtp: true,
+    invoicing: true,
+    maxVoiceNotes: 100,
     leadFinderPerDay: null,
     leadFinderMaxResults: 50,
   },
@@ -48,6 +54,8 @@ export const LIMITS: Record<PlanTier, PlanLimits> = {
     automations: true,
     emailCampaigns: true,
     smtp: true,
+    invoicing: true,
+    maxVoiceNotes: 100,
     leadFinderPerDay: null,
     leadFinderMaxResults: 50,
   },
@@ -75,6 +83,8 @@ const FEATURE_LABELS: Record<FeatureKey, string> = {
   automations: "Automazioni",
   emailCampaigns: "Campagne email",
   smtp: "Configurazione email SMTP",
+  invoicing: "Fatture in Cloud",
+  maxVoiceNotes: "Note vocali",
   leadFinderPerDay: "Lead Finder ricerche giornaliere",
   leadFinderMaxResults: "Lead Finder candidati per ricerca",
 };
