@@ -4,7 +4,7 @@
 
 ## Sessione del 2026-09-07 — Pubblicazione e completamento delle note vocali
 
-Pubblicata la prima versione di note vocali, comandi, compilazione locale e connettore Fatture in Cloud, dopo backup verificato e ripristino su PostgreSQL 17. Decima migrazione applicata, deploy READY e conteggi CRM preservati. Proseguito con rinomina/ricollegamento, conservazione delle registrazioni nelle unioni ed eliminazioni e controllo del destinatario dei comandi. Sei comandi sintetici collaudati con successo sul servizio AI reale. Rapporto aggiornato e stato del completamento: [RILASCIO-VOCE-FATTURE-2026-09-07.md](RILASCIO-VOCE-FATTURE-2026-09-07.md).
+Pubblicata la prima versione di note vocali, comandi, compilazione locale e connettore Fatture in Cloud, dopo backup verificato e ripristino su PostgreSQL 17. Decima migrazione applicata, deploy READY e conteggi CRM preservati. Proseguito con rinomina/ricollegamento, conservazione delle registrazioni nelle unioni ed eliminazioni e controllo del destinatario dei comandi. Pubblicato anche il completamento (`1c26b9d`), con undicesima migrazione applicata. Sei comandi sintetici collaudati con successo sul servizio AI reale; verificati sul sito login, upload, download e trascrizione, con pulizia delle fixture e conteggi originali preservati. Rapporto aggiornato e stato del completamento: [RILASCIO-VOCE-FATTURE-2026-09-07.md](RILASCIO-VOCE-FATTURE-2026-09-07.md).
 
 ## Sessione del 2026-09-07 — Nuove funzioni, implementazione locale
 

@@ -32,9 +32,19 @@ Evidenza completa: [COMANDI-AI-2026-09-07.json](COMANDI-AI-2026-09-07.json). È 
 - 169 test unitari superati; TypeScript e lint completati.
 - 50 casi di integrazione verificati: 27 regressioni CRM e 23 vocali/fatturazione. I 23 casi sono superati anche su PostgreSQL 17 con otto connessioni. Il test che provoca intenzionalmente una violazione FK ora la esegue in transazione, così il database PGlite resta utilizzabile dal caso successivo.
 - 44 casi UI verificati su desktop e mobile. Corretto il nome accessibile del selettore di collegamento; ripetuti con esito positivo tutti i 16 casi delle nuove funzionalità dopo la correzione.
-- Build locale finale completata. Seconda pubblicazione: in completamento.
+- Build locale finale completata. Commit `1c26b9d` pubblicato, deploy `dpl_3ZP5GWgS9WxTsK4Nme8tUhG4aJbv` READY e assegnato al dominio pubblico. Undicesima migrazione applicata senza errori irrisolti; checksum verificati.
 
 Secondo backup: `backups/pipely-prod-20260907-pre-voice-integrity.dump`, 150.467 byte, SHA-256 `e8123490534949fe2d88be5f3de2344877bbbe020b2c2c0b015bdb28a2e395f8`, con tutte le 49 tabelle e dieci migrazioni. Il rapporto di ripristino è conservato accanto all’archivio.
+
+## Verifica autenticata in produzione completata
+
+Alle 13:53 UTC è stato collaudato il normale login con un account e un’organizzazione temporanei, senza usare account clienti. `/voice` e `/settings/invoicing` hanno risposto HTTP 200; una registrazione WAV sintetica è stata caricata tramite la vera API del sito e scaricata identica byte per byte, con `Cache-Control: private, no-store`. La trascrizione reale ha restituito “Richiama il cliente domani alle 10.00.”. La seconda richiesta ha restituito il testo conservato: il contatore è rimasto a una sola elaborazione.
+
+Account, contatto, organizzazione, registrazione e quota della fixture rimossi. Controllo delle 13:54 UTC: conteggi delle 49 tabelle CRM uguali al secondo backup; solo `_prisma_migrations` passa da 10 a 11. Il workflow preesistente resta disattivato, nessun job in coda. Nessun invio di fatture, email o pagamento durante questo collaudo.
+
+Evidenza: [VOCE-PRODUZIONE-2026-09-07.json](VOCE-PRODUZIONE-2026-09-07.json). Lo script riproducibile `scripts/check-voice-production.mjs` richiede `--synthetic-fixture`, rifiuta una fixture già presente, usa il login normale e rimuove solo i dati creati dal test. Non stampa password, cookie o credenziali.
+
+Nessun errore di runtime rilevato sul secondo deploy nella finestra finale a partire dalle 13:52 UTC. Il precedente JWTSessionError delle 13:49:59 proveniva dal primo tentativo di sessione sintetica del collaudo, rifiutato; il controllo successivo ha utilizzato il normale login del sito. Tutti i container di prova sono stati rimossi; i backup verificati restano conservati localmente.
 
 ## Passi ancora aperti
 
@@ -64,3 +74,5 @@ Restano inoltre i collaudi SMTP personale e Stripe in modalità test del precede
 - `tests/unit/contact-merge.test.ts`
 
 Documentazione aggiornata: `docs/RILASCIO-VOCE-FATTURE-2026-09-07.md`, `docs/FUNZIONALITA-CRM-2026-09-07.md`, `docs/FATTURE-IN-CLOUD.md`, `docs/LAVORI_SVOLTI.md`.
+
+Evidenza e script finali: `docs/VOCE-PRODUZIONE-2026-09-07.json`, `scripts/check-voice-production.mjs`.
