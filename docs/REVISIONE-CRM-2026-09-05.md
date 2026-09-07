@@ -1,6 +1,6 @@
 # Revisione Pipely — 5 settembre 2026
 
-> Correzioni del 7 settembre implementate e descritte in [CORREZIONI-CRM-2026-09-07.md](CORREZIONI-CRM-2026-09-07.md), con test e inventario dei file. Rilascio della nuova migrazione ancora da eseguire.
+> Correzioni del 7 settembre implementate e descritte in [CORREZIONI-CRM-2026-09-07.md](CORREZIONI-CRM-2026-09-07.md), con test e inventario dei file. Nuova migrazione applicata e correzioni rilasciate: [esiti in produzione](RILASCIO-CRM-2026-09-07.md).
 
 > Audit iniziale del 7 settembre: nuova [revisione di codice, home, piani e automazioni](REVISIONE-CODICE-HOME-PIANI-2026-09-07.md), con problemi aperti, 21 prove mirate e conteggi del database in sola lettura. Questo documento conserva lo storico del lavoro del 5–6 settembre.
 

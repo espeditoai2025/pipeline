@@ -2,6 +2,10 @@
 
 > Ultimo aggiornamento del registro: 2026-09-07. Le sezioni precedenti sono conservate come storico.
 
+## Sessione del 2026-09-07 — Rilascio delle correzioni
+
+Commit applicativo 343db83 pubblicato su main; deploy Vercel READY e nona migrazione applicata. Docker riavviato, backup delle 44 tabelle CRM ripristinato e migrazione provata sulla copia; tutte le 27 prove di integrazione superate anche su PostgreSQL 17 con otto connessioni. Il cron reale delle 09:45 UTC ha completato due automazioni, creando attività e notifica interna e inviando un’email alla casella di simulazione ufficiale Resend. Fixture e container di prova rimossi; conteggi CRM originali preservati, backup conservato. Home, login, protezioni e log verificati. Restano SMTP personale, recapito su casella dell’utente e collaudo Stripe in modalità test. Rapporto: [RILASCIO-CRM-2026-09-07.md](RILASCIO-CRM-2026-09-07.md).
+
 ## Sessione del 2026-09-07 — Correzioni della revisione
 
 Su richiesta «correggi», implementati controlli dei ruoli attuali, riferimenti limitati all’organizzazione, quote transazionali e coerenza dei piani; riscritti coda e worker delle automazioni; completati builder, registro e ripresa; corretti Stripe, API lead, toggle prodotti, report e promesse della home. Aggiunta migrazione additiva collaudata su PostgreSQL temporaneo. Dettaglio, prove riproducibili, limiti del collaudo, passi di rilascio e file modificati in [CORREZIONI-CRM-2026-09-07.md](CORREZIONI-CRM-2026-09-07.md). Verifiche: 156 test unitari, 27 di integrazione e 28 UI superati; TypeScript, lint, schema Prisma e build locale completati senza errori. Non sono stati eseguiti deploy, migrazioni di produzione o invii reali in questa sessione di correzione.

@@ -2,7 +2,7 @@
 
 Data: 7 settembre 2026. Base Git: ba67b0e. Target: liberi professionisti e microimprese.
 
-Le anomalie dell’audit sono state corrette nel codice locale. La nuova migrazione è stata verificata su un database di prova temporaneo; **non è stata applicata in produzione e il nuovo codice non è stato pubblicato**. Lo storico dell’audit iniziale rimane in REVISIONE-CODICE-HOME-PIANI-2026-09-07.md e nel JSON AUDIT-2026-09-07-tests.json.
+**Correzioni rilasciate in produzione il 7 settembre 2026**, commit applicativo 343db83, con nuova migrazione applicata, backup ripristinato su PostgreSQL 17 e due automazioni eseguite dal cron reale. Dettagli e limiti del collaudo in [RILASCIO-CRM-2026-09-07.md](RILASCIO-CRM-2026-09-07.md). Lo storico dell’audit iniziale rimane in REVISIONE-CODICE-HOME-PIANI-2026-09-07.md e nel JSON AUDIT-2026-09-07-tests.json.
 
 ## Problemi trattati
 
@@ -57,15 +57,13 @@ npm run build
 
 Controllo finale git diff --check superato. Risultati macchina: CORREZIONI-2026-09-07-tests.json e CORREZIONI-2026-09-07-integration.json. La suite audit è mantenuta come alias della regressione integrata. Il JSON AUDIT iniziale conserva i precedenti 4 successi e 17 fallimenti.
 
-## Da fare per il rilascio
+## Rilascio e verifiche operative
 
-- Applicare la migrazione 20260907090000_workflow_reliability e pubblicare insieme il nuovo worker e i produttori di eventi. Lo schema è additivo, ma i nuovi campi obbligatori della coda richiedono un passaggio coordinato: sospendere le vecchie esecuzioni durante migrazione e deploy. Salvare prima un backup e l’elenco dei workflow attivi da riattivare. Il comando Vercel esistente esegue già migrate deploy prima della build; non lanciare db push sul database reale.
-- Verificare nell’ambiente di destinazione CRON_SECRET, esecuzione del nuovo cron ogni 5 minuti, durata delle funzioni e disponibilità del servizio di pianificazione. La presenza in vercel.json non prova che il cron sia già operativo.
-- Verificare STRIPE_PRO_PRICE_ID, chiave e firma webhook. Il prezzo deve essere attivo, EUR 2900 centesimi, mensile e a quantità fissa. Eseguire un ciclo in modalità Stripe test con attivazione, retry, cancellazione e ritorno a Starter.
-- Collaudare su recapiti di prova il provider della piattaforma e SMTP verificato: consegna, rifiuto, attesa, ripresa dopo errore e downgrade. Questi invii non sono stati effettuati durante la correzione.
-- Ripetere i casi di contesa su PostgreSQL con più connessioni e carico rappresentativo; calibrare capacità dei worker, conservazione dei log e monitoraggio della coda.
+Completati commit, push, backup e ripristino di prova, migrazione di produzione e deploy READY. Ripetute con successo le 27 prove di integrazione su PostgreSQL 17 con otto connessioni. Il cron reale ha creato attività e notifica e inviato un’email alla casella di test ufficiale Resend; esiti SUCCESS e HTTP 200, fixture poi rimossa e conteggi originali preservati.
 
-In questa sessione non sono stati eseguiti commit, push, deploy o migrazioni di produzione. Le precedenti migrazioni di incassi, candidati e consegne campagne e le configurazioni Resend/Redis già rilasciate rimangono nello storico; non sono tornate pendenti.
+Restano il recapito su casella personale, SMTP personalizzato (non configurato), verifica prezzo/ciclo Stripe in modalità test, test di carico e monitoraggio. Non sono stati effettuati pagamenti reali. Evidenze, backup, orari e inventario aggiuntivo nel [rapporto di rilascio](RILASCIO-CRM-2026-09-07.md).
+
+Durante la precedente fase di correzione il codice era rimasto locale; questa sezione aggiorna quello stato dopo l’autorizzazione al rilascio. Le precedenti migrazioni di incassi, candidati e consegne campagne e le configurazioni Resend/Redis rimangono rilasciate.
 
 ## File modificati e aggiunti
 

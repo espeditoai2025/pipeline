@@ -4,7 +4,7 @@ Data: **7 settembre 2026**. Base Git: `ba67b0e`, albero inizialmente pulito. Tar
 
 ## Stato dopo le correzioni del 7 settembre
 
-Le correzioni sono ora implementate nel codice locale. Il dettaglio aggiornato, i test, i file modificati e le operazioni necessarie per il rilascio sono in [CORREZIONI-CRM-2026-09-07.md](CORREZIONI-CRM-2026-09-07.md). La migrazione delle automazioni è stata collaudata soltanto sul database temporaneo di prova; non è stata applicata in produzione.
+Le correzioni sono state rilasciate in produzione con il commit 343db83. Il dettaglio aggiornato, i test, i file modificati e le operazioni necessarie per il rilascio sono in [CORREZIONI-CRM-2026-09-07.md](CORREZIONI-CRM-2026-09-07.md). La migrazione è applicata e il cron reale ha completato due job di prova: [rapporto di rilascio](RILASCIO-CRM-2026-09-07.md).
 
 ## Esito dell’audit iniziale (storico, prima delle correzioni)
 

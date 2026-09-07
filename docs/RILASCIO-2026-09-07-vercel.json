@@ -1,0 +1,45 @@
+{
+  "checkedAt": "2026-09-07T09:49:00.728Z",
+  "deployment": "dpl_uKd978rZRj3dgTbBCsE3KFkSqjmv",
+  "commit": "343db83b992df85ac032b959fc0c97cc12029f99",
+  "cronDeployment": "dpl_uKd978rZRj3dgTbBCsE3KFkSqjmv",
+  "cronEnabled": true,
+  "definitions": [
+    {
+      "host": "pipeline-qqor8dgqq-espeditoai2025-1690s-projects.vercel.app",
+      "path": "/api/cron/backup",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "host": "pipeline-qqor8dgqq-espeditoai2025-1690s-projects.vercel.app",
+      "path": "/api/cron/process-webhooks",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "host": "pipeline-qqor8dgqq-espeditoai2025-1690s-projects.vercel.app",
+      "path": "/api/cron/workflows",
+      "schedule": "*/5 * * * *"
+    }
+  ],
+  "cronRequests": [
+    {
+      "timestamp": 1788774343161,
+      "path": "/api/cron/workflows",
+      "status": 200,
+      "level": "info"
+    },
+    {
+      "timestamp": 1788774159056,
+      "path": "/api/cron/workflows",
+      "status": 401,
+      "level": "info"
+    },
+    {
+      "timestamp": 1788774043072,
+      "path": "/api/cron/workflows",
+      "status": 200,
+      "level": "info"
+    }
+  ],
+  "errorRequests": []
+}

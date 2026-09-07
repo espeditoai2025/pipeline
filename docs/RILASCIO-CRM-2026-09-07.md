@@ -14,15 +14,29 @@ Autorizzato dall’utente dopo le correzioni dell’audit, con richiesta di ripr
 
 La suite continua a usare PGlite per default. L’opzione `PIPELY_TEST_DATABASE_URL` accetta esclusivamente `127.0.0.1` e il database dedicato `pipely_review_fixture`, senza leggere `DATABASE_URL` o `.env.local`. Il database deve essere nuovo e vuoto. Le prove concorrenti non costituiscono un test di carico.
 
-## Stato del rilascio
+## Rilascio completato e prove in produzione
 
-Commit, push, migrazione e verifica del deploy: in corso. Nessun workflow operativo è stato attivato e nessun pagamento reale è stato effettuato.
+- Commit applicativo `343db83b992df85ac032b959fc0c97cc12029f99`, pubblicato su `main`. Deploy `dpl_uKd978rZRj3dgTbBCsE3KFkSqjmv` READY e assegnato a pipely.it/www.pipely.it.
+- Log Vercel: nona migrazione `20260907090000_workflow_reliability` applicata fra 09:38:02 e 09:38:03 UTC; tutte le migrazioni completate. Build e TypeScript superati.
+- Home canonica https://www.pipely.it/ e login: HTTP 200; nuova CTA Pro presente. Automazioni e billing senza sessione: redirect al login. Cron senza credenziale: HTTP 401.
+- Cron abilitato sul deploy corretto con frequenza di 5 minuti. Chiamate reali HTTP 200 alle 09:40 e 09:45 UTC; nessun errore di runtime rilevato nella finestra 09:39–09:49 UTC. Evidenza in [RILASCIO-2026-09-07-vercel.json](RILASCIO-2026-09-07-vercel.json).
+- Creata un’organizzazione temporanea, distinta dai clienti, con un contatto e un lead di prova. Gli eventi sono stati accodati tramite il produttore applicativo; nessun worker è stato avviato dal locale. Il cron Vercel delle 09:45 ha completato due job: un’attività, una notifica interna e un invio email. Entrambi SUCCESS, due esecuzioni, nessun errore, nessun duplicato osservato.
+- Resend ha accettato l’email destinata a `delivered+pipely-release-20260907@resend.dev`, registrata SENT nello storico. È l’indirizzo ufficiale per simulare la consegna, non una casella cliente: [documentazione Resend](https://resend.com/docs/knowledge-base/what-email-addresses-to-use-for-testing). Questo prova il collegamento reale fra worker e provider; non certifica il recapito nella casella personale dell’utente. Evidenza in [RILASCIO-2026-09-07-smoke.json](RILASCIO-2026-09-07-smoke.json).
+- Rimossi tutti i dati della fixture, compresa l’email, che nel modello corrente non ha una cancellazione a cascata dall’organizzazione. Controllo delle 09:52 UTC: tutti i conteggi delle tabelle CRM coincidono col backup; soltanto `_prisma_migrations` passa da 8 a 9. Rimangono il workflow originario disattivato e zero job in coda.
+- Container di collaudo fermato e rimosso con il suo volume temporaneo. Backup verificato conservato; Docker lasciato disponibile. Nessuna modifica ai container preesistenti e nessun pagamento reale.
 
-## Verifiche successive richieste
+## Verifiche ancora da completare
 
-- Confermare deploy READY, migrazione completata e conteggi del database preservati.
-- Confermare nuova definizione cron `/api/cron/workflows` ogni 5 minuti e almeno un’esecuzione reale senza errori; verificare che richieste senza autenticazione vengano rifiutate.
-- Verificare home pubblicata, login e protezione delle pagine riservate.
-- Distinguere la verifica del worker vuoto dalla prova completa di consegna: SMTP non è configurato nel CRM. Per SMTP e un ciclo di pagamento servono recapiti/configurazioni di prova e Stripe in modalità test; non vanno eseguiti addebiti reali per collaudare il rilascio.
+- Consegna a una casella personale: destinatario richiesto all’utente. Il test Resend sopra usa la simulazione ufficiale del provider.
+- SMTP personalizzato: nessuna configurazione presente nel CRM; servono account e configurazione verificata prima del collaudo.
+- Stripe: variabili presenti e regressioni applicative superate con servizio simulato; restano verifica del prezzo remoto e ciclo completo in modalità test. Nessun checkout pagato o addebito reale eseguito.
+- Carico rappresentativo, capacità dei worker, conservazione dei log e monitoraggio continuativo della coda. Le prove concorrenti con otto connessioni sono state completate e non sono più pendenti.
 
-Dettaglio delle correzioni e verifiche precedenti: [CORREZIONI-CRM-2026-09-07.md](CORREZIONI-CRM-2026-09-07.md).
+## File della fase di rilascio
+
+- `scripts/release-backup.mjs`: backup esplicito di sola lettura, checksum delle migrazioni, inventario e confronto finale.
+- `scripts/release-workflow-smoke.ts`: fixture con identità fissa, destinatario Resend limitato alla casella di test, lettura degli esiti e pulizia vincolata alla sola fixture conclusa.
+- `tests/integration/database.ts`: collaudo opzionale su database locale dedicato con otto connessioni.
+- I tre JSON RILASCIO di questa data, questo rapporto e gli indici di revisione/lavori svolti.
+
+Dettaglio delle correzioni e dei 92 file originari: [CORREZIONI-CRM-2026-09-07.md](CORREZIONI-CRM-2026-09-07.md).

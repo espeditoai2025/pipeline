@@ -1,0 +1,56 @@
+{
+  "checkedAt": "2026-09-07T09:46:56.665Z",
+  "jobs": [
+    {
+      "status": "SUCCESS",
+      "stepIndex": 1,
+      "attempts": 0,
+      "logs": [
+        {
+          "at": "2026-09-07T09:45:43.610Z",
+          "step": 0,
+          "action": "SEND_EMAIL",
+          "status": "SUCCESS",
+          "message": "Email accettata dal provider"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-09-07T09:44:40.130Z"
+    },
+    {
+      "status": "SUCCESS",
+      "stepIndex": 2,
+      "attempts": 0,
+      "logs": [
+        {
+          "at": "2026-09-07T09:45:43.436Z",
+          "step": 0,
+          "action": "CREATE_ACTIVITY",
+          "status": "SUCCESS",
+          "message": "Attività creata: Verifica automatica rilascio"
+        },
+        {
+          "at": "2026-09-07T09:45:43.540Z",
+          "step": 1,
+          "action": "SEND_NOTIFICATION",
+          "status": "SUCCESS",
+          "message": "Notifica inviata a 1 persona"
+        }
+      ],
+      "error": null,
+      "createdAt": "2026-09-07T09:41:21.152Z"
+    }
+  ],
+  "activities": 1,
+  "notices": 1,
+  "executions": 2,
+  "emails": [
+    {
+      "status": "SENT",
+      "sentAt": "2026-09-07T09:45:44.249Z",
+      "toAddresses": [
+        "delivered+pipely-release-20260907@resend.dev"
+      ]
+    }
+  ]
+}
