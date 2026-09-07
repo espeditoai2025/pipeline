@@ -81,3 +81,26 @@ test("dichiara il collegamento non configurato senza mostrare una falsa attivazi
   await expect(page.getByText(/deve essere attivato dal gestore/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Collega Fatture in Cloud", exact: true })).toHaveCount(0);
 });
+
+
+test("rinomina e ricollega una nota conservandone il testo", async ({ page }) => {
+  await page.goto("/?view=voice&saved=true");
+  await page.getByRole("button", { name: "Cerca record", exact: true }).click();
+  await page.getByLabel("Seleziona record CRM").selectOption("deal:deal-1");
+  await page.getByText("Modifica titolo e collegamento", { exact: true }).click();
+  await page.getByLabel("Titolo della nota", { exact: true }).fill("Incontro aggiornato");
+  await page.getByLabel("Collegamento della nota", { exact: true }).selectOption("selected");
+  await page.getByRole("button", { name: "Salva titolo e collegamento" }).click();
+  await expect(page.getByRole("heading", { name: "Incontro aggiornato" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Apri affare collegato" })).toHaveAttribute("href", "/deals/deal-1");
+  await expect(page.getByLabel("Trascrizione di Incontro aggiornato")).toHaveValue("Aggiungi una nota: incontro positivo.");
+});
+
+test("una nota senza collegamento non eredita il destinatario di un comando precedente", async ({ page }) => {
+  await page.goto("/?view=voice&saved=true");
+  await page.getByRole("button", { name: "Cerca record", exact: true }).click();
+  await page.getByLabel("Seleziona record CRM").selectOption("deal:deal-1");
+  await page.getByRole("button", { name: "Usa come comando", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Mostra anteprima del comando" })).toBeDisabled();
+  await expect(page.getByLabel("Seleziona record CRM")).toHaveValue("");
+});

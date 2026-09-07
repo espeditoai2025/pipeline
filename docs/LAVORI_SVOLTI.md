@@ -2,6 +2,10 @@
 
 > Ultimo aggiornamento del registro: 2026-09-07. Le sezioni precedenti sono conservate come storico.
 
+## Sessione del 2026-09-07 — Pubblicazione e completamento delle note vocali
+
+Pubblicata la prima versione di note vocali, comandi, compilazione locale e connettore Fatture in Cloud, dopo backup verificato e ripristino su PostgreSQL 17. Decima migrazione applicata, deploy READY e conteggi CRM preservati. Proseguito con rinomina/ricollegamento, conservazione delle registrazioni nelle unioni ed eliminazioni e controllo del destinatario dei comandi. Sei comandi sintetici collaudati con successo sul servizio AI reale. Rapporto aggiornato e stato del completamento: [RILASCIO-VOCE-FATTURE-2026-09-07.md](RILASCIO-VOCE-FATTURE-2026-09-07.md).
+
 ## Sessione del 2026-09-07 — Nuove funzioni, implementazione locale
 
 Aggiunti note vocali nel browser, trascrizione, comandi CRM con anteprima e conferma, compilazione aziendale da testo o dati della stessa organizzazione senza API esterne e connettore OAuth Fatture in Cloud. Configurati controlli di piano, ruolo e concorrenza, quote e protezione dai duplicati. Trascrizione collaudata realmente con audio sintetico; connettore fiscale verificato con API simulate, in attesa dell’app OAuth non ancora creata. Migrazione additiva provata in Docker, senza rilascio o modifiche al database di produzione. Rapporto, risultati, limiti e inventario: [FUNZIONALITA-CRM-2026-09-07.md](FUNZIONALITA-CRM-2026-09-07.md). Attivazione: [FATTURE-IN-CLOUD.md](FATTURE-IN-CLOUD.md).

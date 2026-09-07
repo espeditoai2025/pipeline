@@ -67,7 +67,14 @@ export const createInvoiceFromDeal = async (_input: unknown) => { fixtureInvoice
 
 // Voice / invoicing UI fixtures: server behaviour is tested separately on PostgreSQL.
 export const findCompanySuggestions = async () => ({ data: [{ source: 'Azienda già in Pipely: Studio Cliente', fields: { name: 'Studio Cliente', vatNumber: '12345678903', city: 'Milano' }, warnings: [] }] });
-export const listVoiceNotes = async () => ({ data: [] });
+export const fixtureVoiceNotes: import('@/lib/voice').VoiceNoteSummary[] = [{ id: 'voice-saved', title: 'Nota da riordinare', mimeType: 'audio/webm', duration: 12, transcript: 'Aggiungi una nota: incontro positivo.', dealId: null, contactId: null, authorId: 'test-user', createdAt: new Date().toISOString(), targetName: null }];
+export const listVoiceNotes = async () => ({ data: fixtureVoiceNotes });
+export const updateVoiceNoteDetails = async (input: { id: string; title: string; kind: string; targetId: string }) => {
+  const note = fixtureVoiceNotes.find(row => row.id === input.id)!;
+  Object.assign(note, { title: input.title, dealId: input.kind === 'deal' ? input.targetId : null, contactId: input.kind === 'contact' ? input.targetId : null, targetName: input.kind === 'none' ? null : 'Consulenza Rossi' });
+  document.documentElement.dataset.voiceUpdated = JSON.stringify(input);
+  return { ok: true };
+};
 export const saveVoiceTranscript = async () => ({ ok: true });
 export const deleteVoiceNote = async () => ({ ok: true });
 export const searchVoiceTargets = async () => ({ data: [{ id: 'deal-1', kind: 'deal' as const, name: 'Consulenza Rossi' }] });

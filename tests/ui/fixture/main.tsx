@@ -10,7 +10,7 @@ import { DailyFocus } from "@/components/dashboard/DailyFocus";
 import { MergeDuplicatesModal } from "@/components/contacts/MergeDuplicatesModal";
 import { ImportCSVModal } from "@/components/contacts/ImportCSVModal";
 import { ActivitiesPageClient } from "@/components/activities/ActivitiesPageClient";
-import { contacts, fixture, fixtureInvoice } from "./actions";
+import { contacts, fixture, fixtureInvoice, fixtureVoiceNotes } from "./actions";
 import { InvoiceDetailClient } from "@/components/invoices/InvoiceDetailClient";
 import { InvoiceWorkspace } from "@/components/invoices/InvoiceWorkspace";
 import { CreateInvoiceModal } from "@/components/invoices/CreateInvoiceModal";
@@ -44,7 +44,7 @@ function App() {
   if (view === "home") return <LandingPage />;
   return <main className="mx-auto min-h-screen max-w-6xl bg-[var(--crm-neutral-50)] p-4 text-[var(--crm-neutral-900)] sm:p-8" style={{ fontFamily: "Arial, sans-serif" }}>
     <Toaster />
-    {view === "voice" ? <VoiceWorkspace initialNotes={[]} canWrite={params.get("role") !== "viewer"} canManage userId="test-user" ai={params.get("plan") !== "starter"} maxNotes={100} />
+    {view === "voice" ? <VoiceWorkspace initialNotes={params.get("saved") === "true" ? fixtureVoiceNotes : []} canWrite={params.get("role") !== "viewer"} canManage userId="test-user" ai={params.get("plan") !== "starter"} maxNotes={100} />
     : view === "company-autofill" ? <><p data-testid="company-fields">{JSON.stringify(companyFields)}</p><CompanyAutofill current={() => companyFields} onApply={fields => setCompanyFields(prev => ({ ...prev, ...fields }))} /></>
     : view === "invoice-cloud" ? <InvoiceCloudPanel invoice={{ ...fixtureInvoice, status: "DRAFT", recipientVat: "12345678903" }} canWrite />
     : view === "invoicing-settings" ? <InvoicingSettings initial={{ configured: false, connected: false, connection: null, available: true, canManage: true }} />

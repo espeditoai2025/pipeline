@@ -16,7 +16,7 @@ function fixture() {
     contact: { findFirst: vi.fn().mockResolvedValueOnce(primary).mockResolvedValueOnce(duplicate), update: vi.fn(), delete: vi.fn() },
     customFieldValue: { update: vi.fn() },
     note: { ...related(), create: vi.fn() },
-    deal: related(), activity: related(), email: related(), lead: related(),
+    deal: related(), activity: related(), email: related(), lead: related(), voiceNote: related(),
     company: { findFirst: vi.fn().mockResolvedValue(null) },
   };
   return { tx, client: tx as unknown as Prisma.TransactionClient };
@@ -32,7 +32,7 @@ describe("fusione con conservazione dello storico", () => {
     expect(tx.note.create.mock.calls[0]![0].data.content).toContain("Alternativo");
     expect(tx.note.create.mock.calls[0]![0].data.content).toContain("Primario");
     expect(tx.contact.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "a", organizationId: "org-a" }, data: expect.objectContaining({ phone: "021234", tags: { connect: [{ id: "tag-a" }] } }) }));
-    for (const model of [tx.deal, tx.activity, tx.email, tx.lead]) expect(model.updateMany).toHaveBeenCalledWith({ where: { contactId: "b", organizationId: "org-a" }, data: { contactId: "a" } });
+    for (const model of [tx.deal, tx.activity, tx.email, tx.lead, tx.voiceNote]) expect(model.updateMany).toHaveBeenCalledWith({ where: { contactId: "b", organizationId: "org-a" }, data: { contactId: "a" } });
     expect(tx.contact.delete).toHaveBeenCalledWith({ where: { id: "b", organizationId: "org-a" } });
     expect(tx.contact.delete.mock.invocationCallOrder[0]).toBeGreaterThan(tx.note.create.mock.invocationCallOrder[0]!);
   });

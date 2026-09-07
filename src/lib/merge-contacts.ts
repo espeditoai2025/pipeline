@@ -66,6 +66,7 @@ export async function mergeContactRecords(
   await tx.activity.updateMany({ where: { contactId: duplicateId, organizationId }, data: { contactId: primaryId } });
   await tx.email.updateMany({ where: { contactId: duplicateId, organizationId }, data: { contactId: primaryId } });
   await tx.lead.updateMany({ where: { contactId: duplicateId, organizationId }, data: { contactId: primaryId } });
+  await tx.voiceNote.updateMany({ where: { contactId: duplicateId, organizationId }, data: { contactId: primaryId } });
   await tx.note.updateMany({ where: { contactId: duplicateId, contact: { organizationId } }, data: { contactId: primaryId } });
   await tx.contact.update({
     where: { id: primaryId, organizationId },

@@ -190,6 +190,7 @@ model Deal {
   notes        Note[]
   emails       Email[]
   products     DealProduct[]
+  voiceNotes   VoiceNote[]
   customValues CustomFieldValue[]
   invoices     Invoice[]
 
@@ -231,6 +232,7 @@ model Contact {
   customValues CustomFieldValue[]
   tags         Tag[]              @relation("ContactTags")
   notes        Note[]
+  voiceNotes   VoiceNote[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -981,10 +983,14 @@ model VoiceNote {
   transcript String @default("") @db.Text
   transcribingAt DateTime?
   dealId String?
+  deal Deal? @relation(fields: [dealId], references: [id], onDelete: SetNull)
   contactId String?
+  contact Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([organizationId, createdAt], map: "VoiceNote_org_created")
+  @@index([contactId])
+  @@index([dealId])
 }
 
 model CrmCommand {

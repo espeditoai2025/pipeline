@@ -11,7 +11,7 @@ vi.mock("@/lib/webhook-delivery", () => ({ dispatchWebhook: vi.fn(async () => {}
 vi.mock("@/lib/rate-limit", () => ({ withApiKeyRateLimit: vi.fn(async () => null) }));
 import { prepareCrmCommand, executeCrmCommand } from "@/server/actions/crm-commands";
 import { findCompanySuggestions } from "@/server/actions/company-autofill";
-import { listVoiceNotes, saveVoiceTranscript, deleteVoiceNote } from "@/server/actions/voice";
+import { listVoiceNotes, saveVoiceTranscript, deleteVoiceNote, updateVoiceNoteDetails } from "@/server/actions/voice";
 import { POST as uploadVoice } from "@/app/api/voice/route";
 import { GET as audioDownload } from "@/app/api/voice/[id]/route";
 import { POST as transcription } from "@/app/api/voice/[id]/transcribe/route";
@@ -20,6 +20,8 @@ import { GET as oauthCallback } from "@/app/api/integrations/fatture-in-cloud/ca
 import { prepareInvoiceExport, createInvoiceInCloud, sendInvoiceToSdi, refreshInvoiceExport, selectInvoicingCompany, getInvoicingSettings } from "@/server/actions/invoicing";
 import { deleteInvoice, updateInvoiceStatus } from "@/server/actions/invoices";
 import { sealIntegration, openIntegration } from "@/lib/integration-crypto";
+import { crmTransaction } from "@/lib/crm-transaction";
+import { mergeContactRecords } from "@/lib/merge-contacts";
 import { todayInItaly } from "@/lib/invoice-utils";
 import type { InvoiceExportInput } from "@/lib/invoicing-schema";
 
@@ -64,8 +66,8 @@ beforeEach(async () => {
 async function previewCommand() { const result = await prepareCrmCommand({ kind: "deal", targetId: "features-deal", text: "Aggiungi nota cliente interessato, richiama Rossi l’8 settembre 2030 alle 10, segna vinto a 4000 euro" }); expect(result.error).toBeUndefined(); return result.data!; }
 async function preparedExport() { const result = await prepareInvoiceExport(exportInput); expect(result.error).toBeUndefined(); return result.data!; }
 async function createdExport() { const preview = await preparedExport(); expect(await createInvoiceInCloud(preview.invoiceId, preview.previewId)).toEqual({ ok: true }); return preview; }
-function upload(id = "cbf124a9-2219-45e3-9835-4876b75c41b1", linkedId = "features-deal") {
-  const form = new FormData(); form.set("id", id); form.set("title", "Incontro Rossi"); form.set("duration", "15"); form.set("dealId", linkedId); form.set("contactId", ""); form.set("audio", new Blob([new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0, 0, 0, 0, 0, 0, 0, 0])], { type: "audio/webm" }), "nota.webm");
+function upload(id = "cbf124a9-2219-45e3-9835-4876b75c41b1", linkedId = "features-deal", kind: "deal" | "contact" = "deal") {
+  const form = new FormData(); form.set("id", id); form.set("title", "Incontro Rossi"); form.set("duration", "15"); form.set("dealId", kind === "deal" ? linkedId : ""); form.set("contactId", kind === "contact" ? linkedId : ""); form.set("audio", new Blob([new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0, 0, 0, 0, 0, 0, 0, 0])], { type: "audio/webm" }), "nota.webm");
   return uploadVoice(new NextRequest("http://localhost/api/voice", { method: "POST", body: form, headers: { origin: "http://localhost" } }));
 }
 describe("comandi CRM confermati", () => {
@@ -150,6 +152,47 @@ describe("note vocali e dati locali", () => {
     const result = await findCompanySuggestions(vat); expect(result.data).toHaveLength(1); expect(result.data?.[0]?.fields.name).toBe("Studio A"); expect(mocks.fetch).not.toHaveBeenCalled();
   });
 });
+describe("conservazione e collegamenti delle note vocali", () => {
+  it("rinomina e ricollega senza alterare audio e trascrizione, con permessi e organizzazione correnti", async () => {
+    await upload(); const id = "cbf124a9-2219-45e3-9835-4876b75c41b1";
+    await saveVoiceTranscript(id, "Testo conservato");
+    const before = await db.voiceNote.findUniqueOrThrow({ where: { id } });
+    expect((await updateVoiceNoteDetails({ id, title: "Titolo corretto", kind: "contact", targetId: "features-contact" })).ok).toBe(true);
+    const after = await db.voiceNote.findUniqueOrThrow({ where: { id } });
+    expect(after.contactId).toBe("features-contact"); expect(after.dealId).toBeNull(); expect(after.audio).toEqual(before.audio); expect(after.transcript).toBe(before.transcript);
+    expect((await listVoiceNotes()).data?.[0]?.targetName).toBe("Rossi");
+    expect((await updateVoiceNoteDetails({ id, title: "Non applicare", kind: "contact", targetId: "missing-or-foreign" })).error).toBeTruthy();
+    mocks.auth.mockResolvedValue({ user: { id: "features-sales", organizationId: orgId, role: "SALES" } });
+    expect((await updateVoiceNoteDetails({ id, title: "Non consentito", kind: "none", targetId: "" })).error).toBeTruthy();
+    expect((await db.voiceNote.findUniqueOrThrow({ where: { id } })).title).toBe("Titolo corretto");
+  });
+  it("trasferisce la nota al contatto principale durante un’unione", async () => {
+    const id = "cbf124a9-2219-45e3-9835-4876b75c41b1";
+    await db.contact.create({ data: { id: "features-duplicate", firstName: "Duplicato", organizationId: orgId, ownerId: userId } });
+    await upload(id, "features-duplicate", "contact");
+    await crmTransaction(tx => mergeContactRecords(tx, orgId, userId, "features-contact", "features-duplicate", {}));
+    expect(await db.contact.findUnique({ where: { id: "features-duplicate" } })).toBeNull();
+    expect((await db.voiceNote.findUniqueOrThrow({ where: { id } })).contactId).toBe("features-contact");
+    expect((await listVoiceNotes()).data?.[0]?.targetName).toBe("Rossi");
+  });
+  it("conserva la registrazione se il contatto viene eliminato e rifiuta riferimenti inesistenti", async () => {
+    const id = "cbf124a9-2219-45e3-9835-4876b75c41b1";
+    await upload(id, "features-contact", "contact");
+    await db.contact.delete({ where: { id: "features-contact" } });
+    const note = await db.voiceNote.findUniqueOrThrow({ where: { id } });
+    expect(note.contactId).toBeNull(); expect(note.audio.byteLength).toBeGreaterThan(0);
+    await expect(db.$transaction(tx => tx.voiceNote.update({ where: { id }, data: { contactId: "does-not-exist" } }))).rejects.toThrow();
+  });
+  it("non propone comandi sull’affare eliminato e conserva l’audio anche dopo rimozione definitiva", async () => {
+    await upload(); const id = "cbf124a9-2219-45e3-9835-4876b75c41b1";
+    await db.deal.update({ where: { id: "features-deal" }, data: { status: "DELETED" } });
+    expect((await listVoiceNotes()).data?.[0]?.dealId).toBeNull();
+    expect((await updateVoiceNoteDetails({ id, title: "Nota", kind: "deal", targetId: "features-deal" })).error).toBeTruthy();
+    await db.deal.delete({ where: { id: "features-deal" } });
+    expect((await db.voiceNote.findUniqueOrThrow({ where: { id } })).dealId).toBeNull();
+  });
+});
+
 describe("fatturazione Fatture in Cloud", () => {
   it("confronta i totali prima della creazione e invia soltanto dopo un secondo comando", async () => {
     const preview = await preparedExport(); expect(mocks.fetch.mock.calls.some(([url]) => String(url).endsWith("/e_invoice/send"))).toBe(false);

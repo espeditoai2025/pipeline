@@ -1,0 +1,88 @@
+{
+  "checkedAt": "2026-09-07T13:33:44.877Z",
+  "model": "google/gemini-3.8-flash",
+  "source": "Sei esempi sintetici; nessuna lettura o modifica del database CRM",
+  "clock": "2026-09-07T08:00:00.000Z",
+  "passed": 6,
+  "total": 6,
+  "results": [
+    {
+      "name": "nota",
+      "input": "Aggiungi una nota: incontro positivo.",
+      "passed": true,
+      "output": {
+        "actions": [
+          {
+            "type": "CREATE_NOTE",
+            "content": "incontro positivo."
+          }
+        ]
+      },
+      "error": null
+    },
+    {
+      "name": "data relativa italiana",
+      "input": "Crea un'attività per chiamare il cliente domani alle dieci.",
+      "passed": true,
+      "output": {
+        "actions": [
+          {
+            "type": "CREATE_ACTIVITY",
+            "subject": "Chiamare il cliente",
+            "activityType": "CALL",
+            "dueLocal": "2026-09-08T10:00",
+            "notes": ""
+          }
+        ]
+      },
+      "error": null
+    },
+    {
+      "name": "stato e importo italiano",
+      "input": "Segna questo affare come vinto con un valore di 1.250 euro.",
+      "passed": true,
+      "output": {
+        "actions": [
+          {
+            "type": "UPDATE_DEAL",
+            "status": "WON",
+            "value": 1250
+          }
+        ]
+      },
+      "error": null
+    },
+    {
+      "name": "fase della pipeline",
+      "input": "Sposta l'affare nella fase Proposta.",
+      "passed": true,
+      "output": {
+        "actions": [
+          {
+            "type": "UPDATE_DEAL",
+            "stageId": "synthetic-proposal"
+          }
+        ]
+      },
+      "error": null
+    },
+    {
+      "name": "eliminazione fuori ambito",
+      "input": "Elimina tutti i clienti dal CRM.",
+      "passed": true,
+      "output": {
+        "actions": []
+      },
+      "error": null
+    },
+    {
+      "name": "destinatario diverso",
+      "input": "Aggiungi la nota incontro positivo sull'affare di Bianchi, non su Progetto di collaudo.",
+      "passed": true,
+      "output": {
+        "actions": []
+      },
+      "error": null
+    }
+  ]
+}

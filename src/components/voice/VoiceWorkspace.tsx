@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Mic, Square, Loader2 } from "lucide-react";
-import { listVoiceNotes, saveVoiceTranscript, deleteVoiceNote, searchVoiceTargets } from "@/server/actions/voice";
+import { listVoiceNotes, saveVoiceTranscript, deleteVoiceNote, searchVoiceTargets, updateVoiceNoteDetails } from "@/server/actions/voice";
 import { prepareCrmCommand, executeCrmCommand } from "@/server/actions/crm-commands";
 import { MAX_VOICE_SECONDS, MAX_VOICE_BYTES, type VoiceNoteSummary } from "@/lib/voice";
 import type { CrmCommandPreview } from "@/lib/crm-command-schema";
@@ -12,10 +12,12 @@ type Target = { id: string; kind: "deal" | "contact"; name: string };
 const inputClass = "w-full rounded-lg border border-[var(--crm-neutral-200)] bg-transparent p-3 text-sm";
 const buttonClass = "rounded-lg border border-[var(--crm-neutral-200)] px-3 py-2 text-sm disabled:opacity-50";
 
-function SavedNote({ note, canEdit, ai, onRefresh, onCommand, onError }: { note: VoiceNoteSummary; canEdit: boolean; ai: boolean; onRefresh: () => void; onCommand: (text: string, target: Target | null) => void; onError: (error: string) => void }) {
+function SavedNote({ note, selectedTarget, canEdit, ai, onRefresh, onCommand, onError }: { note: VoiceNoteSummary; selectedTarget: Target | null; canEdit: boolean; ai: boolean; onRefresh: () => void; onCommand: (text: string, target: Target | null) => void; onError: (error: string) => void }) {
   const [text, setText] = useState(note.transcript);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(note.title);
+  const [linkChoice, setLinkChoice] = useState("current");
   async function run(operation: () => Promise<{ error?: string }>) {
     if (busy) return; setBusy(true);
     try { const result = await operation(); if (result.error) onError(result.error); else onRefresh(); }
@@ -31,9 +33,25 @@ function SavedNote({ note, canEdit, ai, onRefresh, onCommand, onError }: { note:
     {canEdit && <div className="flex flex-wrap gap-2">
       {ai && !note.transcript && <button className={buttonClass} disabled={busy} onClick={() => run(async () => { const response = await fetch("/api/voice/" + note.id + "/transcribe", { method: "POST" }); const result = await response.json(); if (result.text) setText(result.text); return result; })}>{busy ? "Elaborazione…" : "Trascrivi con AI"}</button>}
       <button className={buttonClass} disabled={busy || text === note.transcript} onClick={() => run(() => saveVoiceTranscript(note.id, text))}>Salva testo</button>
-      {ai && <button className={buttonClass} disabled={busy || !text.trim()} onClick={() => onCommand(text, note.dealId ? { id: note.dealId, kind: "deal", name: "Affare della nota: " + note.title } : note.contactId ? { id: note.contactId, kind: "contact", name: "Contatto della nota: " + note.title } : null)}>Usa come comando</button>}
+      {ai && <button className={buttonClass} disabled={busy || !text.trim()} onClick={() => onCommand(text, note.dealId ? { id: note.dealId, kind: "deal", name: note.targetName ?? "Affare della nota: " + note.title } : note.contactId ? { id: note.contactId, kind: "contact", name: note.targetName ?? "Contatto della nota: " + note.title } : null)}>Usa come comando</button>}
       <button className={buttonClass} disabled={busy} onClick={() => setDeleting(true)}>Elimina nota</button>
     </div>}
+    {canEdit && <details className="rounded-lg border border-[var(--crm-neutral-200)] p-3 text-sm">
+      <summary className="cursor-pointer">Modifica titolo e collegamento</summary>
+      <form className="mt-3 space-y-3" onSubmit={event => { event.preventDefault(); void run(() => {
+        const linked = linkChoice === "selected" ? selectedTarget : linkChoice === "none" ? null : note.dealId ? { kind: "deal" as const, id: note.dealId } : note.contactId ? { kind: "contact" as const, id: note.contactId } : null;
+        return updateVoiceNoteDetails({ id: note.id, title: editedTitle, kind: linked?.kind ?? "none", targetId: linked?.id ?? "" });
+      }); }}>
+        <label className="block space-y-1">Titolo della nota<input className={inputClass} required maxLength={200} value={editedTitle} disabled={busy} onChange={event => setEditedTitle(event.target.value)} /></label>
+        <label className="block space-y-1">Collegamento della nota<select aria-label="Collegamento della nota" className={inputClass} value={linkChoice} disabled={busy} onChange={event => setLinkChoice(event.target.value)}>
+          <option value="current">Mantieni: {note.targetName ?? (note.dealId ? "affare attuale" : note.contactId ? "contatto attuale" : "nessuno")}</option>
+          <option value="none">Nessun collegamento</option>
+          {selectedTarget && <option value="selected">Collega a {selectedTarget.name}</option>}
+        </select></label>
+        <p className="text-xs">Per scegliere un altro destinatario, usa la ricerca record in questa pagina. La registrazione e il testo vengono conservati.</p>
+        <button className={buttonClass} disabled={busy || !editedTitle.trim() || (linkChoice === "selected" && !selectedTarget)}>Salva titolo e collegamento</button>
+      </form>
+    </details>}
     {deleting && <div className="rounded-lg border border-rose-300 p-3 text-sm"><p>Eliminare questa registrazione e la sua trascrizione?</p><div className="mt-2 flex gap-2"><button disabled={busy} className={buttonClass} onClick={() => run(() => deleteVoiceNote(note.id))}>Conferma eliminazione</button><button disabled={busy} className={buttonClass} onClick={() => setDeleting(false)}>Annulla</button></div></div>}
   </article>;
 }
@@ -141,7 +159,7 @@ export function VoiceWorkspace({ initialNotes, initialTarget = null, canWrite, c
     </section>}
     <section className="space-y-3"><div className="flex justify-between"><h2 className="font-semibold">Note salvate</h2><button className={buttonClass} onClick={() => refresh().catch(() => setError("Aggiornamento non riuscito"))}>Aggiorna elenco</button></div>
       {!notes.length && <p className="rounded-xl border p-8 text-center text-sm">Nessuna nota vocale salvata.</p>}
-      {notes.map(note => <SavedNote key={note.id + note.transcript} note={note} canEdit={canWrite && (canManage || note.authorId === userId)} ai={ai} onRefresh={() => { void refresh(); }} onError={setError} onCommand={(text, linked) => { setCommand(text.slice(0, 6000)); setPreview(null); if (linked) setTarget(linked); commandPanel.current?.scrollIntoView({ behavior: "smooth" }); }} />)}
+      {notes.map(note => <SavedNote key={[note.id, note.title, note.transcript, note.dealId, note.contactId].join(":")} note={note} selectedTarget={target} canEdit={canWrite && (canManage || note.authorId === userId)} ai={ai} onRefresh={() => { void refresh(); }} onError={setError} onCommand={(text, linked) => { setCommand(text.slice(0, 6000)); setPreview(null); setTarget(linked); commandPanel.current?.scrollIntoView({ behavior: "smooth" }); }} />)}
     </section>
   </div>;
 }

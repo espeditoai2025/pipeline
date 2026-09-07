@@ -7,6 +7,7 @@ export const voiceMimeTypes: Record<string, string> = {
 export type VoiceNoteSummary = {
   id: string; title: string; mimeType: string; duration: number; transcript: string;
   dealId: string | null; contactId: string | null; authorId: string; createdAt: string;
+  targetName?: string | null;
 };
 export function matchesAudioSignature(bytes: Uint8Array, mime: string) {
   const ascii = (start: number, length: number) => String.fromCharCode(...bytes.slice(start, start + length));

@@ -1,8 +1,10 @@
 # Pipely — note vocali, comandi, fatturazione e dati aziendali
 
-**Data: 7 settembre 2026. Stato: implementazione locale; rilascio e attivazione Fatture in Cloud da eseguire.**
+**Data: 7 settembre 2026. Prima versione pubblicata; Fatture in Cloud in attesa di attivazione OAuth.**
 
-Questa sessione segue il rilascio documentato in [RILASCIO-CRM-2026-09-07.md](RILASCIO-CRM-2026-09-07.md). Parte dal commit `431e3560819a6d200d7d3d42ef205905e62eb4d8`. Le nuove modifiche non sono state committate, pubblicate o applicate al database di produzione. La migrazione è stata provata su PostgreSQL 17 temporaneo in Docker; relazioni e indici sono stati confrontati con la SQL canonica Prisma. Il container e i suoi volumi di prova sono stati rimossi a collaudo concluso. Nessun dato CRM reale è stato modificato e nessuna fattura è stata inviata.
+Aggiornamenti e prosecuzione: [RILASCIO-VOCE-FATTURE-2026-09-07.md](RILASCIO-VOCE-FATTURE-2026-09-07.md). Il resto del documento conserva il dettaglio della prima implementazione.
+
+Questa sessione segue il rilascio documentato in [RILASCIO-CRM-2026-09-07.md](RILASCIO-CRM-2026-09-07.md). Parte dal commit `431e3560819a6d200d7d3d42ef205905e62eb4d8`. Al termine della prima implementazione le modifiche erano locali; su successiva autorizzazione sono state pubblicate nei commit `2ee140c` e `d2db6f5`, con la decima migrazione applicata in produzione. La migrazione è stata provata su PostgreSQL 17 temporaneo in Docker; relazioni e indici sono stati confrontati con la SQL canonica Prisma. Il container e i suoi volumi di prova sono stati rimossi a collaudo concluso. Nessun dato CRM reale è stato modificato e nessuna fattura è stata inviata.
 
 ## Funzioni implementate
 
@@ -63,7 +65,7 @@ Aggiornati gli elenchi condivisi delle caratteristiche dei piani. La prima versi
 | Build Next.js | Completata, comprese le nuove pagine e API |
 | Trascrizione effettiva tramite OpenRouter | Superata con audio sintetico italiano, senza dati personali |
 | OAuth / creazione / invio su Fatture in Cloud reale | Non eseguiti: app e credenziali mancanti |
-| Pubblicazione e migrazione di produzione | Non eseguite in questa sessione |
+| Pubblicazione e migrazione di produzione | Completate nella successiva fase di rilascio, descritta nel rapporto collegato sopra |
 
 La prova reale di trascrizione ha restituito **“Richiama il cliente domani alle 10.00.”** dall’audio sintetico **“Richiama il cliente domani alle dieci.”** (134.504 byte), usando `openai/whisper-large-v3`. Evidenza in [FUNZIONALITA-2026-09-07-trascrizione.json](FUNZIONALITA-2026-09-07-trascrizione.json). L’interpretazione dei comandi nei test usa risposte AI simulate; la transazione CRM e il database sono reali nel collaudo Docker. L’accuratezza linguistica dei comandi reali va misurata prima di promettere comprensione generale.
 
@@ -86,7 +88,7 @@ Per Docker, `PIPELY_TEST_DATABASE_URL` deve puntare soltanto a `127.0.0.1` e al 
 ## Da fare
 
 1. Creare l’app OAuth di Pipely, configurare i segreti server e collaudare collegamento, rinnovo e documenti nel sistema del fornitore; richiedere poi l’abilitazione pubblica.
-2. Rilasciare il codice e applicare la decima migrazione secondo il processo di backup e rilascio già usato. Questa fase non è stata eseguita.
+2. Rilasciare il codice e applicare la decima migrazione secondo il processo di backup e rilascio già usato. Completato nella successiva fase di rilascio.
 3. Estendere il modello fiscale per forfettari, natura IVA, bollo, casse e ritenute prima di offrire la fatturazione a tutti i liberi professionisti. Seguono PA, estero, note di credito, incassi e sincronizzazione delle variazioni effettuate nel gestionale.
 4. Collaudare microfono fisico, Safari/iOS, accenti, rumore, date relative e comandi reali; monitorare costo e tasso di errore prima di ampliare le quote.
 5. Definire conservazione/pulizia di anteprime e contatori AI, gestione delle note dopo eliminazione/fusione dei record collegati e crescita dello spazio audio. Gli ID del collegamento vocale sono validati nell’applicazione ma non hanno ancora relazioni FK verso contatti/affari.

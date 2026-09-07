@@ -1,6 +1,6 @@
 # Fatture in Cloud — attivazione per Pipely
 
-Aggiornato il 7 settembre 2026. Il connettore è implementato nel codice locale; l’app OAuth non è stata ancora creata e non sono presenti le sue credenziali. Nessuna fattura reale è stata creata o inviata durante lo sviluppo.
+Aggiornato il 7 settembre 2026. Il connettore è stato pubblicato su Pipely; l’app OAuth non è stata ancora creata e non sono presenti le sue credenziali. Nessuna fattura reale è stata creata o inviata durante lo sviluppo.
 
 ## 1. Creare l’app di Pipely
 
@@ -29,7 +29,7 @@ Il codice usa AES-256-GCM per i token, con vincolo all’organizzazione. Se la c
 
 I permessi richiesti dal codice sono `issued_documents.invoices:a settings:r`: gestione delle fatture e lettura delle impostazioni necessarie. Le credenziali e i token non sono restituiti dalle azioni all’interfaccia.
 
-Prima di aprire le nuove pagine sull’ambiente di destinazione, applicare la migrazione `20260907120000_voice_and_invoicing` con `prisma migrate deploy` secondo la procedura di rilascio del progetto, poi pubblicare la build con la configurazione impostata. **Questi passaggi non sono stati eseguiti in produzione in questa sessione.** Non usare `db push` o reset sul database di produzione.
+Prima di aprire le nuove pagine sull’ambiente di destinazione, applicare la migrazione `20260907120000_voice_and_invoicing` con `prisma migrate deploy` secondo la procedura di rilascio del progetto, poi pubblicare la build con la configurazione impostata. **La migrazione e la pubblicazione del codice sono state eseguite; restano da configurare le credenziali OAuth.** Non usare `db push` o reset sul database di produzione.
 
 ## 3. Collegare e collaudare
 
