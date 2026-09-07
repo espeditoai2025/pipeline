@@ -1,0 +1,40 @@
+import { db } from "@/lib/db";
+import type { Prisma } from "@/generated/prisma/client";
+import { checkContactLimit, checkPipelineLimit } from "@/lib/plan";
+
+export class CrmError extends Error {}
+
+/** Count, validate and write within one serializable transaction; retry serialization conflicts. */
+export async function crmTransaction<T>(
+  work: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await db.$transaction(work, { isolationLevel: "Serializable", timeout: 30000 });
+    } catch (error) {
+      if (attempt < 2 && (error as { code?: string })?.code === "P2034") continue;
+      throw error;
+    }
+  }
+}
+
+export async function assertContactCapacity(
+  tx: Prisma.TransactionClient,
+  orgId: string,
+  adding = 1,
+) {
+  const org = await tx.organization.findUnique({ where: { id: orgId }, select: { plan: true } });
+  if (!org) throw new CrmError("Organizzazione non disponibile");
+  const count = await tx.contact.count({ where: { organizationId: orgId } });
+  const error = checkContactLimit(org.plan, count, adding);
+  if (error) throw new CrmError(error);
+}
+
+export async function assertPipelineCapacity(tx: Prisma.TransactionClient, orgId: string) {
+  const org = await tx.organization.findUnique({ where: { id: orgId }, select: { plan: true } });
+  if (!org) throw new CrmError("Organizzazione non disponibile");
+  const count = await tx.pipeline.count({ where: { organizationId: orgId } });
+  const error = checkPipelineLimit(org.plan, count);
+  if (error) throw new CrmError(error);
+  return count;
+}

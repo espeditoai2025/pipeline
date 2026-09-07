@@ -82,7 +82,7 @@ const FEATURE_LABELS: Record<FeatureKey, string> = {
 export function checkFeature(plan: Plan | string, feature: FeatureKey): string | null {
   const limits = getLimits(plan);
   const value = limits[feature];
-  const allowed = typeof value === "boolean" ? value : value !== null;
+  const allowed = typeof value === "boolean" ? value : value === null || value > 0;
   if (allowed) return null;
   return `${FEATURE_LABELS[feature]} è disponibile dal piano Pro.`;
 }

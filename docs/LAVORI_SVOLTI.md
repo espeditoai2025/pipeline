@@ -1,6 +1,18 @@
 # Pipely — Lavori Svolti
 
-> Ultimo aggiornamento del registro: 2026-09-06. Le sezioni di maggio sotto sono conservate come storico.
+> Ultimo aggiornamento del registro: 2026-09-07. Le sezioni precedenti sono conservate come storico.
+
+## Sessione del 2026-09-07 — Correzioni della revisione
+
+Su richiesta «correggi», implementati controlli dei ruoli attuali, riferimenti limitati all’organizzazione, quote transazionali e coerenza dei piani; riscritti coda e worker delle automazioni; completati builder, registro e ripresa; corretti Stripe, API lead, toggle prodotti, report e promesse della home. Aggiunta migrazione additiva collaudata su PostgreSQL temporaneo. Dettaglio, prove riproducibili, limiti del collaudo, passi di rilascio e file modificati in [CORREZIONI-CRM-2026-09-07.md](CORREZIONI-CRM-2026-09-07.md). Verifiche: 156 test unitari, 27 di integrazione e 28 UI superati; TypeScript, lint, schema Prisma e build locale completati senza errori. Non sono stati eseguiti deploy, migrazioni di produzione o invii reali in questa sessione di correzione.
+
+## Sessione del 2026-09-07 — Audit iniziale di codice, home, piani e automazioni (storico)
+
+Revisione dettagliata in [REVISIONE-CODICE-HOME-PIANI-2026-09-07.md](REVISIONE-CODICE-HOME-PIANI-2026-09-07.md): confronto tra promesse della home, funzioni implementate e controlli dei piani. Analizzati builder, motore, eventi, coda e cron delle automazioni, insieme a billing/Stripe, permessi, riferimenti tra organizzazioni, mail, conversioni, report e catalogo.
+
+Esito: motore reale ma incompleto e con difetti di affidabilità; quote e downgrade non rispettati in tutti i percorsi; tracking universale, report personalizzati e SSO/SAML non disponibili come pubblicizzati. Query aggregate con TLS verificato e transazione READ ONLY: 1 workflow disattivato, nessuna esecuzione e nessun job in coda; nessun SMTP o abbonamento Stripe collegato. Non sono state inviate email, attivate automazioni o effettuati pagamenti.
+
+Verifiche: 139 test ordinari superati, TypeScript ed ESLint; home osservata in browser desktop e a 390 px. Aggiunta suite separata `tests/audit/crm-review.test.ts`: **21 prove, 4 superate e 17 fallite**, con servizi simulati; i fallimenti documentavano i difetti aperti alla fine dell’audit, poi trattati nella sessione di correzione. Risultato in `AUDIT-2026-09-07-tests.json`; comando e inventario file nel rapporto. Aggiunto script ripetibile di soli conteggi DB. Nessuna correzione applicativa, migrazione o pubblicazione in questa sessione.
 
 ## Sessione del 2026-09-06 — Posta ed email marketing
 

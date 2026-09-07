@@ -4,10 +4,12 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
+import { crmPermissionError } from "@/lib/crm-permissions";
 import { db } from "@/lib/db";
 import { getOrgPlan, getLimits } from "@/lib/plan";
 import { sendOrgMail } from "@/lib/mailer";
 import { logger } from "@/lib/logger";
+import { validateCrmReferences } from "@/lib/crm-references";
 import type { EmailMessage, EmailTemplate } from "@/types/emails";
 
 function getOrgId(s: Session | null) {
@@ -89,11 +91,11 @@ export async function getEmails(): Promise<EmailMessage[]> {
     where: { organizationId: orgId },
     orderBy: { createdAt: "desc" },
     take: 200,
-    include: { deal: { select: { title: true } }, contact: { select: { firstName: true, lastName: true } } },
+    include: { deal: { select: { title: true, organizationId: true } }, contact: { select: { firstName: true, lastName: true, organizationId: true } } },
   });
 
   return rows.map((r) =>
-    mapEmail(r, r.deal?.title, r.contact ? `${r.contact.firstName} ${r.contact.lastName ?? ""}`.trim() : null)
+    mapEmail({ ...r, dealId: r.deal?.organizationId === orgId ? r.dealId : null, contactId: r.contact?.organizationId === orgId ? r.contactId : null }, r.deal?.organizationId === orgId ? r.deal.title : null, r.contact?.organizationId === orgId ? `${r.contact.firstName} ${r.contact.lastName ?? ""}`.trim() : null)
   );
 }
 
@@ -123,12 +125,14 @@ export async function getTemplates(): Promise<EmailTemplate[]> {
 export async function sendEmail(input: z.infer<typeof composeSchema>): Promise<{ data: EmailMessage | null; error: string | null }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!session || !orgId) return { data: null, error: "Non autorizzato" };
+  if ((!session || !orgId) || (await crmPermissionError(session, "write"))) return { data: null, error: "Non autorizzato" };
 
   const parsed = composeSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
 
   const { to, cc, subject, body, dealId, contactId } = parsed.data;
+  const referenceError = await validateCrmReferences(orgId, { dealId, contactId });
+  if (referenceError) return { data: null, error: referenceError };
   const fromAddress = session.user?.email ?? "noreply@pipely.app";
   const fromName = session.user?.name ?? "Pipely CRM";
   const threadId = `thread-${Date.now()}`;
@@ -177,12 +181,14 @@ export async function sendEmail(input: z.infer<typeof composeSchema>): Promise<{
 export async function saveDraft(input: z.infer<typeof composeSchema>): Promise<{ data: EmailMessage | null; error: string | null }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!session || !orgId) return { data: null, error: "Non autorizzato" };
+  if ((!session || !orgId) || (await crmPermissionError(session, "write"))) return { data: null, error: "Non autorizzato" };
 
   const parsed = composeSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
 
   const { to, cc, subject, body, dealId, contactId } = parsed.data;
+  const referenceError = await validateCrmReferences(orgId, { dealId, contactId });
+  if (referenceError) return { data: null, error: referenceError };
 
   const row = await db.email.create({
     data: {
@@ -208,7 +214,7 @@ export async function saveDraft(input: z.infer<typeof composeSchema>): Promise<{
 export async function createTemplate(input: z.infer<typeof templateSchema>): Promise<{ data: EmailTemplate | null; error: string | null }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!session || !orgId) return { data: null, error: "Non autorizzato" };
+  if ((!session || !orgId) || (await crmPermissionError(session, "write"))) return { data: null, error: "Non autorizzato" };
 
   const parsed = templateSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
@@ -224,7 +230,7 @@ export async function createTemplate(input: z.infer<typeof templateSchema>): Pro
 export async function updateTemplate(input: z.infer<typeof templateSchema> & { id: string }): Promise<{ data: EmailTemplate | null; error: string | null }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!session || !orgId) return { data: null, error: "Non autorizzato" };
+  if ((!session || !orgId) || (await crmPermissionError(session, "write"))) return { data: null, error: "Non autorizzato" };
 
   const parsed = templateSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
@@ -241,7 +247,7 @@ export async function updateTemplate(input: z.infer<typeof templateSchema> & { i
 export async function deleteTemplate(id: string): Promise<{ error: string | null }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   await db.emailTemplate.delete({ where: { id, organizationId: orgId } });
   revalidatePath("/emails");
@@ -251,7 +257,7 @@ export async function deleteTemplate(id: string): Promise<{ error: string | null
 export async function incrementTemplateUsage(id: string): Promise<void> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return;
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return;
   await db.emailTemplate.update({
     where: { id, organizationId: orgId },
     data: { usageCount: { increment: 1 } },

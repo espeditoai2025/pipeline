@@ -7,11 +7,13 @@ import { validateCrmReferences } from "@/lib/crm-references";
 import { mergeContactRecords, mergeContactSchema, type MergeContactOverrides } from "@/lib/merge-contacts";
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
+import { crmPermissionError } from "@/lib/crm-permissions";
 import { db } from "@/lib/db";
 import type { Contact, Company } from "@/types/contacts";
-import { getOrgPlan, checkContactLimit } from "@/lib/plan";
-import { runWorkflows } from "@/lib/workflow-engine";
-import { dispatchWebhook } from "@/server/actions/webhooks";
+import { enqueueWorkflows, enqueueImportedRecords } from "@/lib/workflow-events";
+import { wakeWorkflows } from "@/lib/workflow-wake";
+import { crmTransaction, assertContactCapacity } from "@/lib/crm-transaction";
+import { dispatchWebhook } from "@/lib/webhook-delivery";
 
 function getOrgId(s: Session | null) {
   return (s?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
@@ -231,7 +233,7 @@ export async function createContactNote(contactId: string, content: string): Pro
   const session = await auth();
   const orgId = getOrgId(session);
   const userId = (session?.user as { id?: string } | undefined)?.id;
-  if (!orgId || !userId) return { error: "Non autorizzato" };
+  if ((!orgId || !userId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   if (!content.trim()) return { error: "Il contenuto della nota non può essere vuoto" };
 
@@ -271,20 +273,17 @@ const companySchema = z.object({
 export async function createContact(input: z.infer<typeof contactSchema>): Promise<{ data: Contact | null; error: string | null }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!session || !orgId) return { data: null, error: "Non autorizzato" };
+  if ((!session || !orgId) || (await crmPermissionError(session, "write"))) return { data: null, error: "Non autorizzato" };
 
   const parsed = contactSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
 
-  const plan = await getOrgPlan(orgId);
-  const currentCount = await db.contact.count({ where: { organizationId: orgId } });
-  const limitError = checkContactLimit(plan, currentCount);
-  if (limitError) return { data: null, error: limitError };
-
   try {
     const referenceError = await validateCrmReferences(orgId, parsed.data);
     if (referenceError) return { data: null, error: referenceError };
-    const row = await db.contact.create({
+    const row = await crmTransaction(async tx => {
+    await assertContactCapacity(tx, orgId);
+    const row = await tx.contact.create({
       data: {
         firstName: parsed.data.firstName,
         lastName: parsed.data.lastName || null,
@@ -301,14 +300,17 @@ export async function createContact(input: z.infer<typeof contactSchema>): Promi
       },
     });
 
-    revalidatePath("/contacts");
-    runWorkflows({
+    await enqueueWorkflows(tx, {
       trigger: "CONTACT_CREATED",
       orgId, contactId: row.id,
       contactName: `${row.firstName} ${row.lastName ?? ""}`.trim(),
       contactEmail: row.email ?? undefined,
       ownerId: row.ownerId,
-    }).catch(console.error);
+    }, `created:${row.id}`);
+    return row;
+    });
+    revalidatePath("/contacts");
+    wakeWorkflows(orgId);
     dispatchWebhook(orgId, "contact.created", { id: row.id, firstName: row.firstName, lastName: row.lastName, email: row.email }).catch(() => {});
     return {
       data: {
@@ -337,7 +339,7 @@ export async function createContact(input: z.infer<typeof contactSchema>): Promi
 export async function updateContact(input: z.infer<typeof contactSchema> & { id: string }): Promise<{ data: Contact | null; error: string | null }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!session || !orgId) return { data: null, error: "Non autorizzato" };
+  if ((!session || !orgId) || (await crmPermissionError(session, "write"))) return { data: null, error: "Non autorizzato" };
 
   const parsed = contactSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
@@ -391,7 +393,7 @@ export async function updateContact(input: z.infer<typeof contactSchema> & { id:
 export async function deleteContact(id: string): Promise<{ error: string | null }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   try {
     await db.contact.delete({ where: { id, organizationId: orgId } });
@@ -410,7 +412,7 @@ export async function mergeContacts(
 ): Promise<{ error: string | null }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId || !session?.user?.id) return { error: "Non autorizzato" };
+  if ((!orgId || !session?.user?.id) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
   if (!primaryId || !duplicateId) return { error: "Contatto non valido" };
   if (primaryId === duplicateId) return { error: "Non puoi unire un contatto con se stesso" };
   const parsed = mergeContactSchema.safeParse(overrides);
@@ -440,7 +442,7 @@ export async function mergeContacts(
 export async function importContacts(rows: ContactImportRow[]): Promise<{ imported: number; duplicates: number; companies?: number; error: string | null }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!session?.user?.id || !orgId) return { imported: 0, duplicates: 0, error: "Non autorizzato" };
+  if ((!session?.user?.id || !orgId) || (await crmPermissionError(session, "write"))) return { imported: 0, duplicates: 0, error: "Non autorizzato" };
   const parsed = contactImportSchema.safeParse(rows);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
@@ -449,13 +451,11 @@ export async function importContacts(rows: ContactImportRow[]): Promise<{ import
   }
 
   try {
-    const plan = await getOrgPlan(orgId);
-    const result = await db.$transaction(async (tx) => {
+    const result = await crmTransaction(async (tx) => {
       const existing = await tx.contact.findMany({ where: { organizationId: orgId }, select: { email: true } });
       const { contacts, duplicates } = deduplicateContactImport(parsed.data, existing.map((contact) => contact.email));
       if (!contacts.length) return { imported: 0, duplicates, companies: 0 };
-      const limitError = checkContactLimit(plan, existing.length, contacts.length);
-      if (limitError) throw new Error(limitError);
+      await assertContactCapacity(tx, orgId, contacts.length);
 
       const names = [...new Set(contacts.map((row) => row.companyName).filter((name): name is string => !!name))];
       const companies = names.length ? await tx.company.findMany({
@@ -475,14 +475,16 @@ export async function importContacts(rows: ContactImportRow[]): Promise<{ import
           cache.set(key, company.id);
         }
       }
-      await tx.contact.createMany({ data: contacts.map((row) => ({
+      const created = await tx.contact.createManyAndReturn({ data: contacts.map((row) => ({
         firstName: row.firstName, lastName: row.lastName || null, email: row.email || null,
         phone: row.phone || null, jobTitle: row.jobTitle || null,
         companyId: row.companyName ? cache.get(row.companyName.toLowerCase())! : null,
         organizationId: orgId, ownerId: session.user!.id!,
       })) });
+      await enqueueImportedRecords(tx, orgId, created.map(row => ({ trigger: "CONTACT_CREATED", orgId, contactId: row.id, contactName: row.firstName, contactEmail: row.email ?? undefined, ownerId: row.ownerId })));
       return { imported: contacts.length, duplicates, companies: cache.size };
-    }, { isolationLevel: "Serializable", timeout: 30_000 });
+    });
+    wakeWorkflows(orgId);
     revalidatePath("/contacts");
     revalidatePath("/companies");
     revalidatePath("/dashboard");
@@ -500,7 +502,7 @@ export async function importContacts(rows: ContactImportRow[]): Promise<{ import
 export async function createCompany(input: z.infer<typeof companySchema>): Promise<{ data: Company | null; error: string | null }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!session || !orgId) return { data: null, error: "Non autorizzato" };
+  if ((!session || !orgId) || (await crmPermissionError(session, "write"))) return { data: null, error: "Non autorizzato" };
 
   const parsed = companySchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
@@ -564,7 +566,7 @@ export async function createCompany(input: z.infer<typeof companySchema>): Promi
 export async function updateCompany(input: z.infer<typeof companySchema> & { id: string }): Promise<{ data: Company | null; error: string | null }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!session || !orgId) return { data: null, error: "Non autorizzato" };
+  if ((!session || !orgId) || (await crmPermissionError(session, "write"))) return { data: null, error: "Non autorizzato" };
 
   const parsed = companySchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
@@ -629,7 +631,7 @@ export async function updateCompany(input: z.infer<typeof companySchema> & { id:
 export async function deleteCompany(id: string): Promise<{ error: string | null }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   try {
     await db.company.delete({ where: { id, organizationId: orgId } });

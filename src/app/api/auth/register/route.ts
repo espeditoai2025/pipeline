@@ -41,6 +41,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Invito non valido o scaduto" }, { status: 400 });
       }
 
+      if (!["ADMIN", "MANAGER", "SALES", "VIEWER"].includes(invitation.role)) {
+        return NextResponse.json({ error: "Ruolo invito non consentito. Richiedi un nuovo invito." }, { status: 400 });
+      }
+
       const normalizedEmail = email.trim().toLowerCase();
       if (invitation.email !== normalizedEmail) {
         return NextResponse.json({ error: "Questo invito è stato inviato a un'altra email" }, { status: 400 });

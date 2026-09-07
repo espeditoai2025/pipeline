@@ -4,7 +4,7 @@
  * Protected by CRON_SECRET (fail-closed). Schedule in vercel.json.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { processWebhookRetries } from "@/server/actions/webhooks";
+import { processWebhookRetries } from "@/lib/webhook-delivery";
 import { processDueCampaigns } from "@/lib/campaign-sender";
 import { logger } from "@/lib/logger";
 

@@ -591,7 +591,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     articles: [
       { id: "em1", title: "Configurare il tuo account email (SMTP wizard)", excerpt: "Usa il wizard in Impostazioni → Email per collegare Gmail, Aruba, Libero o un provider SMTP custom in pochi clic.", readTime: 5, popular: true, blocks: [
         { type: "heading", text: "Perché configurare l'SMTP" },
-        { type: "para", text: "Senza SMTP configurato, le email create in Pipely vengono registrate nel CRM ma non recapitate realmente. Con SMTP attivo ogni email parte dalla tua casella di posta." },
+        { type: "para", text: "Le email possono partire dal provider della piattaforma. Con un SMTP verificato e un piano Pro o Enterprise partono dalla tua casella. Un rifiuto del provider viene mostrato come errore. Dopo un downgrade, rimuovi la configurazione SMTP oppure riattiva Pro per riprendere gli invii." },
         { type: "heading", text: "Provider supportati" },
         { type: "list", items: [
           "Gmail — email Google con App Password dedicata",
@@ -797,7 +797,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       { id: "ca6", title: "Monitorare aperture e click della campagna", excerpt: "Ogni email contiene un pixel di tracciamento e link con redirect. Dopo l'invio vedi quante email sono state aperte e quanti link cliccati.", readTime: 3, blocks: [
         { type: "heading", text: "Come funziona il tracciamento" },
         { type: "list", items: [
-          "Aperture: ogni email inviata contiene un pixel di tracciamento 1×1 px invisibile. Quando il destinatario apre l'email e carica le immagini, il pixel viene richiesto al server Pipely registrando l'apertura.",
+          "Aperture delle campagne: ogni messaggio della campagna contiene un pixel di tracciamento 1×1 px invisibile. Quando il destinatario apre l'email e carica le immagini, il pixel viene richiesto al server Pipely registrando l'apertura.",
           "Click: ogni link nel corpo dell'email viene reindirizzato attraverso un URL di tracciamento Pipely. Quando il destinatario clicca, il server registra il click e poi reindirizza all'URL originale.",
         ]},
         { type: "heading", text: "Dove vedere le statistiche" },
@@ -831,7 +831,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
           "Grafico a barre: distribuzione affari e valore per stage",
           "Grafico vinti vs persi: confronto mensile degli ultimi 6 mesi",
         ]},
-        { type: "tip", text: "Usa il selettore periodo in alto nella pagina Report per aggiornare tutti i KPI e i grafici: 7 giorni, 30 giorni, 90 giorni o 12 mesi." },
+        { type: "tip", text: "Il periodo filtra gli affari per data di chiusura e le attività per data di creazione. La pipeline mostra gli affari attualmente aperti. I grafici mensili coprono sempre gli ultimi 6 mesi. Seleziona la valuta per evitare di sommare importi non confrontabili." },
       ]},
       { id: "r2", title: "Analisi del funnel di vendita", excerpt: "Come interpretare il grafico funnel e identificare i colli di bottiglia.", readTime: 5, blocks: [
         { type: "heading", text: "Come leggere il grafico funnel" },
@@ -1017,13 +1017,13 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       ]},
       { id: "au6", title: "Monitorare e debuggare le automazioni", excerpt: "Come visualizzare la cronologia di esecuzione, testare i workflow e risolvere gli errori.", readTime: 4, blocks: [
         { type: "heading", text: "Il tab Log del workflow" },
-        { type: "para", text: "Ogni workflow dispone di un tab Log che mostra l'elenco delle ultime esecuzioni con data, entità coinvolta (es. nome dell'affare) e stato: SUCCESS o FAILED. I log vengono letti direttamente dal database e includono il nome del record che ha attivato il workflow." },
+        { type: "para", text: "Nella pagina Automazioni, Log esecuzioni mostra eventi in coda, in corso, in attesa, sospesi, riusciti, saltati o falliti. Apri una riga per leggere i passi completati e gli errori. Le attese e le attività scadute vengono controllate ogni 5 minuti." },
         { type: "heading", text: "Testare un workflow prima di attivarlo" },
         { type: "steps", items: [
           "Apri il workflow che vuoi testare",
-          "Clicca il pulsante \"Testa workflow\"",
-          "Pipely simula un'esecuzione con dati di test reali dal tuo CRM",
-          "Verifica il risultato nel tab Log: la riga di test è contrassegnata come test run",
+          "Clicca il pulsante \"Valida configurazione\"",
+          "Pipely valida la configurazione e i riferimenti nella tua organizzazione; nessuna azione viene eseguita",
+          "Leggi il risultato della validazione sulla scheda: non viene conteggiato come esecuzione",
           "Se il test va a buon fine, attiva il workflow con il toggle ON",
         ]},
         { type: "heading", text: "Come accedere al log" },
@@ -1037,11 +1037,11 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         { type: "heading", text: "Errori comuni e soluzioni" },
         { type: "list", items: [
           "SMTP non configurato — l'azione \"Invia email\" fallisce: configura SMTP in Impostazioni → Email",
-          "Contatto senza email — l'invio non riesce: verifica che il contatto abbia un'email valida",
+          "Contatto senza email — il passo viene saltato e segnalato nel registro",
           "Workflow disattivato — le esecuzioni non partono: controlla il toggle ON/OFF",
-          "Azione WAIT in corso — il workflow è in pausa: verrà ripreso automaticamente dopo il periodo di attesa configurato",
+          "Azione WAIT in corso — ripresa dopo il termine previsto, al successivo controllo entro 5 minuti. Un invio email incerto richiede verifica nel provider prima della ripresa manuale",
         ]},
-        { type: "tip", text: "Usa sempre il pulsante \"Testa workflow\" prima di attivare un'automazione in produzione. In questo modo verifichi che trigger, condizioni e azioni funzionino correttamente senza rischi." },
+        { type: "tip", text: "Valida la configurazione prima di attivare il workflow. Per verificare l’esecuzione reale, genera un evento su dati di prova: le azioni, incluse le email, verranno eseguite. Il registro permette di controllarne l’esito." },
       ]},
     ],
   },
@@ -1120,8 +1120,8 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       { id: "pr5", title: "Prezzi in valute diverse", excerpt: "Supporto multi-valuta: come impostare prezzi in EUR, USD e altre valute.", readTime: 4, blocks: [
         { type: "heading", text: "Valuta dell'organizzazione" },
         { type: "para", text: "Il prezzo di ogni prodotto è inserito nella valuta predefinita dell'organizzazione. Tutti i calcoli e i report utilizzano la stessa valuta: non è prevista conversione automatica." },
-        { type: "heading", text: "Multi-valuta non ancora supportata" },
-        { type: "para", text: "Pipely non supporta ancora la gestione multi-valuta nativa. Non è possibile impostare prezzi in valute diverse sulla stessa scheda prodotto." },
+        { type: "heading", text: "Valute e report" },
+        { type: "para", text: "Ogni prodotto ha una valuta. Nei report puoi selezionare la valuta da analizzare; gli importi non vengono convertiti né sommati fra valute diverse." },
         { type: "heading", text: "Workaround consigliato" },
         { type: "list", items: [
           "Crea varianti dello stesso prodotto con prezzi in valute diverse (es. \"Piano Pro - EUR\" e \"Piano Pro - USD\")",
@@ -1336,7 +1336,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         { type: "heading", text: "Upgrade a Pro" },
         { type: "para", text: "Clicca \"Upgrade a Pro\" per accedere alla pagina di checkout con Stripe. Inserisci i dati di pagamento e conferma: il piano viene attivato immediatamente." },
         { type: "heading", text: "Piano Enterprise" },
-        { type: "para", text: "Per il piano Enterprise (prezzo custom, SLA, SSO, account manager dedicato) contatta il supporto tramite /contatti o usa il pulsante \"Contatta il supporto\" nella pagina." },
+        { type: "para", text: "Per il piano Enterprise (prezzo custom, assistenza e condizioni da concordare) contatta il supporto tramite /contatti o usa il pulsante \"Contatta il supporto\" nella pagina." },
         { type: "tip", text: "Le fatture vengono emesse e gestite tramite il portale Stripe. Clicca il link nella pagina Piano / Fatturazione per accedere allo storico pagamenti e scaricare le fatture in PDF." },
       ]},
     ],
@@ -1449,7 +1449,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       ]},
       { id: "in2", title: "Usare l'API REST di Pipely", excerpt: "Documentazione base per sviluppatori: autenticazione, endpoint principali ed esempi.", readTime: 8, popular: true, blocks: [
         { type: "heading", text: "Stato dell'API" },
-        { type: "para", text: "L'API REST di Pipely è attualmente in sviluppo. L'autenticazione tramite API Key non è ancora disponibile per il pubblico generale. Per accesso anticipato contatta il supporto." },
+        { type: "para", text: "API REST e webhook sono disponibili in tutti i piani. Proprietari e amministratori possono creare chiavi API dalle impostazioni. Una chiave perde i permessi se il suo creatore non è più proprietario o amministratore dell’organizzazione." },
         { type: "heading", text: "Endpoint pianificati" },
         { type: "list", items: [
           "GET /api/deals — lista affari con filtri",
@@ -1643,7 +1643,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
           "Contatti illimitati",
           "AI Assistant integrato",
           "Automazioni avanzate (workflow trigger-action)",
-          "Report personalizzati",
+          "Report vendite",
           "Campagne email con tracciamento aperture e click",
           "Configurazione SMTP per provider email custom",
         ]},
@@ -1651,10 +1651,10 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         { type: "para", text: "Per organizzazioni con esigenze avanzate di sicurezza, compliance e supporto." },
         { type: "list", items: [
           "Tutto incluso nel piano Pro",
-          "Contatti illimitati con SLA al 99,5%",
-          "SSO / SAML per autenticazione aziendale",
-          "Supporto dedicato con account manager",
-          "Onboarding personalizzato e formazione del team",
+          "Contatti e pipeline illimitati",
+          "Condizioni di assistenza da concordare",
+          "Assistenza da definire nel preventivo",
+          "Progetto di adozione da concordare",
         ]},
         { type: "tip", text: "Puoi iniziare con Starter gratuitamente e passare a Pro in qualsiasi momento. Nessun contratto annuale obbligatorio." },
       ]},
@@ -1672,7 +1672,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
           "Contatti illimitati — nessun limite alla crescita del CRM",
           "AI Assistant — suggerimenti intelligenti e generazione testi",
           "Automazioni avanzate — workflow attivi",
-          "Report personalizzati — filtri e periodi custom",
+          "Report vendite con periodi predefiniti, valuta ed esportazione CSV",
         ]},
         { type: "tip", text: "Per il piano Enterprise contatta il team commerciale tramite il pulsante Contatta il supporto in basso nella pagina." },
       ]},

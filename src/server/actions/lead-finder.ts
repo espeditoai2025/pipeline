@@ -1,4 +1,5 @@
 "use server";
+import { crmPermissionError } from "@/lib/crm-permissions";
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -129,7 +130,7 @@ export async function createSearch(
 ): Promise<{ data: LeadFinderSearch | null; error: string | null }> {
   const session = await auth();
   const { orgId } = getIds(session);
-  if (!orgId) return { data: null, error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { data: null, error: "Non autorizzato" };
 
   const plan = await getOrgPlan(orgId);
   const limits = getLimits(plan);
@@ -891,7 +892,7 @@ export async function runSearch(
 ): Promise<{ error: string | null }> {
   const session = await auth();
   const { orgId } = getIds(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   const search = await db.leadFinderSearch.findFirst({
     where: { id: searchId, organizationId: orgId },
@@ -1528,7 +1529,7 @@ export async function approveCandidate(
 ): Promise<{ leadId: string | null; error: string | null }> {
   const session = await auth();
   const { orgId } = getIds(session);
-  if (!orgId) return { leadId: null, error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { leadId: null, error: "Non autorizzato" };
 
   const candidate = await db.leadCandidate.findFirst({
     where: { id: candidateId, organizationId: orgId },
@@ -1597,7 +1598,7 @@ export async function approveAllCandidates(
 ): Promise<{ created: number; skipped: number; error: string | null }> {
   const session = await auth();
   const { orgId } = getIds(session);
-  if (!orgId) return { created: 0, skipped: 0, error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { created: 0, skipped: 0, error: "Non autorizzato" };
 
   const pending = await db.leadCandidate.findMany({
     where: { searchId, organizationId: orgId, status: "PENDING" },
@@ -1677,7 +1678,7 @@ export async function rejectBelowScore(
 ): Promise<{ count: number; error: string | null }> {
   const session = await auth();
   const { orgId } = getIds(session);
-  if (!orgId) return { count: 0, error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { count: 0, error: "Non autorizzato" };
 
   try {
     const result = await db.leadCandidate.updateMany({
@@ -1698,7 +1699,7 @@ export async function rejectCandidate(
 ): Promise<{ error: string | null }> {
   const session = await auth();
   const { orgId } = getIds(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   try {
     await db.leadCandidate.updateMany({
@@ -1718,7 +1719,7 @@ export async function deleteSearch(
 ): Promise<{ error: string | null }> {
   const session = await auth();
   const { orgId } = getIds(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   try {
     await db.leadFinderSearch.delete({

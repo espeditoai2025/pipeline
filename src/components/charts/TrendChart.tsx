@@ -7,13 +7,13 @@ import {
 
 type DataPoint = { label: string; vinti: number; persi: number; valore: number };
 
-type Props = {
+type Props = { currency?: string;
   data: DataPoint[];
   showValue?: boolean;
 };
 
-function formatEur(v: number) {
-  return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
+function formatEur(v: number, currency: string) {
+  return new Intl.NumberFormat("it-IT", { style: "currency", currency, maximumFractionDigits: 0 }).format(v);
 }
 
 function formatYAxis(v: number) {
@@ -22,7 +22,7 @@ function formatYAxis(v: number) {
   return `${Math.round(v)}`;
 }
 
-export function TrendChart({ data, showValue = false }: Props) {
+export function TrendChart({ data, showValue = false, currency = "EUR" }: Props) {
   if (showValue) {
     return (
       <ResponsiveContainer width="100%" height={220}>
@@ -37,7 +37,7 @@ export function TrendChart({ data, showValue = false }: Props) {
           <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--crm-neutral-500)" }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fontSize: 11, fill: "var(--crm-neutral-500)" }} tickFormatter={formatYAxis} axisLine={false} tickLine={false} width={48} />
           <Tooltip
-            formatter={(value) => [formatEur(Number(value)), "Valore"]}
+            formatter={(value) => [formatEur(Number(value), currency), "Valore"]}
             contentStyle={{ borderRadius: "8px", border: "1px solid var(--crm-neutral-100)", fontSize: 12 }}
           />
           <Area type="monotone" dataKey="valore" stroke="var(--crm-primary)" strokeWidth={2} fill="url(#valueGrad)" dot={{ fill: "var(--crm-primary)", r: 3 }} />

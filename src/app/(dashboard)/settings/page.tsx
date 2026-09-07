@@ -1,4 +1,5 @@
 "use client";
+import { STARTER_FEATURES, PRO_FEATURES, ENTERPRISE_FEATURES } from "@/lib/plan-client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -56,15 +57,15 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 const PLANS = [
   {
     id: "starter", name: "Starter", price: 0, currency: "€", period: "mese",
-    features: ["1 pipeline", "Fino a 500 contatti", "Report base", "App mobile"],
+    features: STARTER_FEATURES,
   },
   {
     id: "pro", name: "Pro", price: 29, currency: "€", period: "mese",
-    features: ["Pipeline illimitate", "Contatti illimitati", "AI Assistant", "Automazioni avanzate", "Report personalizzati"],
+    features: PRO_FEATURES,
   },
   {
     id: "enterprise", name: "Enterprise", price: null, currency: "€", period: "mese",
-    features: ["Tutto di Pro", "Contatti illimitati", "SLA 99.5%", "SSO / SAML", "Supporto dedicato"],
+    features: ENTERPRISE_FEATURES,
   },
 ];
 
@@ -80,7 +81,7 @@ const ROLE_COLORS: Record<string, string> = {
   VIEWER: "bg-gray-100 text-gray-600",
 };
 const PLAN_LABELS: Record<string, string> = {
-  FREE: "Free", STARTER: "Starter", PRO: "Pro", ENTERPRISE: "Enterprise",
+  FREE: "Starter", STARTER: "Starter", ESSENTIAL: "Pro", ADVANCED: "Pro", PROFESSIONAL: "Pro", PRO: "Pro", ENTERPRISE: "Enterprise",
 };
 
 function timeAgo(iso: string) {

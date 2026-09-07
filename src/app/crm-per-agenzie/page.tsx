@@ -64,7 +64,7 @@ export default function CrmPerAgenzePage() {
         { q: "Posso gestire più clienti/aziende sullo stesso account?", a: "Sì. Pipely ti permette di creare più pipeline separate, ognuna con i propri stage, e di associare ogni affare al contatto o azienda corretta. Puoi gestire decine di clienti attivi in modo ordinato." },
         { q: "Posso assegnare trattative a collaboratori o account manager specifici?", a: "Sì. Ogni affare, contatto e lead può essere assegnato a un membro del team. Puoi anche filtrare le trattative per responsabile per vedere il carico di lavoro di ciascuno." },
         { q: "Come faccio a non perdere le scadenze delle proposte?", a: "Crei un workflow: quando un affare entra nello stage 'Proposta inviata', parte automaticamente un task con scadenza a 5 giorni per il follow-up. Nessuna scadenza dimenticata." },
-        { q: "Pipely si integra con i tool che già uso?", a: "Pipely supporta SMTP personalizzato (Gmail, Outlook, Aruba) per inviare email dai tuoi account esistenti. Per integrazioni avanzate con altri strumenti, il piano Enterprise include API dedicata." },
+        { q: "Pipely si integra con i tool che già uso?", a: "Pipely supporta SMTP personalizzato (Gmail, Outlook, Aruba) per inviare email dai tuoi account esistenti. API REST e webhook sono disponibili in tutti i piani e gestibili da proprietari e amministratori." },
       ]}
       cta={{
         title: "Porta la tua agenzia al livello successivo",

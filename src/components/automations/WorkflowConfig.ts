@@ -22,5 +22,5 @@ export const ACTION_CONFIG: Record<ActionType, { label: string; description: str
   UPDATE_DEAL_STAGE:  { label: "Aggiorna stage",        description: "Sposta l'affare in un altro stage",             icon: ArrowRightCircle,  color: "text-purple-600" },
   ASSIGN_OWNER:       { label: "Assegna proprietario",  description: "Cambia il proprietario dell'affare",            icon: UserCheck,         color: "text-sky-600" },
   SEND_NOTIFICATION:  { label: "Invia notifica",        description: "Invia una notifica in-app all'utente",          icon: Bell,              color: "text-yellow-600" },
-  WAIT:               { label: "Attendi",               description: "Attendi N giorni prima del prossimo step",      icon: Timer,             color: "text-neutral-500", disabled: true },
+  WAIT:               { label: "Attendi",               description: "Attendi N giorni prima del prossimo step",      icon: Timer,             color: "text-neutral-500" },
 };

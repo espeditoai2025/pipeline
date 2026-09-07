@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { crmTransaction, assertContactCapacity, CrmError } from "@/lib/crm-transaction";
+import { enqueueWorkflows } from "@/lib/workflow-events";
+import { wakeWorkflows } from "@/lib/workflow-wake";
 import { db } from "@/lib/db";
 import { authenticateApiKey, parsePagination, validateOrgForeignKeys } from "@/lib/api-auth";
-import { getOrgPlan, checkContactLimit } from "@/lib/plan";
 
 const createSchema = z.object({
   firstName: z.string().min(1, "firstName is required"),
@@ -88,12 +90,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Validation error", details: parsed.error.flatten().fieldErrors }, { status: 422 });
   }
 
-  // Plan gating: enforce contact limit (same leva di monetizzazione delle action interne).
-  const plan = await getOrgPlan(organizationId);
-  const currentCount = await db.contact.count({ where: { organizationId } });
-  const limitError = checkContactLimit(plan, currentCount);
-  if (limitError) return NextResponse.json({ error: limitError }, { status: 402 });
-
   // Prevent cross-tenant FK injection (companyId/ownerId must belong to the org).
   const fkError = await validateOrgForeignKeys(organizationId, {
     companyId: parsed.data.companyId,
@@ -109,7 +105,10 @@ export async function POST(req: NextRequest) {
     resolvedOwnerId = firstUser.id;
   }
 
-  const contact = await db.contact.create({
+  try {
+  const contact = await crmTransaction(async tx => {
+    await assertContactCapacity(tx, organizationId);
+    const row = await tx.contact.create({
     data: { ...rest, organizationId, ownerId: resolvedOwnerId },
     include: {
       owner: { select: { id: true, name: true, email: true } },
@@ -117,5 +116,10 @@ export async function POST(req: NextRequest) {
     },
   });
 
+    await enqueueWorkflows(tx, { trigger: "CONTACT_CREATED", orgId: organizationId, contactId: row.id, contactName: row.firstName, contactEmail: row.email ?? undefined, ownerId: row.ownerId, source: "api" }, `created:${row.id}`);
+    return row;
+  });
+  wakeWorkflows(organizationId);
   return NextResponse.json({ data: serialize(contact) }, { status: 201 });
+  } catch (error) { if (error instanceof CrmError) return NextResponse.json({ error: error.message }, { status: 402 }); throw error; }
 }

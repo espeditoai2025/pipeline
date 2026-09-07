@@ -5,6 +5,14 @@ import type { MergeContactOverrides } from "@/lib/merge-contacts";
 import type { ContactImportRow } from "@/lib/contact-import";
 import type { InvoiceDetail } from "@/server/actions/invoices";
 import type { RecordPaymentInput } from "@/lib/invoice-utils";
+import type { Workflow, WorkflowLog } from "@/types/workflows";
+export const fixtureWorkflow: Workflow = { id: "wf", name: "Ricontatto", description: "", isActive: true, triggerOnImport: false, trigger: { type: "DEAL_STAGE_CHANGED", fromStageId: "stage", toStageId: "next" }, steps: [{ id: "one", action: { type: "SEND_NOTIFICATION", message: "Ricontatta il cliente" } }], executionCount: 0, lastRunAt: null, organizationId: "test-org", createdAt: "2026-09-01T08:00:00Z", updatedAt: "2026-09-01T08:00:00Z" };
+export const getWorkflowChoices = async () => ({ stages: [{ id: "stage", pipelineId: "p", name: "Vendite · Nuovo" }, { id: "next", pipelineId: "p", name: "Vendite · Proposta" }], users: [{ id: "user", name: "Maria Rossi" }] });
+export const getTemplates = async () => [{ id: "template", name: "Benvenuto", category: "generale", subject: "Ciao", body: "Ciao", usageCount: 0, createdAt: "2026-09-01T08:00:00Z", updatedAt: "2026-09-01T08:00:00Z" }];
+export const updateWorkflow = async (input: Partial<Workflow>) => ({ data: { ...fixtureWorkflow, ...input }, error: null });
+export const createWorkflow = updateWorkflow;
+export const fixtureLogs: WorkflowLog[] = [{ id: "log", queueId: "queue", workflowId: "wf", workflowName: "Richiamo cliente", status: "FAILED", trigger: "DEAL_CREATED", entityType: "deal", entityId: "deal", entityLabel: "Consulenza", stepsExecuted: 1, error: "Invio interrotto: esito incerto", emailInFlight: true, executedAt: "2026-09-01T08:00:00Z", logs: ["Azione 1 · SUCCESS · Notifica creata", "Azione 2 · FAILED · Timeout email"] }];
+export const resumeWorkflowJob = async (_id: string, confirmed: boolean) => { document.documentElement.dataset.resumed = String(confirmed); return { error: null }; };
 
 export const contacts: Contact[] = ["a", "b", "c"].map((id, index) => ({
   id, firstName: "Mario", lastName: "Rossi", email: "mario@example.it", phone: index ? "0212345" : null,

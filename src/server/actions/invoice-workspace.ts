@@ -4,14 +4,16 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { crmPermissionError } from "@/lib/crm-permissions";
 import { Prisma } from "@/generated/prisma/client";
 import { invoiceFilters, paymentSchema, todayInItaly, type InvoiceFilter, type RecordPaymentInput } from "@/lib/invoice-utils";
 import { InvoiceError, lockInvoice, refreshInvoiceBalance, roundMoney } from "@/lib/invoice-payments";
 import type { InvoiceListItem } from "./invoices";
 
 async function actor() {
-  const user = (await auth())?.user as { organizationId?: string; id?: string; role?: string } | undefined;
-  return { orgId: user?.organizationId, userId: user?.id, canWrite: ["OWNER", "ADMIN", "MANAGER", "SALES"].includes(user?.role ?? "") };
+  const session = await auth();
+  const user = session?.user as { organizationId?: string; id?: string; role?: string } | undefined;
+  return { orgId: user?.organizationId, userId: user?.id, canWrite: ["OWNER", "ADMIN", "MANAGER", "SALES"].includes(user?.role ?? "") && !(await crmPermissionError(session, "write")) };
 }
 function refresh(id: string) {
   revalidatePath("/invoices");

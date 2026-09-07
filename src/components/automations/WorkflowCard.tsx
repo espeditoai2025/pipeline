@@ -54,9 +54,9 @@ export function WorkflowCard({ workflow, templates = [], onEdit, onDeleted, onTo
     setTestOpen(true);
     const res = await testWorkflow(workflow.id);
     setTesting(false);
-    if (res.error) { toast.error(res.error); return; }
     setTestLog(res.log);
-    toast.success(`Test completato: ${res.stepsRun} step eseguiti`);
+    if (res.error) { toast.error(res.error); return; }
+    toast.success(`Validazione completata: ${res.stepsRun} azioni valide`);
   }
 
   return (
@@ -78,7 +78,8 @@ export function WorkflowCard({ workflow, templates = [], onEdit, onDeleted, onTo
             {/* Actions */}
             <div className="flex items-center gap-1 flex-shrink-0">
               <button
-                title="Test esecuzione"
+                title="Valida configurazione"
+                aria-label="Valida configurazione"
                 className="p-1.5 rounded hover:bg-[var(--crm-neutral-100)] text-[var(--crm-neutral-500)] hover:text-[var(--crm-primary)]"
                 onClick={handleTest}
               >
@@ -182,11 +183,11 @@ export function WorkflowCard({ workflow, templates = [], onEdit, onDeleted, onTo
       {testOpen && (
         <div className="border-t border-[var(--crm-neutral-100)] px-4 py-3">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-[var(--crm-neutral-600)]">Log esecuzione test</p>
+            <p className="text-xs font-semibold text-[var(--crm-neutral-600)]">Validazione configurazione — nessuna azione eseguita</p>
             <button className="text-xs text-[var(--crm-neutral-400)] hover:text-[var(--crm-neutral-600)]" onClick={() => setTestOpen(false)}>✕</button>
           </div>
           <div className="rounded-lg bg-[var(--crm-neutral-900)] dark:bg-black/50 p-3 font-mono text-xs space-y-1 max-h-40 overflow-y-auto">
-            {testing && <p className="text-green-400">Esecuzione in corso...</p>}
+            {testing && <p className="text-green-400">Validazione in corso...</p>}
             {testLog.map((line, i) => (
               <p key={i} className={line.includes("✓") ? "text-green-400" : line.includes("Completato") ? "text-blue-400" : "text-[var(--crm-neutral-300)]"}>{line}</p>
             ))}

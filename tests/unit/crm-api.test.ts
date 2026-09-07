@@ -2,10 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   authenticate: vi.fn(),
-  db: { contact: { findFirst: vi.fn(), update: vi.fn() }, company: { findFirst: vi.fn() }, deal: { findFirst: vi.fn(), update: vi.fn() }, stage: { findFirst: vi.fn() }, pipeline: { findFirst: vi.fn() } },
+  db: { $transaction: vi.fn(), organization: { findUnique: vi.fn() }, contact: { findFirst: vi.fn(), update: vi.fn() }, company: { findFirst: vi.fn() }, deal: { findFirst: vi.fn(), update: vi.fn() }, stage: { findFirst: vi.fn() }, pipeline: { findFirst: vi.fn() } },
 }));
 vi.mock("@/lib/db", () => ({ db: mocks.db }));
 vi.mock("@/lib/api-auth", () => ({ authenticateApiKey: mocks.authenticate }));
+vi.mock("@/lib/workflow-wake", () => ({ wakeWorkflows: vi.fn() }));
 import { PATCH as patchContact } from "@/app/api/v1/contacts/[id]/route";
 import { PATCH as patchDeal } from "@/app/api/v1/deals/[id]/route";
 
@@ -13,6 +14,8 @@ const request = (body: unknown) => new NextRequest("http://localhost/api/v1/test
 const params = { params: Promise.resolve({ id: "id" }) };
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.db.$transaction.mockImplementation(async callback => callback(mocks.db));
+  mocks.db.organization.findUnique.mockResolvedValue({ plan: "STARTER" });
   mocks.authenticate.mockResolvedValue({ organizationId: "org-a" });
   mocks.db.contact.findFirst.mockResolvedValue({ id: "id" });
   mocks.db.company.findFirst.mockResolvedValue(null);

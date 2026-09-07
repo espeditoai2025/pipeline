@@ -11,6 +11,7 @@ import { getTemplates } from "@/server/actions/emails";
 import type { Workflow } from "@/types/workflows";
 import type { WorkflowLog } from "@/types/workflows";
 import type { EmailTemplate } from "@/types/emails";
+import { toast } from "sonner";
 
 type Tab = "workflows" | "logs";
 
@@ -31,6 +32,18 @@ export default function AutomationsPage() {
       setTemplates(tpls);
     });
   }, []);
+
+  useEffect(() => {
+    if (tab !== "logs") return;
+    let cancelled = false;
+    const refresh = async () => {
+      try { const rows = await getWorkflowLogs(); if (!cancelled) setLogs(rows); }
+      catch { if (!cancelled) toast.error("Impossibile aggiornare il registro"); }
+    };
+    void refresh();
+    const interval = setInterval(refresh, 15_000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [tab]);
 
   const activeCount = workflows.filter((w) => w.isActive).length;
   const totalRuns = workflows.reduce((s, w) => s + w.executionCount, 0);
@@ -145,7 +158,7 @@ export default function AutomationsPage() {
           )}
         </div>
       ) : (
-        <AutomationLogView logs={logs} />
+        <AutomationLogView logs={logs} onRefresh={() => { void getWorkflowLogs().then(setLogs).catch(() => toast.error("Impossibile aggiornare il registro")); }} />
       )}
 
       <WorkflowBuilder

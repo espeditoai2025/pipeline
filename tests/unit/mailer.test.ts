@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // messaggio rifiutato (dominio non verificato, chiave errata, limite superato).
 const state = vi.hoisted(() => ({
   send: vi.fn(),
+  plan: "PRO",
   smtpRow: null as { isVerified: boolean } | null,
   smtpResult: { ok: true } as { ok: boolean; error?: string },
   smtpCalls: [] as Array<{ orgId: string; opts: Record<string, unknown> }>,
@@ -23,7 +24,7 @@ vi.mock("@/lib/smtp-send", () => ({
   },
 }));
 vi.mock("@/lib/db", () => ({
-  db: { smtpConfig: { findUnique: async () => state.smtpRow } },
+  db: { organization: { findUnique: async () => ({ plan: state.plan }) }, smtpConfig: { findUnique: async () => state.smtpRow } },
 }));
 vi.mock("@/lib/logger", () => ({
   logger: { error: (_s: string, msg: string) => state.logs.push(msg), warn: () => {}, info: () => {} },
@@ -34,6 +35,7 @@ import { resolveOrgChannel, sendOrgMail, sendPlatformMail } from "@/lib/mailer";
 const mail = { to: "cliente@esempio.it", subject: "Oggetto", html: "<p>ciao</p>" };
 
 beforeEach(() => {
+  state.plan = "PRO";
   state.send.mockReset();
   state.smtpRow = null;
   state.smtpResult = { ok: true };
@@ -111,4 +113,12 @@ describe("invio per conto di un'organizzazione", () => {
     await sendOrgMail("org_1", { ...mail, cc: ["capo@esempio.it"], replyTo: "io@azienda.it" });
     expect(state.smtpCalls[0]!.opts).toMatchObject({ cc: ["capo@esempio.it"], replyTo: "io@azienda.it" });
   });
+});
+
+it("blocca SMTP dopo downgrade anche con canale memorizzato", async () => {
+  state.plan = "STARTER"; state.smtpRow = { isVerified: true };
+  expect(await resolveOrgChannel("org_1")).toBeNull();
+  expect(await sendOrgMail("org_1", mail, "smtp")).toMatchObject({ ok: false });
+  expect(state.smtpCalls).toHaveLength(0);
+  expect(state.send).not.toHaveBeenCalled();
 });

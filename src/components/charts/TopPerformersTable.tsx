@@ -5,14 +5,14 @@ type Performer = {
   winRate: number;
 };
 
-type Props = { data: Performer[] };
+type Props = { currency?: string; data: Performer[] };
 
-function formatEur(v: number) {
-  return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
+function formatEur(v: number, currency: string) {
+  return new Intl.NumberFormat("it-IT", { style: "currency", currency, maximumFractionDigits: 0 }).format(v);
 }
 
-export function TopPerformersTable({ data }: Props) {
-  const max = data[0]?.valore ?? 1;
+export function TopPerformersTable({ data, currency = "EUR" }: Props) {
+  const max = Math.max(1, data[0]?.valore ?? 0);
   return (
     <div className="space-y-3">
       {data.map((p, i) => (
@@ -24,7 +24,7 @@ export function TopPerformersTable({ data }: Props) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-0.5">
               <span className="text-sm font-medium truncate">{p.name}</span>
-              <span className="text-sm font-semibold ml-2 flex-shrink-0">{formatEur(p.valore)}</span>
+              <span className="text-sm font-semibold ml-2 flex-shrink-0">{formatEur(p.valore, currency)}</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="flex-1 h-1.5 rounded-full bg-[var(--crm-neutral-100)] overflow-hidden">

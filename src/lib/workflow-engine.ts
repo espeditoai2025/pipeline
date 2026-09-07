@@ -1,259 +1,544 @@
-/**
- * Workflow execution engine.
- * Called from server actions after relevant CRM events.
- * Never import this from client components.
- */
+import { randomUUID } from "crypto";
+import { db } from "@/lib/db";
+import { sendOrgMail } from "@/lib/mailer";
+import { getLimits } from "@/lib/plan";
+import { crmTransaction, CrmError } from "@/lib/crm-transaction";
+import { workflowStepSchema } from "@/lib/workflow-schema";
+import { enqueueWorkflows, workflowEntity, type WorkflowPayload } from "@/lib/workflow-events";
+import type { Prisma, WorkflowQueue } from "@/generated/prisma/client";
+import type { WorkflowStep } from "@/types/workflows";
 
-import { db } from "./db";
-import { sendOrgMail } from "./mailer";
-import type { TriggerConfig, WorkflowStep } from "@/types/workflows";
-
-function esc(s: string): string {
-  return s
+export type { WorkflowPayload } from "@/lib/workflow-events";
+type Tx = Prisma.TransactionClient;
+type StepLog = { at: string; step: number; action: string; status: string; message: string };
+type Context = Awaited<ReturnType<typeof resolveContext>>;
+const LEASE_MS = 5 * 60_000;
+const stepLogs = (logs: Prisma.JsonValue[]) => logs as unknown as StepLog[];
+const esc = (value: string) =>
+  value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
+class SkipStep extends Error {}
 
-// ─── Payload types per trigger ────────────────────────────────────────────────
-
-export type WorkflowPayload =
-  | { trigger: "DEAL_CREATED";       orgId: string; dealId: string;    dealTitle: string; dealValue?: number; ownerId: string; stageId: string; contactId?: string }
-  | { trigger: "DEAL_STAGE_CHANGED"; orgId: string; dealId: string;    dealTitle: string; fromStageId: string; toStageId: string; contactId?: string; ownerId: string }
-  | { trigger: "DEAL_WON";           orgId: string; dealId: string;    dealTitle: string; dealValue?: number; contactId?: string; ownerId: string }
-  | { trigger: "DEAL_LOST";          orgId: string; dealId: string;    dealTitle: string; contactId?: string; ownerId: string }
-  | { trigger: "DEAL_VALUE_CHANGED"; orgId: string; dealId: string;    dealTitle: string; newValue: number;  contactId?: string; ownerId: string }
-  | { trigger: "CONTACT_CREATED";    orgId: string; contactId: string; contactName: string; contactEmail?: string; ownerId: string }
-  | { trigger: "LEAD_CREATED";       orgId: string; leadId: string;    leadTitle: string }
-  | { trigger: "ACTIVITY_OVERDUE";   orgId: string; activityId: string; ownerId: string; dealId?: string; contactId?: string };
-
-// ─── Trigger matcher ──────────────────────────────────────────────────────────
-
-function triggerMatches(cfg: TriggerConfig, payload: WorkflowPayload): boolean {
-  if (cfg.type !== payload.trigger) return false;
-
-  if (cfg.type === "DEAL_STAGE_CHANGED" && payload.trigger === "DEAL_STAGE_CHANGED") {
-    if (cfg.toStageId && cfg.toStageId !== payload.toStageId) return false;
-    if (cfg.fromStageId && cfg.fromStageId !== payload.fromStageId) return false;
+async function resolveContext(tx: Tx, job: WorkflowQueue) {
+  const payload = job.payload as unknown as WorkflowPayload;
+  if (payload.orgId !== job.orgId) throw new CrmError("Organizzazione evento non valida");
+  const deal =
+    "dealId" in payload && payload.dealId
+      ? await tx.deal.findFirst({
+          where: { id: payload.dealId, organizationId: job.orgId, status: { not: "DELETED" } },
+        })
+      : null;
+  if (payload.trigger.startsWith("DEAL_") && !deal)
+    throw new CrmError("Affare non disponibile nell'organizzazione");
+  const lead =
+    payload.trigger === "LEAD_CREATED"
+      ? await tx.lead.findFirst({ where: { id: payload.leadId, organizationId: job.orgId } })
+      : null;
+  if (payload.trigger === "LEAD_CREATED" && !lead)
+    throw new CrmError("Lead non disponibile nell'organizzazione");
+  if (payload.trigger === "ACTIVITY_OVERDUE") {
+    const activity = await tx.activity.findFirst({
+      where: {
+        id: payload.activityId,
+        organizationId: job.orgId,
+        completedAt: null,
+        dueDate: { lt: new Date() },
+      },
+    });
+    if (!activity || (payload.dueDate && activity.dueDate?.toISOString() !== payload.dueDate))
+      throw new SkipStep("Attività completata o scadenza modificata");
   }
-
-  if (cfg.type === "DEAL_VALUE_CHANGED" && payload.trigger === "DEAL_VALUE_CHANGED") {
-    if (cfg.minValue !== undefined && payload.newValue < cfg.minValue) return false;
-  }
-
-  return true;
+  const contactId =
+    deal?.contactId ?? lead?.contactId ?? ("contactId" in payload ? payload.contactId : undefined);
+  const contact = contactId
+    ? await tx.contact.findFirst({ where: { id: contactId, organizationId: job.orgId } })
+    : null;
+  if (payload.trigger === "CONTACT_CREATED" && !contact)
+    throw new CrmError("Contatto non disponibile nell'organizzazione");
+  const ownerId =
+    job.ownerId || deal?.ownerId || lead?.ownerId || contact?.ownerId || payload.actorId;
+  const owner = ownerId
+    ? await tx.user.findFirst({ where: { id: ownerId, organizationId: job.orgId } })
+    : await tx.user.findFirst({
+        where: { organizationId: job.orgId, role: "OWNER" },
+        orderBy: { id: "asc" },
+      });
+  const name = contact
+    ? `${contact.firstName} ${contact.lastName ?? ""}`.trim()
+    : (lead?.title ?? "");
+  const variables: Record<string, string> = {
+    nome: name,
+    cognome: contact?.lastName ?? "",
+    email: contact?.email ?? lead?.email ?? "",
+    deal: deal?.title ?? "",
+    lead: lead?.title ?? "",
+  };
+  return { payload, deal, lead, contact, owner, variables };
 }
 
-// ─── Email sender (SMTP dell'organizzazione, altrimenti Resend) ───────────────
-
-/** Lancia se il messaggio non è partito, così lo step del workflow risulta fallito. */
-async function sendMail(orgId: string, opts: { to: string; subject: string; html: string }): Promise<void> {
-  const result = await sendOrgMail(orgId, opts);
-  if (!result.ok) throw new Error(result.error);
+function interpolate(text: string, ctx: Context, html = false) {
+  return text.replace(/\{\{(nome|cognome|email|deal|lead)\}\}/gi, (_, name: string) =>
+    html ? esc(ctx.variables[name.toLowerCase()] ?? "") : (ctx.variables[name.toLowerCase()] ?? ""),
+  );
 }
 
-// ─── Step executor ────────────────────────────────────────────────────────────
+/** The checkpoint and database action share a transaction. A crash cannot repeat committed actions. */
+async function checkpoint(
+  tx: Tx,
+  job: WorkflowQueue,
+  data: Omit<Prisma.WorkflowQueueUpdateInput, "logs"> & { logs?: Prisma.JsonValue[] },
+) {
+  const { logs: inputLogs, ...rest } = data;
+  const updated = await tx.workflowQueue.update({
+    where: { id: job.id, lockToken: job.lockToken },
+    data: {
+      ...rest,
+      ...(inputLogs
+        ? { logs: inputLogs.filter((v) => v !== null) as Prisma.InputJsonValue[] }
+        : {}),
+    },
+  });
+  const payload = updated.payload as unknown as WorkflowPayload;
+  const logs = stepLogs(updated.logs);
+  const execution = {
+    status: updated.status,
+    payload: {
+      trigger: payload.trigger,
+      ...workflowEntity(payload),
+      error: updated.error,
+      stepsExecuted: logs.filter((l) => l.status === "SUCCESS").length,
+    },
+    logs: updated.logs as Prisma.InputJsonValue[],
+    finishedAt: ["SUCCESS", "SKIPPED", "FAILED"].includes(updated.status) ? new Date() : null,
+  };
+  await tx.workflowExecution.upsert({
+    where: { queueId: job.id },
+    create: { workflowId: job.workflowId, queueId: job.id, ...execution },
+    update: execution,
+  });
+  return updated;
+}
 
-async function executeStep(
+async function executeDatabaseStep(
+  tx: Tx,
+  job: WorkflowQueue,
   step: WorkflowStep,
-  payload: WorkflowPayload,
-  orgId: string,
-  ownerId: string,
-): Promise<string> {
-  const { action } = step;
-
-  switch (action.type) {
-    case "SEND_EMAIL": {
-      // Resolve destination email
-      let toEmail: string | null = null;
-
-      if (action.to === "contact" || action.to === "owner") {
-        if (action.to === "contact" && "contactId" in payload && payload.contactId) {
-          const c = await db.contact.findUnique({ where: { id: payload.contactId }, select: { email: true, firstName: true, lastName: true } });
-          toEmail = c?.email ?? null;
-        }
-        if (action.to === "owner") {
-          const u = await db.user.findUnique({ where: { id: ownerId }, select: { email: true } });
-          toEmail = u?.email ?? null;
-        }
-      } else {
-        // action.to is a literal email
-        toEmail = action.to;
-      }
-
-      if (!toEmail) return `SKIP SEND_EMAIL: nessuna email destinatario disponibile`;
-
-      // Load template
-      const tpl = await db.emailTemplate.findFirst({ where: { id: action.templateId, organizationId: orgId } });
-      if (!tpl) return `SKIP SEND_EMAIL: template ${action.templateId} non trovato`;
-
-      const entityLabel = "dealTitle" in payload ? payload.dealTitle : "contactName" in payload ? payload.contactName : "leadTitle" in payload ? payload.leadTitle : "";
-      const safeLabel = esc(entityLabel);
-
-      const subject = tpl.subject.replace(/\{\{deal\}\}/gi, entityLabel).replace(/\{\{nome\}\}/gi, entityLabel);
-      const html    = tpl.body   .replace(/\{\{deal\}\}/gi, safeLabel).replace(/\{\{nome\}\}/gi, safeLabel);
-
-      await sendMail(orgId, { to: toEmail, subject, html });
-      return `SEND_EMAIL → ${toEmail} (template: ${tpl.name})`;
-    }
-
+  ctx: Context,
+): Promise<{ message: string; ownerId?: string }> {
+  const a = step.action;
+  switch (a.type) {
     case "CREATE_ACTIVITY": {
-      const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + (action.dueDays ?? 0));
-
-      await db.activity.create({
+      if (!ctx.owner) throw new CrmError("Responsabile non disponibile nell'organizzazione");
+      const parsed = workflowStepSchema.parse(step);
+      if (parsed.action.type !== "CREATE_ACTIVITY") throw new CrmError("Azione non valida");
+      await tx.activity.create({
         data: {
-          type: action.activityType as never,
-          subject: action.subject,
-          dueDate,
-          organizationId: orgId,
-          userId: ownerId,
-          dealId:    "dealId"    in payload ? payload.dealId    : undefined,
-          contactId: "contactId" in payload && payload.contactId ? payload.contactId : undefined,
+          type: parsed.action.activityType,
+          subject: interpolate(a.subject, ctx),
+          dueDate: new Date(Date.now() + a.dueDays * 86_400_000),
+          organizationId: job.orgId,
+          userId: ctx.owner.id,
+          dealId: ctx.deal?.id,
+          contactId: ctx.contact?.id,
         },
       });
-      return `CREATE_ACTIVITY: "${action.subject}" (${action.activityType}) tra ${action.dueDays ?? 0}gg`;
+      return { message: `Attività creata: ${interpolate(a.subject, ctx)}` };
     }
-
     case "UPDATE_DEAL_STAGE": {
-      if (!("dealId" in payload)) return `SKIP UPDATE_DEAL_STAGE: nessun affare nel payload`;
-      await db.deal.update({ where: { id: payload.dealId }, data: { stageId: action.stageId } });
-      return `UPDATE_DEAL_STAGE → stage ${action.stageId}`;
+      if (!ctx.deal) throw new CrmError("Questa azione richiede un affare");
+      const stage = await tx.stage.findFirst({
+        where: {
+          id: a.stageId,
+          pipelineId: ctx.deal.pipelineId,
+          pipeline: { organizationId: job.orgId },
+        },
+      });
+      if (!stage) throw new CrmError("Fase non disponibile nella pipeline dell'affare");
+      if (ctx.deal.status !== "OPEN") throw new SkipStep("Affare già chiuso");
+      if (ctx.deal.stageId === a.stageId) throw new SkipStep("Affare già nella fase selezionata");
+      const before = ctx.deal.stageId;
+      await tx.deal.update({
+        where: { id: ctx.deal.id, organizationId: job.orgId, status: "OPEN", stageId: before },
+        data: { stageId: a.stageId },
+      });
+      await enqueueWorkflows(
+        tx,
+        {
+          trigger: "DEAL_STAGE_CHANGED",
+          orgId: job.orgId,
+          dealId: ctx.deal.id,
+          dealTitle: ctx.deal.title,
+          ownerId: ctx.deal.ownerId,
+          contactId: ctx.deal.contactId ?? undefined,
+          fromStageId: before,
+          toStageId: a.stageId,
+          source: "automation",
+          depth: (ctx.payload.depth ?? 0) + 1,
+        },
+        `workflow:${job.id}:${job.stepIndex}`,
+      );
+      return { message: `Affare spostato in ${stage.name}` };
     }
-
     case "ASSIGN_OWNER": {
-      const targetUser = await db.user.findFirst({ where: { id: action.userId, organizationId: orgId } });
-      if (!targetUser) return `SKIP ASSIGN_OWNER: utente ${action.userId} non trovato nell'organizzazione`;
-      if ("dealId" in payload) {
-        await db.deal.update({ where: { id: payload.dealId }, data: { ownerId: action.userId } });
-        return `ASSIGN_OWNER (deal) → ${targetUser.name ?? targetUser.email}`;
-      }
-      if ("contactId" in payload && payload.contactId) {
-        await db.contact.update({ where: { id: payload.contactId }, data: { ownerId: action.userId } });
-        return `ASSIGN_OWNER (contact) → ${targetUser.name ?? targetUser.email}`;
-      }
-      return `SKIP ASSIGN_OWNER: nessuna entità modificabile`;
+      const owner = await tx.user.findFirst({ where: { id: a.userId, organizationId: job.orgId } });
+      if (!owner) throw new CrmError("Responsabile non disponibile nell'organizzazione");
+      if (ctx.deal)
+        await tx.deal.update({
+          where: { id: ctx.deal.id, organizationId: job.orgId },
+          data: { ownerId: owner.id },
+        });
+      else if (ctx.lead)
+        await tx.lead.update({
+          where: { id: ctx.lead.id, organizationId: job.orgId },
+          data: { ownerId: owner.id },
+        });
+      else if (ctx.contact)
+        await tx.contact.update({
+          where: { id: ctx.contact.id, organizationId: job.orgId },
+          data: { ownerId: owner.id },
+        });
+      else throw new CrmError("Nessuna entità da riassegnare");
+      return { message: `Assegnato a ${owner.name ?? owner.email}`, ownerId: owner.id };
     }
-
     case "SEND_NOTIFICATION": {
-      const targetUserId = ownerId;
-      const entityLabel = "dealTitle" in payload ? payload.dealTitle : "contactName" in payload ? payload.contactName : "leadTitle" in payload ? payload.leadTitle : "";
-      await db.notification.create({
-        data: {
-          userId: targetUserId,
+      const recipients =
+        a.to === "team"
+          ? await tx.user.findMany({ where: { organizationId: job.orgId }, select: { id: true } })
+          : ctx.owner
+            ? [ctx.owner]
+            : [];
+      if (!recipients.length) throw new CrmError("Nessun responsabile disponibile");
+      await tx.notification.createMany({
+        data: recipients.map((user) => ({
+          userId: user.id,
           type: "WORKFLOW",
           title: "Automazione attivata",
-          message: action.message.replace(/\{\{deal\}\}/gi, entityLabel).replace(/\{\{nome\}\}/gi, entityLabel),
-        },
+          message: interpolate(a.message, ctx),
+        })),
       });
-      return `SEND_NOTIFICATION → user ${targetUserId}`;
+      return {
+        message: `Notifica inviata a ${recipients.length} ${recipients.length === 1 ? "persona" : "persone"}`,
+      };
     }
-
-    case "WAIT":
-      // Handled externally by the caller; should never reach here
-      return `WAIT ${action.days}gg`;
-
     default:
-      return `SKIP: tipo step sconosciuto`;
+      throw new CrmError("Azione non eseguibile");
   }
 }
 
-// ─── Main entry point ─────────────────────────────────────────────────────────
-
-export async function runWorkflows(payload: WorkflowPayload): Promise<void> {
-  const orgId = payload.orgId;
-
-  const workflows = await db.workflow.findMany({
-    where: { organizationId: orgId, isActive: true },
-  });
-
-  const matching = workflows.filter((wf) =>
-    triggerMatches(wf.trigger as TriggerConfig, payload)
-  );
-
-  if (matching.length === 0) return;
-
-  const ownerId = "ownerId" in payload ? payload.ownerId : "";
-  const entityId = ("dealId" in payload ? payload.dealId : "contactId" in payload ? payload.contactId : "leadId" in payload ? payload.leadId : "") ?? "";
-  const entityLabel = "dealTitle" in payload ? payload.dealTitle : "contactName" in payload ? payload.contactName : "leadTitle" in payload ? payload.leadTitle : "";
-  const entityType = payload.trigger.startsWith("DEAL") ? "deal" : payload.trigger.startsWith("CONTACT") ? "contact" : "lead";
-
-  await runStepsFrom({ workflows: matching, payload, orgId, ownerId, entityId, entityLabel, entityType, startIndex: 0 });
-}
-
-// ─── Shared step runner (also used by cron for resumed queued steps) ──────────
-
-export async function runStepsFrom({
-  workflows,
-  payload,
-  orgId,
-  ownerId,
-  entityId,
-  entityLabel,
-  entityType,
-  startIndex,
-}: {
-  workflows: { id: string; steps: unknown }[];
-  payload: WorkflowPayload;
-  orgId: string;
-  ownerId: string;
-  entityId: string;
-  entityLabel: string;
-  entityType: string;
-  startIndex: number;
-}): Promise<void> {
-  for (const wf of workflows) {
-    const steps = wf.steps as WorkflowStep[];
-    const logs: string[] = [`[${new Date().toLocaleTimeString("it-IT")}] Trigger: ${payload.trigger}`];
-    let status: "SUCCESS" | "FAILED" | "PAUSED" = "SUCCESS";
-
-    for (let i = startIndex; i < steps.length; i++) {
-      const step = steps[i]!;
-
-      // Handle WAIT by scheduling the remainder and stopping
-      if (step.action.type === "WAIT") {
-        const days = step.action.days ?? 1;
-        const resumeAt = new Date(Date.now() + days * 86_400_000);
-        await db.workflowQueue.create({
-          data: {
-            workflowId: wf.id,
-            stepIndex: i + 1,
-            payload: payload as never,
-            orgId,
-            ownerId,
-            resumeAt,
-          },
-        });
-        logs.push(`[${new Date().toLocaleTimeString("it-IT")}] Step ${i + 1}: WAIT ${days}gg — riprende il ${resumeAt.toLocaleDateString("it-IT")}`);
-        status = "PAUSED";
-        break;
-      }
-
-      try {
-        const msg = await executeStep(step, payload, orgId, ownerId);
-        logs.push(`[${new Date().toLocaleTimeString("it-IT")}] Step ${i + 1}: ${msg}`);
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        logs.push(`[${new Date().toLocaleTimeString("it-IT")}] Step ${i + 1} ERRORE: ${errMsg}`);
-        status = "FAILED";
-        break;
-      }
-    }
-
-    logs.push(`[${new Date().toLocaleTimeString("it-IT")}] Fine esecuzione: ${status}`);
-
-    if (status !== "PAUSED") {
-      await db.workflowExecution.create({
-        data: {
-          workflowId: wf.id,
-          status,
-          payload: { trigger: payload.trigger, entityType, entityId, entityLabel },
-          logs,
-          finishedAt: new Date(),
-        },
+async function executeJob(initial: WorkflowQueue, deadline: number) {
+  let job = initial;
+  const parsed = workflowStepSchema.array().min(1).max(30).safeParse(job.steps);
+  try {
+    if (!parsed.success)
+      throw new CrmError(`Configurazione non valida: ${parsed.error.issues[0]?.message}`);
+    const steps = parsed.data;
+    while (job.stepIndex < steps.length && Date.now() < deadline) {
+      const workflow = await db.workflow.findFirst({
+        where: { id: job.workflowId, organizationId: job.orgId },
+        select: { isActive: true },
       });
+      const org = await db.organization.findUnique({
+        where: { id: job.orgId },
+        select: { plan: true },
+      });
+      if (!workflow?.isActive || !org || !getLimits(org.plan).automations) {
+        await crmTransaction((tx) =>
+          checkpoint(tx, job, {
+            status: "SUSPENDED",
+            error: "Automazione disattivata o piano non abilitato. Ripresa manuale richiesta.",
+            lockToken: null,
+            lockedUntil: null,
+          }),
+        );
+        return;
+      }
+      const step = steps[job.stepIndex]!;
+      const entry: StepLog = {
+        at: new Date().toISOString(),
+        step: job.stepIndex,
+        action: step.action.type,
+        status: "SUCCESS",
+        message: "",
+      };
+      if (step.action.type === "WAIT") {
+        const days = step.action.days;
+        entry.status = "PAUSED";
+        entry.message = `Attesa di ${step.action.days} giorni`;
+        await crmTransaction((tx) =>
+          checkpoint(tx, job, {
+            stepIndex: job.stepIndex + 1,
+            attempts: 0,
+            status: "PAUSED",
+            resumeAt: new Date(Date.now() + days * 86_400_000),
+            logs: [...job.logs, entry],
+            lockToken: null,
+            lockedUntil: null,
+          }),
+        );
+        return;
+      }
+      if (step.action.type === "SEND_EMAIL") {
+        // External mail and Postgres cannot commit atomically. Quarantine uncertain sends.
+        const ctx = await resolveContext(db, job);
+        const to =
+          step.action.to === "contact"
+            ? ctx.contact?.email
+            : step.action.to === "lead"
+              ? ctx.lead?.email
+              : step.action.to === "owner"
+                ? ctx.owner?.email
+                : step.action.to;
+        const template = await db.emailTemplate.findFirst({
+          where: { id: step.action.templateId, organizationId: job.orgId },
+        });
+        if (!to || !template) {
+          entry.status = "SKIPPED";
+          entry.message = !to ? "Destinatario senza email" : "Template non disponibile";
+        } else {
+          job = await crmTransaction((tx) => checkpoint(tx, job, { emailInFlight: true }));
+          const subject = interpolate(template.subject, ctx);
+          const html = interpolate(template.body, ctx, true);
+          let timer: ReturnType<typeof setTimeout> | undefined;
+          const sent = await Promise.race([
+            sendOrgMail(job.orgId, {
+              to,
+              subject,
+              html,
+              idempotencyKey: `workflow-${job.id}-${job.stepIndex}`,
+            }),
+            new Promise<never>((_, reject) => {
+              timer = setTimeout(
+                () =>
+                  reject(
+                    new CrmError(
+                      "Timeout invio: esito incerto. Verifica nel provider prima di riprovare.",
+                    ),
+                  ),
+                15_000,
+              );
+            }),
+          ]).finally(() => clearTimeout(timer));
+          if (!sent.ok)
+            throw new CrmError(
+              `Email non confermata: ${sent.error}. Verifica l'esito prima di riprovare.`,
+            );
+          entry.message = "Email accettata dal provider";
+          job = await crmTransaction(async (tx) => {
+            await tx.email.create({
+              data: {
+                organizationId: job.orgId,
+                subject,
+                body: html,
+                fromAddress: "Automazione Pipely",
+                toAddresses: [to],
+                ccAddresses: [],
+                status: "SENT",
+                sentAt: new Date(),
+                contactId: ctx.contact?.id,
+                dealId: ctx.deal?.id,
+              },
+            });
+            return checkpoint(tx, job, {
+              emailInFlight: false,
+              stepIndex: job.stepIndex + 1,
+              attempts: 0,
+              logs: [...job.logs, entry],
+            });
+          });
+          continue;
+        }
+        job = await crmTransaction((tx) =>
+          checkpoint(tx, job, {
+            stepIndex: job.stepIndex + 1,
+            attempts: 0,
+            logs: [...job.logs, entry],
+          }),
+        );
+      } else {
+        job = await crmTransaction(async (tx) => {
+          let result: { message: string; ownerId?: string };
+          try {
+            result = await executeDatabaseStep(tx, job, step, await resolveContext(tx, job));
+          } catch (error) {
+            if (!(error instanceof SkipStep)) throw error;
+            result = { message: error.message };
+            entry.status = "SKIPPED";
+          }
+          entry.message = result.message;
+          return checkpoint(tx, job, {
+            stepIndex: job.stepIndex + 1,
+            attempts: 0,
+            ownerId: result.ownerId ?? job.ownerId,
+            logs: [...job.logs, entry],
+          });
+        });
+      }
     }
+    const finished = job.stepIndex >= steps.length;
+    await crmTransaction((tx) =>
+      checkpoint(tx, job, {
+        status: finished
+          ? stepLogs(job.logs).some((l) => l.status === "SKIPPED")
+            ? "SKIPPED"
+            : "SUCCESS"
+          : "PENDING",
+        lockToken: null,
+        lockedUntil: null,
+        resumeAt: new Date(),
+        error: null,
+      }),
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Errore durante l'esecuzione";
+    const retryable =
+      !job.emailInFlight &&
+      !(error instanceof CrmError) &&
+      !(error instanceof SkipStep) &&
+      job.attempts < 3;
+    await crmTransaction((tx) =>
+      checkpoint(tx, job, {
+        status: error instanceof SkipStep ? "SKIPPED" : retryable ? "PENDING" : "FAILED",
+        error: message,
+        resumeAt: new Date(Date.now() + 60_000 * Math.max(1, job.attempts)),
+        lockToken: null,
+        lockedUntil: null,
+        logs: [
+          ...job.logs,
+          {
+            at: new Date().toISOString(),
+            step: job.stepIndex,
+            action: parsed.success ? (parsed.data[job.stepIndex]?.action.type ?? "END") : "CONFIG",
+            status: "FAILED",
+            message,
+          },
+        ],
+      }),
+    );
   }
+}
+
+/** Bounded worker. Concurrent cron/after requests compete for an atomic claim. */
+export async function processWorkflowQueue({
+  orgId,
+  limit = 30,
+  budgetMs = 40_000,
+}: { orgId?: string; limit?: number; budgetMs?: number } = {}) {
+  const now = new Date();
+  const deadline = Date.now() + budgetMs;
+  const stale = await db.workflowQueue.findMany({
+    where: { ...(orgId ? { orgId } : {}), status: "RUNNING", lockedUntil: { lt: now } },
+    take: limit,
+    orderBy: [{ lockedUntil: "asc" }, { id: "asc" }],
+  });
+  for (const job of stale) {
+    await crmTransaction(async (tx) => {
+      const claimed = await tx.workflowQueue.updateMany({
+        where: {
+          id: job.id,
+          status: "RUNNING",
+          lockToken: job.lockToken,
+          lockedUntil: { lt: now },
+        },
+        data: { lockedUntil: new Date(Date.now() + LEASE_MS) },
+      });
+      if (!claimed.count) return;
+      await checkpoint(tx, job, {
+        status: job.emailInFlight ? "FAILED" : "PENDING",
+        error: job.emailInFlight
+          ? "Invio email interrotto: esito incerto. Verifica prima di riprovare."
+          : "Esecuzione interrotta: ripresa dal passo salvato",
+        resumeAt: now,
+        lockToken: null,
+        lockedUntil: null,
+      });
+    });
+  }
+  const due = await db.workflowQueue.findMany({
+    where: {
+      ...(orgId ? { orgId } : {}),
+      status: { in: ["PENDING", "PAUSED"] },
+      resumeAt: { lte: now },
+    },
+    orderBy: [{ resumeAt: "asc" }, { id: "asc" }],
+    take: Math.min(100, Math.max(1, limit)),
+  });
+  let processed = 0;
+  for (const item of due) {
+    if (Date.now() >= deadline) break;
+    const token = randomUUID();
+    const claimed = await db.workflowQueue.updateMany({
+      where: { id: item.id, status: { in: ["PENDING", "PAUSED"] }, resumeAt: { lte: now } },
+      data: {
+        status: "RUNNING",
+        lockToken: token,
+        lockedUntil: new Date(Date.now() + LEASE_MS),
+        attempts: { increment: 1 },
+      },
+    });
+    if (!claimed.count) continue;
+    const job = await db.workflowQueue.findUnique({ where: { id: item.id } });
+    if (!job || job.lockToken !== token) continue;
+    await executeJob(job, deadline);
+    processed++;
+  }
+  return processed;
+}
+
+/** Deadline identity, bounded scan and transaction prevent repeated/starved overdue events. */
+export async function enqueueOverdueActivities(limit = 50, budgetMs = 10_000) {
+  const deadline = Date.now() + budgetMs;
+  const due = await db.activity.findMany({
+    where: {
+      completedAt: null,
+      dueDate: { lt: new Date() },
+      OR: [
+        { workflowOverdueAt: null },
+        { NOT: { workflowOverdueAt: { equals: db.activity.fields.dueDate } } },
+      ],
+    },
+    orderBy: [{ dueDate: "asc" }, { id: "asc" }],
+    take: limit,
+  });
+  let count = 0;
+  for (const activity of due) {
+    if (Date.now() >= deadline) break;
+    const emitted = await crmTransaction(async (tx) => {
+      const claimed = await tx.activity.updateMany({
+        where: {
+          id: activity.id,
+          dueDate: activity.dueDate,
+          completedAt: null,
+          workflowOverdueAt: activity.workflowOverdueAt,
+        },
+        data: { workflowOverdueAt: activity.dueDate },
+      });
+      if (!claimed.count || !activity.dueDate) return false;
+      await enqueueWorkflows(
+        tx,
+        {
+          trigger: "ACTIVITY_OVERDUE",
+          orgId: activity.organizationId,
+          activityId: activity.id,
+          ownerId: activity.userId,
+          dueDate: activity.dueDate.toISOString(),
+          dealId: activity.dealId ?? undefined,
+          contactId: activity.contactId ?? undefined,
+        },
+        `overdue:${activity.id}:${activity.dueDate.toISOString()}`,
+      );
+      return true;
+    });
+    if (emitted) count++;
+  }
+  return count;
+}
+
+/** Trusted callers only. CRM mutations enqueue in their own transaction instead. */
+export async function runWorkflows(payload: WorkflowPayload): Promise<void> {
+  await crmTransaction((tx) => enqueueWorkflows(tx, payload, `event:${randomUUID()}`));
+  await processWorkflowQueue({ orgId: payload.orgId });
 }

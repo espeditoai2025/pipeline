@@ -1,4 +1,5 @@
 "use server";
+import { crmPermissionError } from "@/lib/crm-permissions";
 
 import { revalidatePath } from "next/cache";
 import type { Session } from "next-auth";
@@ -161,7 +162,7 @@ export async function createInvoiceFromDeal(
 ): Promise<{ data: { id: string; number: string } | null; error: string | null }> {
   const session = await auth();
   const { orgId, userId, canWrite } = getIds(session);
-  if (!orgId || !userId || !canWrite) return { data: null, error: "Non autorizzato" };
+  if ((!orgId || !userId || !canWrite) || (await crmPermissionError(session, "write"))) return { data: null, error: "Non autorizzato" };
   const parsed = createInvoiceSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
   input = parsed.data;
@@ -280,7 +281,7 @@ export async function updateInvoiceStatus(
 ): Promise<{ error: string | null }> {
   const session = await auth();
   const { orgId, canWrite } = getIds(session);
-  if (!orgId || !canWrite) return { error: "Non autorizzato" };
+  if ((!orgId || !canWrite) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
   if (!["SENT", "CANCELLED"].includes(status)) return { error: "Per segnare una fattura pagata registra un incasso" };
   try {
     await db.$transaction(async tx => {
@@ -304,7 +305,7 @@ export async function updateInvoiceStatus(
 export async function deleteInvoice(id: string): Promise<{ error: string | null }> {
   const session = await auth();
   const { orgId, canWrite } = getIds(session);
-  if (!orgId || !canWrite) return { error: "Non autorizzato" };
+  if ((!orgId || !canWrite) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
   try {
     await db.$transaction(async tx => {
       const inv = await lockInvoice(tx, id, orgId);

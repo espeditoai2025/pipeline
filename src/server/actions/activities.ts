@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
+import { crmPermissionError } from "@/lib/crm-permissions";
 import { db } from "@/lib/db";
 import { validateCrmReferences } from "@/lib/crm-references";
-import { dispatchWebhook } from "@/server/actions/webhooks";
+import { dispatchWebhook } from "@/lib/webhook-delivery";
 import type { Activity, ActivityType } from "@/types/activities";
 
 function getOrgId(s: Session | null) {
@@ -81,7 +82,7 @@ const activitySchema = z.object({
 export async function createActivity(input: z.infer<typeof activitySchema>): Promise<{ data: Activity | null; error: string | null }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!session || !orgId) return { data: null, error: "Non autorizzato" };
+  if ((!session || !orgId) || (await crmPermissionError(session, "write"))) return { data: null, error: "Non autorizzato" };
 
   const parsed = activitySchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
@@ -119,7 +120,7 @@ export async function createActivity(input: z.infer<typeof activitySchema>): Pro
 export async function updateActivity(input: z.infer<typeof activitySchema> & { id: string }): Promise<{ data: Activity | null; error: string | null }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!session || !orgId) return { data: null, error: "Non autorizzato" };
+  if ((!session || !orgId) || (await crmPermissionError(session, "write"))) return { data: null, error: "Non autorizzato" };
 
   const parsed = activitySchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
@@ -155,7 +156,7 @@ export async function updateActivity(input: z.infer<typeof activitySchema> & { i
 export async function completeActivity(id: string): Promise<{ error: string | null }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   try {
     const row = await db.activity.update({
@@ -173,7 +174,7 @@ export async function completeActivity(id: string): Promise<{ error: string | nu
 export async function deleteActivity(id: string): Promise<{ error: string | null }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   try {
     await db.activity.delete({ where: { id, organizationId: orgId } });

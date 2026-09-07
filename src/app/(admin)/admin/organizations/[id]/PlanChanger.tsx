@@ -21,7 +21,7 @@ const PLANS: { value: AdminPlan; label: string; description: string; color: stri
   {
     value: "ENTERPRISE",
     label: "Enterprise",
-    description: "Custom · Tutto di Pro + SLA 99.5% + SSO",
+    description: "Custom · Tutto di Pro + assistenza da concordare",
     color: "text-amber-400",
   },
 ];

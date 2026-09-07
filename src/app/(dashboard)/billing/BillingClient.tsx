@@ -1,5 +1,7 @@
 "use client";
 
+import { getTier, PLAN_LABELS, PRO_FEATURES, STARTER_FEATURES, PRO_PRICING } from "@/lib/plan-client";
+import Link from "next/link";
 import { useState } from "react";
 import { Check, Zap, CreditCard, ExternalLink, Loader2, AlertCircle, FileText, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,23 +14,13 @@ type OrgBilling = {
   stripeCurrentPeriodEnd: Date | null;
 };
 
-const PRO_FEATURES = [
-  "Pipeline illimitate",
-  "Contatti illimitati",
-  "Lead Finder illimitato (50 candidati/ricerca)",
-  "AI Assistant",
-  "Automazioni workflow",
-  "Campagne email marketing",
-  "SMTP personalizzato",
-  "Report avanzati",
-  "Supporto prioritario",
-];
 
-export function BillingClient({ org, invoices = [] }: { org: OrgBilling; invoices?: StripeInvoice[] }) {
+export function BillingClient({ org, invoices = [], canManage = false }: { org: OrgBilling; invoices?: StripeInvoice[]; canManage?: boolean }) {
   const [loading, setLoading] = useState<"checkout" | "portal" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const isPro = org.plan === "PRO" || org.plan === "ENTERPRISE";
+  const tier = getTier(org.plan);
+  const isPro = tier !== "starter";
   const periodEnd = org.stripeCurrentPeriodEnd
     ? new Date(org.stripeCurrentPeriodEnd).toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric" })
     : null;
@@ -78,13 +70,13 @@ export function BillingClient({ org, invoices = [] }: { org: OrgBilling; invoice
               : "bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-400"
           }`}>
             {isPro ? <Zap className="h-3 w-3" /> : null}
-            {isPro ? "Pro" : "Starter (Gratuito)"}
+            {PLAN_LABELS[tier]}
           </span>
         </div>
 
         {isPro && periodEnd && (
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Prossimo rinnovo: <span className="font-medium text-slate-700 dark:text-slate-300">{periodEnd}</span>
+            Periodo corrente fino al: <span className="font-medium text-slate-700 dark:text-slate-300">{periodEnd}</span>
           </p>
         )}
 
@@ -102,7 +94,7 @@ export function BillingClient({ org, invoices = [] }: { org: OrgBilling; invoice
         )}
 
         <div className="mt-4 flex gap-3">
-          {isPro ? (
+          {!canManage ? <p className="text-sm text-slate-500">Solo il proprietario può gestire l’abbonamento.</p> : isPro && !org.stripeCustomerId ? <Link href="/contatti" className="text-sm text-blue-600 underline">Piano gestito direttamente: contatta il supporto</Link> : (isPro || org.stripeSubscriptionId) ? (
             <Button
               variant="outline"
               onClick={handlePortal}
@@ -134,7 +126,7 @@ export function BillingClient({ org, invoices = [] }: { org: OrgBilling; invoice
             Gratis <span className="text-base font-normal text-slate-400">per sempre</span>
           </div>
           <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
-            {["1 pipeline", "500 contatti", "Lead Finder 1/giorno (10 candidati)"].map((f) => (
+            {STARTER_FEATURES.map((f) => (
               <li key={f} className="flex items-center gap-2">
                 <Check className="h-4 w-4 text-slate-400 shrink-0" />
                 {f}
@@ -152,12 +144,13 @@ export function BillingClient({ org, invoices = [] }: { org: OrgBilling; invoice
           <div className="flex items-center justify-between mb-1">
             <h3 className="text-base font-semibold text-slate-900 dark:text-white">Pro</h3>
             <span className="text-xs font-semibold text-blue-600 bg-blue-100 dark:bg-blue-500/20 dark:text-blue-400 px-2 py-0.5 rounded-full">
-              Più popolare
+              Funzioni Pro
             </span>
           </div>
           <div className="text-3xl font-bold text-slate-900 dark:text-white mb-4">
-            29€ <span className="text-base font-normal text-slate-400">/mese</span>
+            {PRO_PRICING.monthly} <span className="text-base font-normal text-slate-400">/mese per organizzazione</span>
           </div>
+          <p className="mb-3 text-xs text-slate-500">Include tutte le funzioni Starter. Importo e imposte sono mostrati al checkout prima della conferma.</p>
           <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
             {PRO_FEATURES.map((f) => (
               <li key={f} className="flex items-center gap-2">
@@ -166,7 +159,7 @@ export function BillingClient({ org, invoices = [] }: { org: OrgBilling; invoice
               </li>
             ))}
           </ul>
-          {!isPro && (
+          {!isPro && canManage && (
             <Button
               onClick={handleCheckout}
               disabled={loading !== null}

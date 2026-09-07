@@ -1,4 +1,5 @@
 "use server";
+import { crmPermissionError } from "@/lib/crm-permissions";
 
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
@@ -26,7 +27,7 @@ export async function getCustomBillingTypes(): Promise<CustomBillingType[]> {
 export async function saveCustomBillingTypes(types: CustomBillingType[]): Promise<{ error?: string }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "manage"))) return { error: "Non autorizzato" };
 
   try {
     await db.organization.update({
@@ -56,7 +57,7 @@ export async function getCustomProductCategories(): Promise<CustomProductCategor
 export async function saveCustomProductCategories(categories: CustomProductCategory[]): Promise<{ error?: string }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "manage"))) return { error: "Non autorizzato" };
 
   try {
     await db.organization.update({

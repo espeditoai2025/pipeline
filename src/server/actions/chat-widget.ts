@@ -1,4 +1,5 @@
 "use server";
+import { crmPermissionError } from "@/lib/crm-permissions";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -33,7 +34,7 @@ export async function getChatMessages(): Promise<ChatMessageItem[]> {
 export async function markChatMessageRead(id: string): Promise<void> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return;
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return;
 
   await db.chatMessage.updateMany({
     where: { id, organizationId: orgId },
@@ -44,7 +45,7 @@ export async function markChatMessageRead(id: string): Promise<void> {
 export async function deleteChatMessage(id: string): Promise<void> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return;
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return;
 
   await db.chatMessage.deleteMany({ where: { id, organizationId: orgId } });
 }

@@ -1,3 +1,4 @@
+import { STARTER_FEATURES, PRO_FEATURES, ENTERPRISE_FEATURES, PRO_PRICING } from "@/lib/plan-client";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -82,7 +83,7 @@ const features = [
     color: "bg-sky-500",
     title: "Campagne email",
     description:
-      "Crea e invia campagne alle tue liste. Traccia aperture e click in tempo reale con pixel di tracking.",
+      "Crea e invia campagne alle tue liste. Consulta aperture e click rilevati nel report della campagna.",
   },
   {
     icon: Mail,
@@ -108,9 +109,9 @@ const features = [
   {
     icon: MousePointerClick,
     color: "bg-teal-500",
-    title: "Tracking aperture & click",
+    title: "Tracking delle campagne",
     description:
-      "Ogni email inviata include pixel di tracking. Sai esattamente chi ha aperto e su quali link ha cliccato.",
+      "Nelle campagne email, registra aperture e click rilevati. Le impostazioni privacy dei destinatari possono rendere i dati incompleti o imprecisi.",
   },
   {
     icon: Building2,
@@ -187,7 +188,7 @@ const faqs = [
   },
   {
     q: "Perché le PMI hanno bisogno di un CRM?",
-    a: "Le PMI perdono mediamente il 20–30% delle opportunità per mancanza di follow-up. Un CRM come Pipely automatizza i promemoria, traccia ogni interazione e mostra in tempo reale lo stato di ogni trattativa. Il risultato: più affari chiusi, meno lavoro manuale e nessun cliente dimenticato.",
+    a: "Senza un promemoria è facile perdere un follow-up. Un CRM come Pipely automatizza i promemoria, traccia ogni interazione e mostra in tempo reale lo stato di ogni trattativa. Il risultato: più affari chiusi, meno lavoro manuale e nessun cliente dimenticato.",
   },
   {
     q: "CRM vs Excel: qual è la differenza?",
@@ -199,7 +200,7 @@ const faqs = [
   },
   {
     q: "Come si automatizzano i follow-up con un CRM?",
-    a: "Con Pipely crei workflow trigger-action: ad esempio «quando un affare non ha attività da 7 giorni → crea task di follow-up e notifica il responsabile». Si configura una volta e funziona in automatico, senza dover ricordare manualmente ogni cliente.",
+    a: "Con Pipely crei workflow trigger-action: ad esempio «quando un affare passa alla fase Proposta → attendi 7 giorni → crea un’attività di follow-up e notifica il responsabile». Si configura una volta e funziona in automatico, senza dover ricordare manualmente ogni cliente.",
   },
   {
     q: "Pipely è gratuito?",
@@ -313,7 +314,7 @@ export default function LandingPage() {
       />
       {/* ── Navbar ── */}
       <header className="sticky top-0 z-50 border-b border-slate-100 bg-white/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+        <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-2 px-3 sm:px-6">
           <PipelyWordmark />
           <nav className="hidden items-center gap-8 md:flex">
             <a
@@ -353,6 +354,7 @@ export default function LandingPage() {
             </Link>
           </div>
         </div>
+        <nav aria-label="Sezioni della home" className="flex justify-center gap-5 border-t px-4 py-2 text-sm md:hidden"><a href="#features">Funzionalità</a><a href="#automations">Automazioni</a><a href="#pricing">Prezzi</a></nav>
       </header>
 
       <main id="main-content">
@@ -389,7 +391,7 @@ export default function LandingPage() {
             <FadeInStaggerItem>
               <p className="mx-auto mb-10 max-w-2xl text-lg leading-relaxed text-slate-300">
                 Pipely è la piattaforma di sales management pensata per team italiani. Pipeline,
-                contatti, automazioni che funzionano davvero, campagne email con tracking e AI
+                contatti, automazioni con registro delle esecuzioni, campagne email con tracking e AI
                 assistant — tutto integrato.
               </p>
             </FadeInStaggerItem>
@@ -404,7 +406,7 @@ export default function LandingPage() {
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Link>
                 <Link
-                  href="/login"
+                  href="#features"
                   className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-8 py-3.5 text-base font-semibold text-white backdrop-blur-md transition-all hover:bg-white/10 hover:scale-105 active:scale-95"
                 >
                   Accedi all&apos;account
@@ -426,6 +428,7 @@ export default function LandingPage() {
 
           {/* Dashboard mockup animato */}
           <FadeIn delay={0.6} direction="up" className="relative mx-auto mt-20 max-w-5xl">
+            <p className="mb-3 text-xs text-slate-400">Anteprima dimostrativa con dati fittizi</p>
             <KanbanPreview />
             <div className="absolute -bottom-10 left-1/2 h-32 w-3/4 -translate-x-1/2 rounded-full bg-blue-600/30 blur-3xl" />
           </FadeIn>
@@ -502,15 +505,14 @@ export default function LandingPage() {
                   </span>
                 </h2>
                 <p className="mb-8 text-lg leading-relaxed text-slate-300">
-                  I workflow automatizzati di Pipely non sono solo regole visive — eseguono azioni reali e continue: inviano
-                  email, creano attività nel calendario, spostano trattative ed eliminano il lavoro manuale.
+                  I workflow di Pipely inviano email, creano attività, assegnano responsabili e spostano trattative. Ogni esecuzione ha un registro; attese e attività scadute vengono controllate ogni 5 minuti.
                 </p>
                 <ul className="space-y-4">
                   {[
-                    "Trigger su ogni evento CRM (affare, contatto, lead)",
+                    "8 eventi: creazione di affari, contatti e lead; variazioni di fase e valore; vittorie, perdite e attività scadute",
                     "Invio email automatico personalizzato",
-                    "Creazione attività con scadenze intelligenti",
-                    "Notifiche in-app istantanee al team",
+                    "Creazione di attività con scadenze configurabili",
+                    "Notifiche nel CRM al responsabile o al team",
                   ].map((item) => (
                     <li key={item} className="flex items-center gap-3 text-sm text-slate-300">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-fuchsia-500/20">
@@ -524,6 +526,7 @@ export default function LandingPage() {
 
               {/* Automation mockup */}
               <FadeInStagger className="space-y-4" faster>
+                <p className="text-xs text-slate-400">Esempi di configurazioni disponibili nel piano Pro</p>
                 {automationSteps.map((step, i) => (
                   <FadeInStaggerItem key={i}>
                     <div className="group rounded-2xl border border-white/5 bg-white/5 p-5 backdrop-blur-md transition-colors hover:bg-white/10">
@@ -580,7 +583,7 @@ export default function LandingPage() {
                 <div className="mt-6 flex items-start gap-3 rounded-xl border border-emerald-100 bg-emerald-50/50 px-5 py-4">
                   <MousePointerClick className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
                   <p className="text-sm font-medium text-emerald-800 leading-relaxed">
-                    Il pixel di tracking proprietario ha rilevato 843 aperture univoche. I click si sono concentrati sul link principale.
+                    Esempio dimostrativo con dati fittizi. Le aperture e i click sono segnali indicativi, non una conferma di lettura.
                   </p>
                 </div>
               </FadeIn>
@@ -594,7 +597,7 @@ export default function LandingPage() {
                   Sai chi apre le tue email — <span className="text-slate-500">e chi no</span>
                 </h2>
                 <p className="mb-6 text-lg leading-relaxed text-slate-600">
-                  Non servono tool esterni per le newsletter. Crea liste segmentate nel CRM, progetta campagne e monitora aperture e click in tempo reale.
+                  Non servono tool esterni per le newsletter. Crea liste nel CRM, prepara campagne e consulta aperture e click rilevati. Questi dati dipendono anche dalle impostazioni privacy dei destinatari.
                 </p>
                 <ul className="space-y-4">
                   {[
@@ -663,7 +666,7 @@ export default function LandingPage() {
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-500 shadow-lg shadow-indigo-500/30">
                       <Sparkles className="h-4 w-4 text-white" />
                     </div>
-                    <span className="text-sm font-semibold text-white">Pipely AI</span>
+                    <span className="text-sm font-semibold text-white">Pipely AI · esempio dimostrativo</span>
                     <div className="ml-auto flex h-2 w-2 rounded-full bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.8)] animate-pulse" />
                   </div>
                   <div className="space-y-4">
@@ -728,7 +731,7 @@ export default function LandingPage() {
                 Il giusto prezzo per crescere
               </h2>
               <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-600">
-                Inizia gratis, passa a Pro quando il tuo team ha bisogno di più potenza.
+                Inizia con Starter. Pro si attiva dall’area Abbonamento dopo la registrazione. Importo e imposte sono mostrati al checkout prima della conferma.
               </p>
             </FadeIn>
 
@@ -739,14 +742,7 @@ export default function LandingPage() {
                   price: "0€",
                   period: "per sempre",
                   description: "Per freelance e piccoli team",
-                  features: [
-                    "1 pipeline",
-                    "Fino a 500 contatti",
-                    "Attività & calendario",
-                    "Catalogo prodotti",
-                    "Import XLS / CSV",
-                    "Report base",
-                  ],
+                  features: STARTER_FEATURES,
                   excluded: [
                     "AI Assistant",
                     "Automazioni",
@@ -759,22 +755,12 @@ export default function LandingPage() {
                 },
                 {
                   name: "Pro",
-                  price: "29€",
-                  originalPrice: "99€",
-                  period: "/ mese",
-                  description: "Per team di vendita in crescita",
-                  features: [
-                    "Pipeline illimitate",
-                    "Contatti illimitati",
-                    "AI Assistant completo",
-                    "Automazioni workflow reali",
-                    "Campagne email + tracking",
-                    "SMTP personalizzato",
-                    "Report personalizzati",
-                    "Supporto prioritario",
-                  ],
+                  price: PRO_PRICING.monthly,
+                  period: "/ mese per organizzazione",
+                  description: "Tutto Starter, con strumenti per crescere",
+                  features: PRO_FEATURES,
                   excluded: [],
-                  cta: "Passa a Pro",
+                  cta: "Crea account, poi attiva Pro",
                   href: "/register",
                   highlight: true,
                 },
@@ -782,15 +768,8 @@ export default function LandingPage() {
                   name: "Enterprise",
                   price: "Su misura",
                   period: "",
-                  description: "Per grandi organizzazioni",
-                  features: [
-                    "Tutto il piano Pro",
-                    "SSO & SAML",
-                    "SLA 99.5% (vedi Termini)",
-                    "API dedicata",
-                    "Onboarding dedicato",
-                    "Account manager",
-                  ],
+                  description: "Per esigenze organizzative da concordare",
+                  features: ENTERPRISE_FEATURES,
                   excluded: [],
                   cta: "Contattaci",
                   href: "/contatti",
@@ -807,7 +786,7 @@ export default function LandingPage() {
                   >
                     {plan.highlight && (
                       <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-teal-400 px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-slate-900 shadow-md">
-                        Più popolare
+                        Per crescere
                       </div>
                     )}
                     <div className="mb-6 border-b pb-6 border-current/10">
@@ -816,16 +795,6 @@ export default function LandingPage() {
                       >
                         {plan.name}
                       </h3>
-                      {"originalPrice" in plan && plan.originalPrice && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <span className="text-sm text-blue-200 line-through">
-                            {plan.originalPrice}
-                          </span>
-                          <span className="rounded-full border border-teal-400/40 bg-teal-400/20 px-2 py-0.5 text-xs font-bold text-teal-300">
-                            Offerta limitata
-                          </span>
-                        </div>
-                      )}
                       <div className="mt-2 flex items-baseline gap-1">
                         <span
                           className={`text-5xl font-bold tracking-tight ${plan.highlight ? "text-white" : "text-slate-900"}`}
@@ -858,9 +827,9 @@ export default function LandingPage() {
                         </li>
                       ))}
                       {plan.excluded.map((f) => (
-                        <li key={f} className="flex items-start gap-3 text-sm font-medium opacity-50">
+                        <li key={f} className="flex items-start gap-3 text-sm font-medium">
                           <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                          <span className={plan.highlight ? "text-white" : "text-slate-500"}>{f}</span>
+                          <span className={plan.highlight ? "text-white" : "text-slate-600"}><span className="sr-only">Non incluso: </span>{f}</span>
                         </li>
                       ))}
                     </ul>
@@ -889,7 +858,7 @@ export default function LandingPage() {
                 {
                   icon: Shield,
                   title: "Sicurezza enterprise",
-                  desc: "Dati crittografati AES-256, HTTPS ovunque, sessioni sicure e password SMTP cifrate.",
+                  desc: "Connessioni HTTPS, accesso autenticato e password SMTP cifrate a riposo.",
                 },
                 {
                   icon: Globe,
@@ -898,8 +867,8 @@ export default function LandingPage() {
                 },
                 {
                   icon: Bell,
-                  title: "Notifiche in tempo reale",
-                  desc: "Ogni automazione e evento importante ti raggiunge con notifiche in-app istantanee.",
+                  title: "Notifiche nel CRM",
+                  desc: "Le automazioni possono creare notifiche per il responsabile o il team, consultabili nel CRM.",
                 },
               ].map((item) => (
                 <FadeInStaggerItem key={item.title}>

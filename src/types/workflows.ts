@@ -31,10 +31,10 @@ export type ActionType =
 
 export type ActionConfig =
   | { type: "SEND_EMAIL"; templateId: string; to: "contact" | "owner" | string }
-  | { type: "CREATE_ACTIVITY"; activityType: string; subject: string; dueDays: number }
+  | { type: "CREATE_ACTIVITY"; activityType: "CALL" | "MEETING" | "TASK" | "DEADLINE" | "EMAIL" | "LUNCH"; subject: string; dueDays: number }
   | { type: "UPDATE_DEAL_STAGE"; stageId: string }
   | { type: "ASSIGN_OWNER"; userId: string }
-  | { type: "SEND_NOTIFICATION"; message: string }
+  | { type: "SEND_NOTIFICATION"; message: string; to?: "owner" | "team" }
   | { type: "WAIT"; days: number };
 
 // ---- Workflow ----
@@ -50,6 +50,7 @@ export type Workflow = {
   name: string;
   description: string;
   isActive: boolean;
+  triggerOnImport?: boolean;
   trigger: TriggerConfig;
   steps: WorkflowStep[];
   organizationId: string;
@@ -61,7 +62,7 @@ export type Workflow = {
 
 // ---- Execution log ----
 
-export type LogStatus = "SUCCESS" | "FAILED" | "SKIPPED";
+export type LogStatus = "PENDING" | "RUNNING" | "PAUSED" | "SUSPENDED" | "SUCCESS" | "FAILED" | "SKIPPED" | "VALIDATION";
 
 export type WorkflowLog = {
   id: string;
@@ -75,4 +76,8 @@ export type WorkflowLog = {
   stepsExecuted: number;
   error: string | null;
   executedAt: string;
+  queueId?: string | null;
+  resumeAt?: string | null;
+  emailInFlight?: boolean;
+  logs?: string[];
 };

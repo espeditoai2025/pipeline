@@ -2,6 +2,7 @@ import { resend, FROM_DEFAULT } from "@/lib/resend";
 import { sendViaSMTP } from "@/lib/smtp-send";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { getOrgPlan, checkFeature } from "@/lib/plan";
 
 /**
  * Unico punto d'uscita della posta.
@@ -22,6 +23,7 @@ export type MailOptions = {
   /** Sovrascrive il nome del mittente sul canale SMTP dell'organizzazione. */
   fromName?: string;
   headers?: Record<string, string>;
+  idempotencyKey?: string;
 };
 
 export type MailResult = { ok: true; via: "smtp" | "resend" } | { ok: false; error: string };
@@ -51,7 +53,7 @@ async function sendViaResend(opts: MailOptions): Promise<MailResult> {
       html: opts.html,
       replyTo: opts.replyTo,
       headers: opts.headers,
-    });
+    }, opts.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : undefined);
     // Il controllo che dà senso a questo modulo: senza, un rifiuto dell'API
     // passerebbe per invio riuscito.
     if (r.error) return { ok: false, error: `${r.error.name}: ${r.error.message}` };
@@ -82,7 +84,7 @@ export async function resolveOrgChannel(orgId: string): Promise<OrgChannel | nul
     where: { organizationId: orgId },
     select: { isVerified: true },
   });
-  if (smtp?.isVerified) return "smtp";
+  if (smtp?.isVerified) return checkFeature(await getOrgPlan(orgId), "smtp") ? null : "smtp";
   return resend ? "resend" : null;
 }
 
@@ -100,6 +102,9 @@ export async function sendOrgMail(orgId: string, opts: MailOptions, channel?: Or
     return { ok: false, error: "Configura un provider email (SMTP verificato o Resend) prima di inviare." };
   }
   if (via === "smtp") {
+    if (checkFeature(await getOrgPlan(orgId), "smtp")) {
+      return { ok: false, error: "Il piano corrente non include SMTP. Aggiorna il piano o riconfigura il canale di invio." };
+    }
     const r = await sendViaSMTP(orgId, opts);
     return r.ok ? { ok: true, via: "smtp" } : { ok: false, error: r.error ?? "Invio SMTP non riuscito" };
   }

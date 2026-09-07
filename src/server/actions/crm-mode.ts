@@ -1,4 +1,5 @@
 "use server";
+import { crmPermissionError } from "@/lib/crm-permissions";
 
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
@@ -38,7 +39,7 @@ export async function isCrmModeSet(): Promise<boolean> {
 export async function setCrmMode(mode: CrmModeId): Promise<{ error?: string }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "manage"))) return { error: "Non autorizzato" };
 
   await db.organization.update({
     where: { id: orgId },

@@ -1,5 +1,6 @@
 "use server";
 
+import { crmPermissionError } from "@/lib/crm-permissions";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { Session } from "next-auth";
@@ -87,7 +88,7 @@ export async function createCustomField(data: {
 }): Promise<{ field?: CustomField; error?: string }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autenticato" };
+  if (!orgId || await crmPermissionError(session, "manage")) return { error: "Non autorizzato" };
 
   const row = await db.customField.create({
     data: {
@@ -119,7 +120,7 @@ export async function updateCustomField(
 ): Promise<{ error?: string }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autenticato" };
+  if (!orgId || await crmPermissionError(session, "manage")) return { error: "Non autorizzato" };
 
   const existing = await db.customField.findFirst({ where: { id, organizationId: orgId } });
   if (!existing) return { error: "Campo non trovato" };
@@ -139,7 +140,7 @@ export async function updateCustomField(
 export async function deleteCustomField(id: string): Promise<{ error?: string }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autenticato" };
+  if (!orgId || await crmPermissionError(session, "manage")) return { error: "Non autorizzato" };
 
   const existing = await db.customField.findFirst({ where: { id, organizationId: orgId } });
   if (!existing) return { error: "Campo non trovato" };
@@ -157,7 +158,7 @@ export async function saveCustomFieldValues(
 ): Promise<{ error?: string }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autenticato" };
+  if (!orgId || await crmPermissionError(session, "write")) return { error: "Non autorizzato" };
 
   // Scoping tenant: l'entità parent deve appartenere all'org (IDOR guard).
   if (!(await parentBelongsToOrg(entityType, entityId, orgId))) {

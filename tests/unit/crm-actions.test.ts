@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
-  const model = () => ({ findFirst: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), count: vi.fn(), create: vi.fn(), createMany: vi.fn(), update: vi.fn(), updateMany: vi.fn(), delete: vi.fn() });
+  const model = () => ({ findFirst: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), count: vi.fn(), create: vi.fn(), createMany: vi.fn(), createManyAndReturn: vi.fn(), update: vi.fn(), updateMany: vi.fn(), delete: vi.fn() });
   return {
     auth: vi.fn(), webhook: vi.fn(), workflow: vi.fn(), revalidate: vi.fn(),
-    db: { contact: model(), company: model(), deal: model(), pipeline: model(), stage: model(), activity: model(), organization: model(), $transaction: vi.fn() },
+    db: { user: model(), contact: model(), company: model(), deal: model(), pipeline: model(), stage: model(), activity: model(), organization: model(), $transaction: vi.fn() },
   };
 });
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/db", () => ({ db: mocks.db }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidate }));
-vi.mock("@/server/actions/webhooks", () => ({ dispatchWebhook: mocks.webhook }));
-vi.mock("@/lib/workflow-engine", () => ({ runWorkflows: mocks.workflow }));
+vi.mock("@/lib/webhook-delivery", () => ({ dispatchWebhook: mocks.webhook }));
+vi.mock("@/lib/workflow-wake", () => ({ wakeWorkflows: vi.fn() }));
 
 import { createActivity, updateActivity } from "@/server/actions/activities";
 import { createContact, importContacts, mergeContacts } from "@/server/actions/contacts";
@@ -21,6 +21,7 @@ import { getDailyFocus } from "@/server/actions/daily-focus";
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.auth.mockResolvedValue({ user: { id: "user-a", organizationId: "org-a" } });
+  mocks.db.user.findUnique.mockResolvedValue({ organizationId: "org-a", role: "OWNER" });
   mocks.webhook.mockResolvedValue(undefined);
   mocks.workflow.mockResolvedValue(undefined);
   for (const model of [mocks.db.company, mocks.db.contact, mocks.db.deal, mocks.db.pipeline, mocks.db.stage, mocks.db.activity]) {
@@ -58,7 +59,7 @@ describe("isolamento dei dati nelle operazioni CRM", () => {
   });
   it("non riscrive la data di chiusura né ripete automazioni per un affare già vinto", async () => {
     mocks.db.deal.findFirst.mockResolvedValue({ status: "WON", stageId: "s1", pipelineId: "p1", value: 100 });
-    mocks.db.deal.update.mockResolvedValue({ id: "deal-a", title: "Progetto", ownerId: "user-a", value: 100, contactId: null });
+    mocks.db.deal.update.mockResolvedValue({ id: "deal-a", title: "Progetto", ownerId: "user-a", value: 100, contactId: null, updatedAt: new Date(), stageId: "s1", status: "WON" });
     expect(await updateDeal({ id: "deal-a", status: "WON", title: "Nuovo titolo" })).toEqual({ ok: true });
     expect(mocks.db.deal.update.mock.calls[0]![0].data.closedAt).toBeUndefined();
     expect(mocks.workflow).not.toHaveBeenCalled();
@@ -71,14 +72,14 @@ describe("isolamento dei dati nelle operazioni CRM", () => {
   });
   it("permette di rimuovere data prevista e contatto dal modulo affare", async () => {
     mocks.db.deal.findFirst.mockResolvedValue({ status: "OPEN", stageId: "s1", pipelineId: "p1", value: 100 });
-    mocks.db.deal.update.mockResolvedValue({ id: "deal-a", title: "Progetto", ownerId: "user-a", value: 100, contactId: null });
+    mocks.db.deal.update.mockResolvedValue({ id: "deal-a", title: "Progetto", ownerId: "user-a", value: 100, contactId: null, updatedAt: new Date(), stageId: "s1", status: "OPEN" });
     expect(await updateDeal({ id: "deal-a", expectedClose: "", contactId: null })).toEqual({ ok: true });
     expect(mocks.db.deal.update.mock.calls[0]![0].data).toMatchObject({ expectedClose: null, contactId: null });
   });
   it("non riapre affari eliminati né altera chiusure già nello stato richiesto", async () => {
     mocks.db.deal.updateMany.mockResolvedValue({ count: 1 });
     await updateDealsStatus(["deal-a"], "WON");
-    expect(mocks.db.deal.updateMany.mock.calls[0]![0].where).toEqual({ id: { in: ["deal-a"] }, organizationId: "org-a", status: { notIn: ["WON", "DELETED"] } });
+    expect(mocks.db.deal.findMany.mock.calls[0]![0].where).toEqual({ id: { in: ["deal-a"] }, organizationId: "org-a", status: { notIn: ["WON", "DELETED"] } });
   });
   it("rifiuta date senza fuso e durate frazionarie", async () => {
     expect((await createActivity({ type: "CALL", subject: "Richiamo", dueDate: "2026-09-05T09:30" })).error).toMatch(/Data non valida/);
@@ -105,7 +106,8 @@ describe("importazione e unione", () => {
   });
   it("calcola il limite del piano sui nuovi contatti dopo aver escluso i duplicati", async () => {
     mocks.db.contact.findMany.mockResolvedValue(Array.from({ length: 499 }, (_, i) => ({ email: `user${i}@example.it` })));
-    mocks.db.contact.createMany.mockResolvedValue({ count: 1 });
+    mocks.db.contact.count.mockResolvedValue(499);
+    mocks.db.contact.createManyAndReturn.mockResolvedValue([{ id: "new", firstName: "Nuovo", ownerId: "user-a", email: "new@example.it" }]);
     const result = await importContacts([{ firstName: "Esistente", email: "USER0@example.it", companyName: "Non creare" }, { firstName: "Nuovo", email: "new@example.it" }]);
     expect(result).toMatchObject({ imported: 1, duplicates: 1, companies: 0, error: null });
     expect(mocks.db.company.create).not.toHaveBeenCalled();
@@ -113,6 +115,7 @@ describe("importazione e unione", () => {
   });
   it("non crea aziende quando il piano ha esaurito i contatti", async () => {
     mocks.db.contact.findMany.mockResolvedValue(Array.from({ length: 500 }, (_, i) => ({ email: `${i}@example.it` })));
+    mocks.db.contact.count.mockResolvedValue(500);
     expect((await importContacts([{ firstName: "Nuovo", companyName: "Studio" }])).error).toMatch(/limite di 500/);
     expect(mocks.db.company.create).not.toHaveBeenCalled();
     expect(mocks.db.contact.createMany).not.toHaveBeenCalled();

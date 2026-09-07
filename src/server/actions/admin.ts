@@ -27,7 +27,13 @@ export async function updateOrgPlan(orgId: string, plan: AdminPlan): Promise<{ e
   if (!(await requireAdmin())) return { error: "Non autorizzato" };
   if (!["STARTER", "PRO", "ENTERPRISE"].includes(plan)) return { error: "Piano non valido" };
 
-  await db.organization.update({ where: { id: orgId }, data: { plan } });
+  await db.$transaction(async tx => {
+    await tx.organization.update({ where: { id: orgId }, data: { plan } });
+    if (plan === "STARTER") {
+      await tx.workflow.updateMany({ where: { organizationId: orgId }, data: { isActive: false } });
+      await tx.workflowQueue.updateMany({ where: { orgId, status: { in: ["PENDING", "PAUSED"] } }, data: { status: "SUSPENDED", error: "Piano non abilitato. Ripresa manuale richiesta." } });
+    }
+  });
   revalidatePath(`/admin/organizations/${orgId}`);
   revalidatePath("/admin/organizations");
   return { error: null };

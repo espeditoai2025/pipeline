@@ -12,8 +12,7 @@ import { db } from "@/lib/db";
 import { isEmailEnabled } from "@/lib/resend";
 import { sendPlatformMail } from "@/lib/mailer";
 import { logger } from "@/lib/logger";
-import { runWorkflows, runStepsFrom, type WorkflowPayload } from "@/lib/workflow-engine";
-import { processWebhookRetries } from "@/server/actions/webhooks";
+import { processWebhookRetries } from "@/lib/webhook-delivery";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -103,70 +102,6 @@ export async function GET(req: NextRequest) {
       logger.info("cron:backup", "Snapshot email inviata", { to: adminEmail });
     }
 
-    // ── ACTIVITY_OVERDUE trigger ─────────────────────────────────────────────
-    // Trova tutte le attività scadute non ancora completate e triggera i workflow
-    const overdueActivities = await db.activity.findMany({
-      where: {
-        completedAt: null,
-        dueDate: { lt: new Date() },
-      },
-      select: { id: true, organizationId: true, userId: true, dealId: true, contactId: true },
-    });
-
-    if (overdueActivities.length > 0) {
-      logger.info("cron:backup", "Attività scadute trovate", { count: overdueActivities.length });
-      // Raggruppa per org e triggera workflow (max 50 per evitare timeout)
-      const toProcess = overdueActivities.slice(0, 50);
-      await Promise.allSettled(
-        toProcess.map((a) =>
-          runWorkflows({
-            trigger: "ACTIVITY_OVERDUE",
-            orgId: a.organizationId,
-            activityId: a.id,
-            ownerId: a.userId,
-            dealId: a.dealId ?? undefined,
-            contactId: a.contactId ?? undefined,
-          })
-        )
-      );
-    }
-
-    // ── WorkflowQueue — resume paused workflows whose delay has elapsed ────────
-    const dueQueueItems = await db.workflowQueue.findMany({
-      where: { resumeAt: { lte: new Date() } },
-      include: { workflow: { select: { id: true, steps: true, isActive: true } } },
-      take: 50,
-    });
-
-    let queueResumed = 0;
-    for (const item of dueQueueItems) {
-      if (!item.workflow.isActive) {
-        await db.workflowQueue.delete({ where: { id: item.id } });
-        continue;
-      }
-      const payload = item.payload as WorkflowPayload;
-      const entityId = ("dealId" in payload ? payload.dealId : "contactId" in payload ? (payload.contactId ?? "") : "leadId" in payload ? payload.leadId : "") ?? "";
-      const entityLabel = "dealTitle" in payload ? payload.dealTitle : "contactName" in payload ? payload.contactName : "leadTitle" in payload ? payload.leadTitle : "";
-      const entityType = payload.trigger.startsWith("DEAL") ? "deal" : payload.trigger.startsWith("CONTACT") ? "contact" : "lead";
-
-      await runStepsFrom({
-        workflows: [item.workflow],
-        payload,
-        orgId: item.orgId,
-        ownerId: item.ownerId,
-        entityId,
-        entityLabel,
-        entityType,
-        startIndex: item.stepIndex,
-      });
-      await db.workflowQueue.delete({ where: { id: item.id } });
-      queueResumed++;
-    }
-
-    if (queueResumed > 0) {
-      logger.info("cron:backup", "Workflow in coda ripresi", { count: queueResumed });
-    }
-
     // ── Webhook retry — fallback daily run (a dedicated cron handles it more
     // frequently when the plan allows; this guarantees retries happen at least daily).
     const webhooksRetried = await processWebhookRetries(100).catch(() => 0);
@@ -174,7 +109,7 @@ export async function GET(req: NextRequest) {
       logger.info("cron:backup", "Consegne webhook ritentate", { count: webhooksRetried });
     }
 
-    return NextResponse.json({ ok: true, snapshot, overdueTriggered: overdueActivities.length, queueResumed, webhooksRetried });
+    return NextResponse.json({ ok: true, snapshot, webhooksRetried });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error("cron:backup", "Backup snapshot fallito", { error: message });

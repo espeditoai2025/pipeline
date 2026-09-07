@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Toaster } from "sonner";
+import LandingPage from "@/app/page";
+import { WorkflowBuilder } from "@/components/automations/WorkflowBuilder";
+import { AutomationLogView } from "@/components/automations/AutomationLogView";
+import { BillingClient } from "@/app/(dashboard)/billing/BillingClient";
+import { fixtureWorkflow, fixtureLogs } from "./actions";
 import { DailyFocus } from "@/components/dashboard/DailyFocus";
 import { MergeDuplicatesModal } from "@/components/contacts/MergeDuplicatesModal";
 import { ImportCSVModal } from "@/components/contacts/ImportCSVModal";
@@ -12,6 +17,7 @@ import { CreateInvoiceModal } from "@/components/invoices/CreateInvoiceModal";
 import type { Activity } from "@/types/activities";
 import "@/app/globals.css";
 
+document.documentElement.style.setProperty("--font-sans", "Arial, sans-serif");
 const dueDate = new Date(Date.now() - 3600000).toISOString();
 const activity: Activity = {
   id: "activity-1", subject: "Richiamare Mario", type: "CALL", notes: null, dueDate, completedAt: null, duration: 30,
@@ -20,6 +26,7 @@ const activity: Activity = {
 };
 function App() {
   const [, render] = useState(0);
+  const [savedWorkflow, setSavedWorkflow] = useState("");
   const [open, setOpen] = useState(true);
   const params = new URLSearchParams(location.search);
   const view = location.pathname.startsWith("/invoices/") ? "invoice" : location.pathname === "/invoices" ? "invoices" : params.get("view");
@@ -28,9 +35,13 @@ function App() {
     window.addEventListener("fixture-refresh", refresh);
     return () => window.removeEventListener("fixture-refresh", refresh);
   }, []);
+  if (view === "home") return <LandingPage />;
   return <main className="mx-auto min-h-screen max-w-6xl bg-[var(--crm-neutral-50)] p-4 text-[var(--crm-neutral-900)] sm:p-8" style={{ fontFamily: "Arial, sans-serif" }}>
     <Toaster />
-    {view === "merge" ? <><p>Unioni eseguite: {fixture.mergeCount}</p>{open && <MergeDuplicatesModal open onClose={() => setOpen(false)} duplicates={[{ key: "mario@example.it", contacts }]} onMerged={() => render(value => value + 1)} />}</>
+    {view === "workflow" ? <><p data-testid="saved-workflow">{savedWorkflow}</p><WorkflowBuilder open={open} onClose={() => setOpen(false)} workflow={fixtureWorkflow} onSaved={row => setSavedWorkflow(JSON.stringify(row))} /></>
+    : view === "workflow-logs" ? <AutomationLogView logs={fixtureLogs} />
+    : view === "billing" ? <BillingClient canManage org={{ plan: params.get("plan") ?? "ESSENTIAL", stripeCustomerId: null, stripeSubscriptionId: null, stripeCurrentPeriodEnd: null }} />
+    : view === "merge" ? <><p>Unioni eseguite: {fixture.mergeCount}</p>{open && <MergeDuplicatesModal open onClose={() => setOpen(false)} duplicates={[{ key: "mario@example.it", contacts }]} onMerged={() => render(value => value + 1)} />}</>
     : view === "import" ? <ImportCSVModal open={open} onClose={() => setOpen(false)} onImported={() => render(value => value + 1)} />
     : view === "activities" ? <ActivitiesPageClient initialActivities={[activity]} gcalConnected={false} gcalConfigured={false} />
     : view === "invoice-create" ? <CreateInvoiceModal open={open} onClose={() => setOpen(false)} dealId="deal-1" companyName="Studio Rossi" />

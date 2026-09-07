@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { crmTransaction } from "@/lib/crm-transaction";
+import { enqueueWorkflows } from "@/lib/workflow-events";
+import { wakeWorkflows } from "@/lib/workflow-wake";
 import { db } from "@/lib/db";
 import { authenticateApiKey, parsePagination, validateOrgForeignKeys } from "@/lib/api-auth";
 
 const createSchema = z.object({
   title: z.string().min(1, "title is required"),
   value: z.number().min(0).default(0),
-  currency: z.string().default("EUR"),
+  currency: z.string().regex(/^[A-Z]{3}$/).default("EUR"),
   stageId: z.string().min(1, "stageId is required"),
   pipelineId: z.string().min(1, "pipelineId is required"),
-  expectedClose: z.string().optional(),
+  expectedClose: z.string().date().or(z.string().datetime({ offset: true })).optional(),
   contactId: z.string().optional(),
   companyId: z.string().optional(),
   ownerId: z.string().optional(),
@@ -111,7 +114,8 @@ export async function POST(req: NextRequest) {
     resolvedOwnerId = firstUser.id;
   }
 
-  const deal = await db.deal.create({
+  const deal = await crmTransaction(async tx => {
+    const row = await tx.deal.create({
     data: {
       ...rest,
       organizationId,
@@ -126,5 +130,9 @@ export async function POST(req: NextRequest) {
     },
   });
 
+    await enqueueWorkflows(tx, { trigger: "DEAL_CREATED", orgId: organizationId, dealId: row.id, dealTitle: row.title, dealValue: Number(row.value), stageId: row.stageId, ownerId: row.ownerId, contactId: row.contactId ?? undefined, source: "api" }, `created:${row.id}`);
+    return row;
+  });
+  wakeWorkflows(organizationId);
   return NextResponse.json({ data: serializeDeal(deal) }, { status: 201 });
 }

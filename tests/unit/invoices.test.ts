@@ -5,7 +5,7 @@ import { roundMoney } from "@/lib/invoice-payments";
 
 const mocks = vi.hoisted(() => {
   const model = () => ({ findFirst: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), aggregate: vi.fn(), groupBy: vi.fn(), count: vi.fn() });
-  return { auth: vi.fn(), revalidate: vi.fn(), db: { invoice: model(), invoicePayment: model(), deal: model(), $queryRaw: vi.fn(), $transaction: vi.fn() } };
+  return { auth: vi.fn(), revalidate: vi.fn(), db: { user: model(), invoice: model(), invoicePayment: model(), deal: model(), $queryRaw: vi.fn(), $transaction: vi.fn() } };
 });
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/db", () => ({ db: mocks.db }));
@@ -21,6 +21,7 @@ const priorPayment = () => ({ id: "p1", invoiceId: "inv-a", organizationId: "org
 beforeEach(() => {
   vi.resetAllMocks(); vi.useFakeTimers(); vi.setSystemTime(new Date("2026-09-05T21:00:00Z"));
   mocks.auth.mockResolvedValue({ user: { id: "user-a", organizationId: "org-a", role: "SALES" } });
+  mocks.db.user.findUnique.mockResolvedValue({ role: "SALES", organizationId: "org-a" });
   mocks.db.$transaction.mockImplementation(async callback => callback(mocks.db));
   mocks.db.$queryRaw.mockResolvedValue([{ id: "inv-a" }]);
   mocks.db.invoice.findFirst.mockResolvedValue(invoice());

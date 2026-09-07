@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
+import { crmPermissionError } from "@/lib/crm-permissions";
 import { db } from "@/lib/db";
 import type { Product, ProductCategory, DealProduct, CreateProductInput, AddDealProductInput } from "@/types/products";
 
@@ -70,7 +71,7 @@ type ActionResult<T> = { data?: T; error?: string };
 export async function createProduct(input: CreateProductInput): Promise<ActionResult<Product>> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   const parsed = productSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Input non valido" };
@@ -101,7 +102,7 @@ export async function createProduct(input: CreateProductInput): Promise<ActionRe
 export async function updateProduct(id: string, input: Partial<CreateProductInput>): Promise<ActionResult<Product>> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   try {
     const row = await db.product.update({
@@ -129,7 +130,7 @@ export async function updateProduct(id: string, input: Partial<CreateProductInpu
 export async function deleteProduct(id: string): Promise<ActionResult<void>> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   try {
     await db.product.delete({ where: { id, organizationId: orgId } });
@@ -140,9 +141,18 @@ export async function deleteProduct(id: string): Promise<ActionResult<void>> {
   }
 }
 
-export async function toggleProductActive(_id: string, _isActive: boolean): Promise<ActionResult<Product>> {
-  // isActive not in schema — no-op, return success
-  return { error: undefined };
+export async function toggleProductActive(id: string, isActive: boolean): Promise<ActionResult<Product>> {
+  const session = await auth();
+  const orgId = getOrgId(session);
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
+  if (!id || typeof isActive !== "boolean") return { error: "Dati non validi" };
+  try {
+    const row = await db.product.update({ where: { id, organizationId: orgId }, data: { isActive } });
+    revalidatePath("/products");
+    return { data: mapProduct(row) };
+  } catch {
+    return { error: "Prodotto non disponibile" };
+  }
 }
 
 const dealProductSchema = z.object({
@@ -159,7 +169,7 @@ const dealProductSchema = z.object({
 export async function addProductToDeal(input: AddDealProductInput): Promise<ActionResult<DealProduct>> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   const parsed = dealProductSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Input non valido" };
@@ -251,7 +261,7 @@ export async function getDealProducts(dealId: string): Promise<ActionResult<Deal
 export async function removeProductFromDeal(id: string): Promise<ActionResult<void>> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   try {
     // Scoping tenant via parent: DealProduct non ha organizationId (IDOR guard).
@@ -270,7 +280,7 @@ export async function updateDealProduct(
 ): Promise<ActionResult<DealProduct>> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   try {
     // Scoping tenant via parent: verifica che la riga appartenga a un deal dell'org.

@@ -29,9 +29,9 @@ export const TIER_RANK: Record<PlanTier, number> = {
 
 export const PRO_PRICING = {
   monthly: "€29",
-  monthlyFull: "€99",
-  yearly: "€290",
-  yearlyNote: "2 mesi omaggio",
+  cents: 2900,
+  currency: "eur",
+  interval: "month",
 } as const;
 
 export function isPlanError(error: string): boolean {
@@ -45,5 +45,9 @@ export const PRO_FEATURES = [
   "Automazioni avanzate (workflow)",
   "Email marketing con tracking aperture e click",
   "Configurazione SMTP (Gmail, Aruba, Libero, custom)",
-  "Report personalizzati",
+  "Lead Finder: ricerche illimitate, fino a 50 candidati per ricerca",
 ];
+
+export const STARTER_FEATURES = ["1 pipeline", "Fino a 500 contatti", "Attività e calendario", "Catalogo prodotti", "Importazione CSV / Excel", "Report vendite ed esportazione CSV", "Lead Finder: 1 ricerca al giorno, fino a 10 candidati", "API REST e webhook per integrazioni"];
+export const ENTERPRISE_FEATURES = ["Tutte le funzionalità Pro", "Progetto di adozione da concordare", "Assistenza e condizioni definite nel preventivo"];
+export const PLAN_LABELS: Record<PlanTier, string> = { starter: "Starter", pro: "Pro", enterprise: "Enterprise" };

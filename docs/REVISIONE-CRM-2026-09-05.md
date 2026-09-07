@@ -1,10 +1,14 @@
 # Revisione Pipely — 5 settembre 2026
 
+> Correzioni del 7 settembre implementate e descritte in [CORREZIONI-CRM-2026-09-07.md](CORREZIONI-CRM-2026-09-07.md), con test e inventario dei file. Rilascio della nuova migrazione ancora da eseguire.
+
+> Audit iniziale del 7 settembre: nuova [revisione di codice, home, piani e automazioni](REVISIONE-CODICE-HOME-PIANI-2026-09-07.md), con problemi aperti, 21 prove mirate e conteggi del database in sola lettura. Questo documento conserva lo storico del lavoro del 5–6 settembre.
+
 Target scelto: **liberi professionisti e microimprese**. Il lavoro si concentra su uso quotidiano, affidabilità dell'agenda, qualità dei contatti, scadenzario e incassi, isolamento delle organizzazioni. La revisione riguarda questi flussi e la configurazione di build; non costituisce una verifica completa di tutti i moduli o delle integrazioni esterne.
 
 ## Stato alla sospensione del lavoro
 
-**Lavoro sospeso su richiesta dell'utente il 5 settembre 2026 e ripreso nella stessa giornata** con un collaudo su PostgreSQL 17 locale e dati di prova, descritto in [INCASSI-RILASCIO.md](INCASSI-RILASCIO.md). Questo documento è il punto di ripresa della sessione. Nessuna modifica applicativa, nessuna migrazione e nessuna pubblicazione sui dati reali.
+**Lavoro sospeso su richiesta dell'utente il 5 settembre 2026 e ripreso nella stessa giornata** con un collaudo su PostgreSQL 17 locale e dati di prova, descritto in [INCASSI-RILASCIO.md](INCASSI-RILASCIO.md). La sospensione iniziale precedeva il rilascio; in serata sono stati eseguiti commit, deploy e migrazione in produzione, come riportato nella tabella seguente.
 
 | Ambito | Stato effettivo |
 | --- | --- |

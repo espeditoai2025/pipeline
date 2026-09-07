@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { crmTransaction } from "@/lib/crm-transaction";
+import { enqueueWorkflows } from "@/lib/workflow-events";
+import { wakeWorkflows } from "@/lib/workflow-wake";
 import { db } from "@/lib/db";
-import { authenticateApiKey, parsePagination } from "@/lib/api-auth";
+import { authenticateApiKey, parsePagination, validateOrgForeignKeys } from "@/lib/api-auth";
 
 const createSchema = z.object({
   title: z.string().min(1, "title is required"),
@@ -9,7 +12,7 @@ const createSchema = z.object({
   phone: z.string().optional(),
   source: z.string().optional(),
   notes: z.string().optional(),
-  score: z.number().min(0).max(100).default(0),
+  score: z.number().int().min(0).max(100).default(0),
   data: z.record(z.string(), z.unknown()).optional(),
   ownerId: z.string().optional(),
 });
@@ -86,18 +89,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Validation error", details: parsed.error.flatten().fieldErrors }, { status: 422 });
   }
 
+  const fkError = await validateOrgForeignKeys(organizationId, { ownerId: parsed.data.ownerId });
+  if (fkError) return fkError;
   const { ownerId, data, ...rest } = parsed.data;
+  const resolvedOwnerId = ownerId ?? (await db.user.findFirst({ where: { organizationId }, select: { id: true } }))?.id;
+  if (!resolvedOwnerId) return NextResponse.json({ error: "No users in organization" }, { status: 400 });
 
-  const lead = await db.lead.create({
+  const lead = await crmTransaction(async tx => {
+    const row = await tx.lead.create({
     data: {
       ...rest,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      data: (data as any) ?? undefined,
+      data: (data as any) ?? {},
       organizationId,
-      ownerId: ownerId ?? null,
+      ownerId: resolvedOwnerId,
     },
     include: { owner: { select: { id: true, name: true, email: true } } },
   });
 
+    await enqueueWorkflows(tx, { trigger: "LEAD_CREATED", orgId: organizationId, leadId: row.id, leadTitle: row.title, ownerId: row.ownerId ?? undefined, source: "api" }, `created:${row.id}`);
+    return row;
+  });
+  wakeWorkflows(organizationId);
   return NextResponse.json({ data: serialize(lead) }, { status: 201 });
 }

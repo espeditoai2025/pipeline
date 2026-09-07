@@ -2,17 +2,17 @@
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
-type Props = {
+type Props = { currency?: string;
   data: { name: string; affari: number; valore: number; probability: number }[];
 };
 
-function formatEur(v: number) {
-  return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
+function formatEur(v: number, currency: string) {
+  return new Intl.NumberFormat("it-IT", { style: "currency", currency, maximumFractionDigits: 0 }).format(v);
 }
 
 const COLORS = ["#6366f1", "#818cf8", "#a5b4fc", "#c7d2fe", "#e0e7ff"];
 
-export function FunnelChart({ data }: Props) {
+export function FunnelChart({ data, currency = "EUR" }: Props) {
   return (
     <ResponsiveContainer width="100%" height={220}>
       <BarChart data={data} layout="vertical" margin={{ top: 0, right: 60, bottom: 0, left: 0 }}>
@@ -25,7 +25,7 @@ export function FunnelChart({ data }: Props) {
         <Tooltip
           formatter={(value, name) => {
             const v = Number(value);
-            return name === "valore" ? [formatEur(v), "Valore"] : [v, "Affari aperti"];
+            return name === "valore" ? [formatEur(v, currency), "Valore"] : [v, "Affari aperti"];
           }}
           contentStyle={{ borderRadius: "8px", border: "1px solid var(--crm-neutral-100)", fontSize: 12 }}
         />

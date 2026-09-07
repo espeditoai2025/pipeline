@@ -3,6 +3,7 @@
 import type { Session } from "next-auth";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
+import { crmPermissionError } from "@/lib/crm-permissions";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
@@ -44,7 +45,7 @@ export async function updateOrgDetails(data: {
 }) {
   const session = await auth();
   const { orgId, userId } = getIds(session);
-  if (!orgId || !userId) return { error: "Non autorizzato" };
+  if ((!orgId || !userId) || (await crmPermissionError(session, "integrations"))) return { error: "Non autorizzato" };
 
   const user = await db.user.findUnique({ where: { id: userId }, select: { role: true } });
   if (!user || !["OWNER", "ADMIN"].includes(user.role)) return { error: "Permesso negato" };
@@ -112,9 +113,10 @@ export async function getUsageStats() {
 // ─── Invitations ──────────────────────────────────────────────────────────────
 
 export async function inviteTeamMember(email: string, role: Role) {
+  if (!z.enum(["ADMIN", "MANAGER", "SALES", "VIEWER"]).safeParse(role).success) return { error: "Ruolo invito non consentito" };
   const session = await auth();
   const { orgId, userId } = getIds(session);
-  if (!orgId || !userId) return { error: "Non autorizzato" };
+  if ((!orgId || !userId) || (await crmPermissionError(session, "integrations"))) return { error: "Non autorizzato" };
 
   const actor = await db.user.findUnique({ where: { id: userId }, select: { role: true } });
   if (!actor || !["OWNER", "ADMIN"].includes(actor.role)) return { error: "Permesso negato" };
@@ -179,7 +181,7 @@ export async function getInvitations() {
 export async function revokeInvitation(id: string) {
   const session = await auth();
   const { orgId, userId } = getIds(session);
-  if (!orgId || !userId) return { error: "Non autorizzato" };
+  if ((!orgId || !userId) || (await crmPermissionError(session, "integrations"))) return { error: "Non autorizzato" };
 
   const actor = await db.user.findUnique({ where: { id: userId }, select: { role: true } });
   if (!actor || !["OWNER", "ADMIN"].includes(actor.role)) return { error: "Permesso negato" };
@@ -194,7 +196,7 @@ export async function revokeInvitation(id: string) {
 export async function removeMember(targetUserId: string) {
   const session = await auth();
   const { orgId, userId } = getIds(session);
-  if (!orgId || !userId) return { error: "Non autorizzato" };
+  if ((!orgId || !userId) || (await crmPermissionError(session, "integrations"))) return { error: "Non autorizzato" };
 
   if (targetUserId === userId) return { error: "Non puoi rimuovere te stesso" };
 
@@ -213,9 +215,10 @@ export async function removeMember(targetUserId: string) {
 }
 
 export async function updateMemberRole(targetUserId: string, role: Role) {
+  if (!z.enum(["ADMIN", "MANAGER", "SALES", "VIEWER"]).safeParse(role).success) return { error: "Ruolo non consentito" };
   const session = await auth();
   const { orgId, userId } = getIds(session);
-  if (!orgId || !userId) return { error: "Non autorizzato" };
+  if ((!orgId || !userId) || (await crmPermissionError(session, "integrations"))) return { error: "Non autorizzato" };
 
   if (targetUserId === userId) return { error: "Non puoi cambiare il tuo ruolo" };
 
@@ -274,7 +277,7 @@ export async function getApiKeys(): Promise<ApiKeyPublic[]> {
 export async function createApiKey(name: string): Promise<{ error: string | null; key: string | null }> {
   const session = await auth();
   const { orgId, userId } = getIds(session);
-  if (!orgId || !userId) return { error: "Non autorizzato", key: null };
+  if ((!orgId || !userId) || (await crmPermissionError(session, "integrations"))) return { error: "Non autorizzato", key: null };
 
   if (!name.trim()) return { error: "Inserisci un nome per la chiave", key: null };
 
@@ -295,7 +298,7 @@ export async function createApiKey(name: string): Promise<{ error: string | null
 export async function revokeApiKey(id: string): Promise<{ error: string | null }> {
   const session = await auth();
   const { orgId } = getIds(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "integrations"))) return { error: "Non autorizzato" };
 
   const key = await db.apiKey.findFirst({ where: { id, organizationId: orgId } });
   if (!key) return { error: "Chiave non trovata" };

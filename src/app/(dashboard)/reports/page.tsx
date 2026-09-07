@@ -13,6 +13,7 @@ const TrendChart          = dynamic(() => import("@/components/charts/TrendChart
 const ActivitiesByTypeChart = dynamic(() => import("@/components/charts/ActivitiesByTypeChart").then(m => m.ActivitiesByTypeChart), { ssr: false, loading: ChartSkeleton });
 const TopPerformersTable  = dynamic(() => import("@/components/charts/TopPerformersTable").then(m => m.TopPerformersTable), { ssr: false, loading: () => <div className="h-24 animate-pulse rounded-xl bg-[var(--crm-neutral-100)]" /> });
 import { getReportData } from "@/server/actions/reports";
+import { toast } from "sonner";
 import { AIInsightsStrip } from "@/components/ai/AIInsightsStrip";
 
 type Period = "7d" | "30d" | "90d" | "12m";
@@ -24,11 +25,7 @@ const PERIODS: { value: Period; label: string }[] = [
   { value: "12m", label: "12 mesi" },
 ];
 
-function formatEur(v: number) {
-  if (v >= 1_000_000) return `€${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `€${(v / 1_000).toFixed(0)}k`;
-  return `€${v}`;
-}
+
 
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -44,16 +41,37 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
 type ReportData = Awaited<ReturnType<typeof getReportData>>;
 
 export default function ReportsPage() {
+  const [currency, setCurrency] = useState("EUR");
+  const formatEur = (v: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency, maximumFractionDigits: 0 }).format(v);
   const [period, setPeriod] = useState<Period>("30d");
   const [data, setData] = useState<ReportData>(null);
+  const [loadedSelection, setLoadedSelection] = useState("");
+  const [loadError, setLoadError] = useState(false);
+  const [reload, setReload] = useState(0);
   const [isPending, startTransition] = useTransition();
+  const loading = isPending || loadedSelection !== `${period}:${currency}`;
 
   useEffect(() => {
+    let cancelled = false;
     startTransition(async () => {
-      const result = await getReportData(period);
-      setData(result);
+      try {
+        const result = await getReportData(period, currency);
+        if (!cancelled) {
+          setData(result);
+          setLoadError(!result);
+          setLoadedSelection(`${period}:${currency}`);
+        }
+      } catch {
+        if (!cancelled) {
+          setData(null);
+          setLoadError(true);
+          setLoadedSelection(`${period}:${currency}`);
+          toast.error("Impossibile caricare il report");
+        }
+      }
     });
-  }, [period]);
+    return () => { cancelled = true; };
+  }, [period, currency, reload]);
 
   const kpis = data?.kpis;
   const funnel = data?.funnel ?? [];
@@ -62,7 +80,7 @@ export default function ReportsPage() {
   const performers = data?.performers ?? [];
 
   function handleExportCSV() {
-    if (!data) return;
+    if (!data || loading || loadError) return;
     const rows: string[][] = [];
     const periodLabel = PERIODS.find((p) => p.value === period)?.label ?? period;
 
@@ -71,23 +89,23 @@ export default function ReportsPage() {
 
     rows.push(["KPI", "Valore", "", ""]);
     rows.push(["Affari aperti", String(kpis?.openDeals ?? 0), "", ""]);
-    rows.push(["Revenue periodo (€)", String(kpis?.wonValue ?? 0), "", ""]);
+    rows.push([`Revenue periodo (${currency})`, String(kpis?.wonValue ?? 0), "", ""]);
     rows.push(["Affari vinti", String(kpis?.wonDeals ?? 0), "", ""]);
     rows.push(["Affari persi", String(kpis?.lostDeals ?? 0), "", ""]);
     rows.push(["Win rate (%)", String(kpis?.convRate ?? 0), "", ""]);
-    rows.push(["Avg deal size (€)", String(Math.round(kpis?.avgDeal ?? 0)), "", ""]);
+    rows.push([`Avg deal size (${currency})`, String(Math.round(kpis?.avgDeal ?? 0)), "", ""]);
     rows.push(["Attività", String(kpis?.activities ?? 0), "", ""]);
     rows.push(["", "", "", ""]);
 
-    rows.push(["Trend mensile", "Vinti", "Persi", "Revenue (€)"]);
+    rows.push(["Trend mensile", "Vinti", "Persi", `Revenue (${currency})`]);
     for (const t of trend) rows.push([t.label, String(t.vinti), String(t.persi), String(t.valore)]);
     rows.push(["", "", "", ""]);
 
-    rows.push(["Pipeline per stage", "Deal", "Valore (€)", ""]);
+    rows.push(["Pipeline per stage", "Deal", `Valore (${currency})`, ""]);
     for (const f of funnel) rows.push([f.stage, String(f.count), String(f.value), ""]);
     rows.push(["", "", "", ""]);
 
-    rows.push(["Top performer", "Affari vinti", "Revenue (€)", "Conv. rate (%)"]);
+    rows.push(["Top performer", "Affari vinti", `Revenue (${currency})`, "Conv. rate (%)"]);
     for (const p of performers) rows.push([p.name, String(p.won), String(p.revenue), String(p.convRate)]);
 
     const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -146,7 +164,8 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <select aria-label="Valuta report" value={currency} onChange={e => setCurrency(e.target.value)} className="rounded border p-2 text-sm">{(data?.currencies ?? [currency]).map(c => <option key={c} value={c}>{c}</option>)}</select>
           <div className="flex rounded-lg border border-[var(--crm-neutral-100)] overflow-hidden">
             {PERIODS.map((p) => (
               <button
@@ -159,17 +178,23 @@ export default function ReportsPage() {
             ))}
           </div>
 
-          <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={!data || isPending}>
+          <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={!data || loading || loadError}>
             <Download className="h-4 w-4 mr-1.5" /> Esporta CSV
           </Button>
         </div>
       </div>
 
+      <p className="text-sm text-slate-500">Importi in {currency}, senza conversioni. Pipeline: affari attualmente aperti. Vinti, persi e tasso di successo: chiusure nel periodo. Attività: create nel periodo.</p>
       <AIInsightsStrip />
 
-      {isPending || !data ? (
+      {loading ? (
         <div className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] p-12 text-center text-sm text-[var(--crm-neutral-500)]">
           Caricamento dati...
+        </div>
+      ) : loadError ? (
+        <div role="alert" className="rounded-xl border p-8 text-center text-sm">
+          <p>Impossibile caricare il report. Riprova per visualizzare i dati aggiornati.</p>
+          <Button className="mt-3" variant="outline" onClick={() => setReload(value => value + 1)}>Riprova</Button>
         </div>
       ) : (
         <>
@@ -190,11 +215,11 @@ export default function ReportsPage() {
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <ChartCard title="Pipeline per stage (affari aperti)">
-              <FunnelChart data={funnel.map((f) => ({ name: f.stage, affari: f.count, valore: f.value, probability: 0 }))} />
+              <FunnelChart currency={currency} data={funnel.map((f) => ({ name: f.stage, affari: f.count, valore: f.value, probability: 0 }))} />
             </ChartCard>
 
             <ChartCard title="Revenue ultimi 6 mesi">
-              <TrendChart data={trend} showValue />
+              <TrendChart currency={currency} data={trend} showValue />
             </ChartCard>
           </div>
 
@@ -209,7 +234,7 @@ export default function ReportsPage() {
           </div>
 
           <ChartCard title="Top performer">
-            <TopPerformersTable data={performers.map((p) => ({ name: p.name ?? "", vinti: p.won, valore: p.revenue, winRate: p.convRate }))} />
+            <TopPerformersTable currency={currency} data={performers.map((p) => ({ name: p.name ?? "", vinti: p.won, valore: p.revenue, winRate: p.convRate }))} />
           </ChartCard>
         </>
       )}

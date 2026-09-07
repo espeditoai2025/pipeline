@@ -38,7 +38,7 @@ export async function authenticateApiKey(
   const keyHash = hashKey(rawKey);
   const apiKey = await db.apiKey.findUnique({
     where: { keyHash },
-    select: { id: true, organizationId: true, expiresAt: true },
+    select: { id: true, organizationId: true, expiresAt: true, createdBy: true },
   });
 
   if (!apiKey) {
@@ -47,6 +47,11 @@ export async function authenticateApiKey(
 
   if (apiKey.expiresAt && apiKey.expiresAt < new Date()) {
     return NextResponse.json({ error: "API key expired" }, { status: 401 });
+  }
+
+  const creator = await db.user.findUnique({ where: { id: apiKey.createdBy }, select: { role: true, organizationId: true } });
+  if (!creator || creator.organizationId !== apiKey.organizationId || !["OWNER", "ADMIN"].includes(creator.role)) {
+    return NextResponse.json({ error: "API key permissions revoked" }, { status: 403 });
   }
 
   // Per-key rate limit (keyed by API key id, not the spoofable client IP).

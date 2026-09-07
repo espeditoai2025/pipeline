@@ -1,4 +1,5 @@
 "use server";
+import { crmPermissionError } from "@/lib/crm-permissions";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -97,7 +98,7 @@ export async function createBookingPage(data: {
   const session = await auth();
   const orgId = getOrgId(session);
   const userId = getUserId(session);
-  if (!orgId || !userId) return { success: false, error: "Non autenticato" };
+  if ((!orgId || !userId) || (await crmPermissionError(session, "write"))) return { success: false, error: "Non autenticato" };
 
   const slug = data.slug.toLowerCase().replace(/[^a-z0-9-]/g, "-");
 
@@ -134,7 +135,7 @@ export async function updateBookingPage(
 ): Promise<{ success: boolean }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { success: false };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { success: false };
 
   await db.bookingPage.updateMany({
     where: { id, organizationId: orgId },
@@ -147,7 +148,7 @@ export async function updateBookingPage(
 export async function deleteBookingPage(id: string): Promise<{ success: boolean }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { success: false };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { success: false };
 
   await db.bookingPage.deleteMany({ where: { id, organizationId: orgId } });
   return { success: true };
@@ -336,7 +337,7 @@ export async function getUpcomingBookings(): Promise<BookingItem[]> {
 export async function cancelBooking(id: string): Promise<{ success: boolean }> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { success: false };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { success: false };
 
   await db.booking.updateMany({
     where: { id, bookingPage: { organizationId: orgId } },

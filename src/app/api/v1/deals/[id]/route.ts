@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { crmTransaction, CrmError } from "@/lib/crm-transaction";
+import { enqueueDealChanges } from "@/lib/workflow-events";
+import { wakeWorkflows } from "@/lib/workflow-wake";
 import { db } from "@/lib/db";
 import { authenticateApiKey } from "@/lib/api-auth";
 import { validateCrmReferences } from "@/lib/crm-references";
@@ -90,9 +93,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { expectedClose, status, ...rest } = parsed.data;
   const referenceError = await validateCrmReferences(organizationId, { ...rest, pipelineId: rest.stageId ? existing.pipelineId : undefined });
   if (referenceError) return NextResponse.json({ error: referenceError }, { status: 422 });
-  const statusChanged = status !== undefined && status !== existing.status;
-  const deal = await db.deal.update({
-    where: { id, organizationId, status: existing.status },
+  const deal = await crmTransaction(async tx => {
+  const current = await tx.deal.findFirst({ where: { id, organizationId, status: { not: "DELETED" } } });
+  if (!current) throw new CrmError("Deal not found");
+  const statusChanged = status !== undefined && status !== current.status;
+  const row = await tx.deal.update({
+    where: { id, organizationId, status: current.status },
     data: {
       ...rest,
       ...(status && { status }),
@@ -101,6 +107,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       ...(expectedClose !== undefined && { expectedClose: expectedClose ? new Date(expectedClose) : null }),
     },
   });
+
+    await enqueueDealChanges(tx, organizationId, current, row, "api");
+    return row;
+  });
+  wakeWorkflows(organizationId);
 
   return NextResponse.json({
     data: {

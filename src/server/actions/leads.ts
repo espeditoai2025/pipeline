@@ -4,10 +4,14 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
+import { crmPermissionError } from "@/lib/crm-permissions";
 import { db } from "@/lib/db";
 import type { Lead, LeadStatus } from "@/types/contacts";
-import { runWorkflows } from "@/lib/workflow-engine";
-import { dispatchWebhook } from "@/server/actions/webhooks";
+import { enqueueWorkflows, enqueueImportedRecords } from "@/lib/workflow-events";
+import { wakeWorkflows } from "@/lib/workflow-wake";
+import { crmTransaction, assertContactCapacity, CrmError } from "@/lib/crm-transaction";
+import { validateCrmReferences } from "@/lib/crm-references";
+import { dispatchWebhook } from "@/lib/webhook-delivery";
 import { safeFetch, assertPublicUrl } from "@/lib/ssrf";
 
 function getIds(s: Session | null) {
@@ -112,13 +116,16 @@ const leadSchema = z.object({
 export async function createLead(input: z.infer<typeof leadSchema>): Promise<{ data: Lead | null; error: string | null }> {
   const session = await auth();
   const { orgId } = getIds(session);
-  if (!session || !orgId) return { data: null, error: "Non autorizzato" };
+  if ((!session || !orgId) || (await crmPermissionError(session, "write"))) return { data: null, error: "Non autorizzato" };
 
   const parsed = leadSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
 
   try {
-    const row = await db.lead.create({
+    const referenceError = await validateCrmReferences(orgId, parsed.data);
+    if (referenceError) return { data: null, error: referenceError };
+    const row = await crmTransaction(async tx => {
+    const row = await tx.lead.create({
       data: {
         title: parsed.data.title,
         source: parsed.data.source || null,
@@ -129,14 +136,16 @@ export async function createLead(input: z.infer<typeof leadSchema>): Promise<{ d
         phone: parsed.data.phone || null,
         notes: parsed.data.notes || null,
         organizationId: orgId,
-        ownerId: parsed.data.ownerId || null,
+        ownerId: parsed.data.ownerId || session.user!.id!,
         contactId: parsed.data.contactId || null,
       },
       select: LEAD_SELECT,
     });
-
+    await enqueueWorkflows(tx, { trigger: "LEAD_CREATED", orgId, leadId: row.id, leadTitle: row.title, ownerId: row.ownerId ?? undefined, actorId: session.user!.id!, contactId: row.contactId ?? undefined }, `created:${row.id}`);
+    return row;
+    });
     revalidatePath("/leads");
-    runWorkflows({ trigger: "LEAD_CREATED", orgId, leadId: row.id, leadTitle: row.title }).catch(console.error);
+    wakeWorkflows(orgId);
     dispatchWebhook(orgId, "lead.created", { id: row.id, title: row.title, email: row.email, source: row.source }).catch(() => {});
     return { data: mapLead(row), error: null };
   } catch (e) {
@@ -147,12 +156,14 @@ export async function createLead(input: z.infer<typeof leadSchema>): Promise<{ d
 export async function updateLead(input: z.infer<typeof leadSchema> & { id: string }): Promise<{ data: Lead | null; error: string | null }> {
   const session = await auth();
   const { orgId } = getIds(session);
-  if (!session || !orgId) return { data: null, error: "Non autorizzato" };
+  if ((!session || !orgId) || (await crmPermissionError(session, "write"))) return { data: null, error: "Non autorizzato" };
 
   const parsed = leadSchema.safeParse(input);
   if (!parsed.success) return { data: null, error: parsed.error.issues[0]?.message ?? "Dati non validi" };
 
   try {
+    const referenceError = await validateCrmReferences(orgId, parsed.data);
+    if (referenceError) return { data: null, error: referenceError };
     const row = await db.lead.update({
       where: { id: input.id, organizationId: orgId },
       data: {
@@ -180,7 +191,7 @@ export async function updateLead(input: z.infer<typeof leadSchema> & { id: strin
 export async function updateLeadStatus(id: string, status: LeadStatus): Promise<{ error: string | null }> {
   const session = await auth();
   const { orgId } = getIds(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   try {
     await db.lead.update({
@@ -197,7 +208,7 @@ export async function updateLeadStatus(id: string, status: LeadStatus): Promise<
 export async function deleteLead(id: string): Promise<{ error: string | null }> {
   const session = await auth();
   const { orgId } = getIds(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   try {
     await db.lead.delete({ where: { id, organizationId: orgId } });
@@ -222,7 +233,8 @@ export async function importLeads(
 ): Promise<{ created: number; skipped: number; error: string | null }> {
   const session = await auth();
   const { orgId } = getIds(session);
-  if (!orgId) return { created: 0, skipped: 0, error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { created: 0, skipped: 0, error: "Non autorizzato" };
+  if (!Array.isArray(rows) || rows.length > 2000) return { created: 0, skipped: 0, error: "Importa al massimo 2000 righe alla volta" };
   if (!rows.length) return { created: 0, skipped: 0, error: null };
 
   const valid = rows
@@ -244,7 +256,12 @@ export async function importLeads(
   if (!valid.length) return { created: 0, skipped, error: "Nessuna riga valida (campo Nome obbligatorio)" };
 
   try {
-    const result = await db.lead.createMany({ data: valid, skipDuplicates: false });
+    const result = await crmTransaction(async tx => {
+      const created = await tx.lead.createManyAndReturn({ data: valid.map(row => ({ ...row, ownerId: session!.user!.id! })) });
+      await enqueueImportedRecords(tx, orgId, created.map(row => ({ trigger: "LEAD_CREATED", orgId, leadId: row.id, leadTitle: row.title, ownerId: row.ownerId ?? undefined })));
+      return { count: created.length };
+    });
+    wakeWorkflows(orgId);
     revalidatePath("/leads");
     return { created: result.count, skipped, error: null };
   } catch (e) {
@@ -552,7 +569,7 @@ export async function enrichLead(id: string): Promise<{
 }> {
   const session = await auth();
   const { orgId } = getIds(session);
-  if (!orgId) return { email: null, phone: null, source: null, error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { email: null, phone: null, source: null, error: "Non autorizzato" };
 
   const lead = await db.lead.findUnique({
     where: { id, organizationId: orgId },
@@ -618,7 +635,7 @@ export async function enrichLead(id: string): Promise<{
 export async function deleteLeads(ids: string[]): Promise<{ count: number; error: string | null }> {
   const session = await auth();
   const { orgId } = getIds(session);
-  if (!orgId) return { count: 0, error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { count: 0, error: "Non autorizzato" };
   if (!ids.length) return { count: 0, error: null };
 
   try {
@@ -657,7 +674,7 @@ export async function convertLead(
 ): Promise<{ dealId: string | null; contactId: string | null; companyId: string | null; error: string | null }> {
   const session = await auth();
   const { orgId, userId } = getIds(session);
-  if (!session || !orgId || !userId) return { dealId: null, contactId: null, companyId: null, error: "Non autorizzato" };
+  if ((!session || !orgId || !userId) || (await crmPermissionError(session, "write"))) return { dealId: null, contactId: null, companyId: null, error: "Non autorizzato" };
 
   const parsed = convertSchema.safeParse(input);
   if (!parsed.success) return { dealId: null, contactId: null, companyId: null, error: "Dati non validi" };
@@ -674,19 +691,20 @@ export async function convertLead(
     if (!pipeline?.stages[0]) return { dealId: null, contactId: null, companyId: null, error: "Nessuna pipeline configurata" };
     const firstStageId = pipeline.stages[0].id;
 
-    // Resolve the product price (scoped to the org) BEFORE the transaction.
-    let productUnitPrice: number | undefined = parsed.data.productId ? parsed.data.productUnitPrice : undefined;
-    if (parsed.data.productId && productUnitPrice === undefined) {
-      const product = await db.product.findFirst({
-        where: { id: parsed.data.productId, organizationId: orgId },
-        select: { unitPrice: true },
-      });
-      productUnitPrice = product ? Number(product.unitPrice) : 0;
-    }
+    const referenceError = await validateCrmReferences(orgId, { contactId: lead.contactId });
+    if (referenceError) throw new CrmError(referenceError);
+    const product = parsed.data.productId ? await db.product.findFirst({
+      where: { id: parsed.data.productId, organizationId: orgId, isActive: true },
+      select: { unitPrice: true, currency: true },
+    }) : null;
+    if (parsed.data.productId && !product) throw new CrmError("Prodotto non disponibile nella tua organizzazione");
+    if (product && product.currency !== parsed.data.currency) throw new CrmError("La valuta del prodotto deve coincidere con quella dell'affare");
+    const productUnitPrice = parsed.data.productUnitPrice ?? (product ? Number(product.unitPrice) : 0);
 
-    // All writes in a single transaction: a mid-way failure must not leave
-    // orphan company/contact/deal or a re-convertible lead (duplicates).
-    const { dealId, contactId, companyId } = await db.$transaction(async (tx) => {
+    const { dealId, contactId, companyId } = await crmTransaction(async (tx) => {
+      const claimed = await tx.lead.updateMany({ where: { id, organizationId: orgId, status: { not: "CONVERTED" } }, data: { status: "CONVERTED" } });
+      if (!claimed.count) throw new CrmError("Lead già convertito");
+      if (parsed.data.createContact && parsed.data.contactFirstName) await assertContactCapacity(tx, orgId);
       let companyId: string | null = null;
       if (parsed.data.createCompany && parsed.data.companyName) {
         const company = await tx.company.create({
@@ -715,6 +733,7 @@ export async function convertLead(
           },
         });
         contactId = contact.id;
+        await enqueueWorkflows(tx, { trigger: "CONTACT_CREATED", orgId, contactId: contact.id, contactName: contact.firstName, contactEmail: contact.email ?? undefined, ownerId: userId }, "created:" + contact.id);
       }
 
       const deal = await tx.deal.create({
@@ -749,9 +768,11 @@ export async function convertLead(
         data: { status: "CONVERTED", convertedDealId: deal.id, contactId: contactId ?? undefined },
       });
 
+      await enqueueWorkflows(tx, { trigger: "DEAL_CREATED", orgId, dealId: deal.id, dealTitle: deal.title, dealValue: Number(deal.value), ownerId: userId, stageId: deal.stageId, contactId: contactId ?? undefined }, "created:" + deal.id);
       return { dealId: deal.id, contactId, companyId };
     });
 
+    wakeWorkflows(orgId);
     revalidatePath("/leads");
     revalidatePath("/deals");
     revalidatePath("/contacts");

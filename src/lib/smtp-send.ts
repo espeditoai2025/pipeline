@@ -24,6 +24,9 @@ export async function sendViaSMTP(orgId: string, opts: {
   const transporter = nodemailer.createTransport({
     host: row.host, port: row.port, secure: row.secure,
     auth: { user: row.username, pass: password },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
   });
 
   try {

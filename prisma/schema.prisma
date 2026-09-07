@@ -37,6 +37,7 @@ model Organization {
 
   // Stripe billing
   stripeCustomerId       String?   @unique
+  stripeCheckoutSessionId String?
   stripeSubscriptionId   String?   @unique
   stripePriceId          String?
   stripeCurrentPeriodEnd DateTime?
@@ -277,6 +278,7 @@ model Tag {
 // ============ ACTIVITIES ============
 
 model Activity {
+  workflowOverdueAt DateTime?
   id             String       @id @default(cuid())
   type           ActivityType
   subject        String
@@ -439,6 +441,7 @@ model Workflow {
   name           String
   description    String?
   isActive       Boolean      @default(false)
+  triggerOnImport Boolean     @default(false)
   trigger        Json
   steps          Json
   organizationId String
@@ -455,6 +458,8 @@ model WorkflowExecution {
   id         String    @id @default(cuid())
   workflowId String
   workflow   Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  queueId    String?   @unique
+  queue      WorkflowQueue? @relation(fields: [queueId], references: [id], onDelete: Cascade)
   status     String
   payload    Json
   logs       Json[]
@@ -674,8 +679,20 @@ model WorkflowQueue {
   ownerId    String
   resumeAt   DateTime
   createdAt  DateTime @default(now())
+  eventKey   String
+  steps      Json
+  status     String   @default("PENDING")
+  attempts   Int      @default(0)
+  lockToken  String?
+  lockedUntil DateTime?
+  emailInFlight Boolean @default(false)
+  error      String?
+  logs       Json[]   @default([])
+  execution  WorkflowExecution?
 
   @@index([resumeAt])
+  @@index([status, resumeAt])
+  @@unique([workflowId, eventKey])
 }
 
 // ============ API KEYS ============

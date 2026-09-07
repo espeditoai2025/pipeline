@@ -35,9 +35,13 @@ export default async function BillingPage() {
 
   if (!org) redirect("/login");
 
+  const member = await db.user.findUnique({ where: { id: session.user.id }, select: { role: true, organizationId: true } });
+  if (!member || member.organizationId !== orgId) redirect("/login");
+  const canManage = member.role === "OWNER";
+
   // Load invoice history from Stripe (fail gracefully if Stripe not configured)
   let invoices: StripeInvoice[] = [];
-  if (org.stripeCustomerId && process.env.STRIPE_SECRET_KEY) {
+  if (canManage && org.stripeCustomerId && process.env.STRIPE_SECRET_KEY) {
     try {
       const { getStripe } = await import("@/lib/stripe");
       const stripe = getStripe();
@@ -59,5 +63,5 @@ export default async function BillingPage() {
     }
   }
 
-  return <BillingClient org={org} invoices={invoices} />;
+  return <BillingClient org={org} invoices={invoices} canManage={canManage} />;
 }

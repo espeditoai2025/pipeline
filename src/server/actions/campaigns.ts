@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
+import { crmPermissionError } from "@/lib/crm-permissions";
 import { db } from "@/lib/db";
 import type { EmailList, EmailListDetail, EmailListContact, EmailCampaign } from "@/types/emails";
 import { getOrgPlan, checkFeature } from "@/lib/plan";
@@ -89,7 +90,7 @@ const listSchema = z.object({
 export async function createEmailList(input: z.infer<typeof listSchema>): Promise<AR<EmailList>> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   const parsed = listSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Input non valido" };
@@ -105,7 +106,7 @@ export async function createEmailList(input: z.infer<typeof listSchema>): Promis
 export async function updateEmailList(id: string, input: z.infer<typeof listSchema>): Promise<AR<EmailList>> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   const row = await db.emailList.update({
     where: { id, organizationId: orgId },
@@ -119,7 +120,7 @@ export async function updateEmailList(id: string, input: z.infer<typeof listSche
 export async function deleteEmailList(id: string): Promise<AR<void>> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   await db.emailList.delete({ where: { id, organizationId: orgId } });
   revalidatePath("/emails");
@@ -135,7 +136,7 @@ const contactSchema = z.object({
 export async function addContactToList(listId: string, input: z.infer<typeof contactSchema>): Promise<AR<EmailListContact>> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   const list = await db.emailList.findFirst({ where: { id: listId, organizationId: orgId } });
   if (!list) return { error: "Lista non trovata" };
@@ -165,7 +166,7 @@ export async function importContactsToList(
 ): Promise<AR<{ added: number; skipped: number }>> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   const list = await db.emailList.findFirst({ where: { id: listId, organizationId: orgId } });
   if (!list) return { error: "Lista non trovata" };
@@ -192,7 +193,7 @@ export async function importContactsToList(
 export async function removeContactFromList(id: string): Promise<AR<void>> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   // Scoping tenant via parent: EmailListContact non ha organizationId (IDOR guard).
   const result = await db.emailListContact.deleteMany({
@@ -256,7 +257,7 @@ const campaignSchema = z.object({
 export async function createCampaign(input: z.infer<typeof campaignSchema>): Promise<AR<EmailCampaign>> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   const parsed = campaignSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Input non valido" };
@@ -290,9 +291,11 @@ export async function createCampaign(input: z.infer<typeof campaignSchema>): Pro
 export async function updateCampaign(id: string, input: z.infer<typeof campaignSchema>): Promise<AR<EmailCampaign>> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   const parsed = campaignSchema.safeParse(input);
+  const featureError = checkFeature(await getOrgPlan(orgId), "emailCampaigns");
+  if (featureError) return { error: featureError };
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Input non valido" };
 
   // Anti-IDOR: la lista deve appartenere all'org (come in createCampaign).
@@ -327,7 +330,7 @@ export async function updateCampaign(id: string, input: z.infer<typeof campaignS
 export async function deleteCampaign(id: string): Promise<AR<void>> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   await db.emailCampaign.delete({ where: { id, organizationId: orgId } });
   revalidatePath("/emails");
@@ -337,7 +340,7 @@ export async function deleteCampaign(id: string): Promise<AR<void>> {
 export async function sendCampaign(id: string): Promise<AR<{ sent: number; failed: number }>> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   const plan = await getOrgPlan(orgId);
   const featureError = checkFeature(plan, "emailCampaigns");

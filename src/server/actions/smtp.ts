@@ -5,6 +5,7 @@ import { z } from "zod";
 import nodemailer from "nodemailer";
 import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
+import { crmPermissionError } from "@/lib/crm-permissions";
 import { db } from "@/lib/db";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { getOrgPlan, checkFeature } from "@/lib/plan";
@@ -74,7 +75,7 @@ export type SmtpConfigInput = z.infer<typeof configSchema>;
 export async function saveSmtpConfig(input: SmtpConfigInput): Promise<AR<SmtpConfigPublic>> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "integrations"))) return { error: "Non autorizzato" };
 
   const parsed = configSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Input non valido" };
@@ -110,8 +111,10 @@ export async function saveSmtpConfig(input: SmtpConfigInput): Promise<AR<SmtpCon
 export async function testSmtpConfig(id: string): Promise<AR<{ message: string }>> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "integrations"))) return { error: "Non autorizzato" };
 
+  const featureError = checkFeature(await getOrgPlan(orgId), "smtp");
+  if (featureError) return { error: featureError };
   const row = await db.smtpConfig.findFirst({ where: { id, organizationId: orgId } });
   if (!row) return { error: "Configurazione non trovata" };
 
@@ -145,7 +148,7 @@ export async function testSmtpConfig(id: string): Promise<AR<{ message: string }
 export async function deleteSmtpConfig(): Promise<AR> {
   const session = await auth();
   const orgId = getOrgId(session);
-  if (!orgId) return { error: "Non autorizzato" };
+  if ((!orgId) || (await crmPermissionError(session, "integrations"))) return { error: "Non autorizzato" };
 
   await db.smtpConfig.deleteMany({ where: { organizationId: orgId } });
   revalidatePath("/settings");

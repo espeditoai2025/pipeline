@@ -36,6 +36,7 @@ export function MergeDuplicatesModal({ open, onClose, duplicates, onMerged }: Pr
   const [groups, setGroups] = useState(duplicates);
   const [choices, setChoices] = useState<Partial<Record<FieldKey, FieldChoice>>>({});
   const [merging, setMerging] = useState(false);
+  const [mergeNotice, setMergeNotice] = useState<string | null>(null);
 
   const group = groups[currentIdx];
   if (!group || group.contacts.length < 2) return null;
@@ -50,12 +51,13 @@ export function MergeDuplicatesModal({ open, onClose, duplicates, onMerged }: Pr
   }
 
   function selectChoice(field: FieldKey, choice: FieldChoice) {
-    setChoices(prev => ({ ...prev, [field]: choice }));
+    setChoices((prev) => ({ ...prev, [field]: choice }));
   }
 
   async function handleMerge() {
     if (merging) return;
     setMerging(true);
+    setMergeNotice(null);
     const overrides: MergeContactOverrides = {};
     for (const f of FIELDS) {
       const choice = choices[f.key] ?? (contactA[f.key] ? "a" : "b");
@@ -65,37 +67,69 @@ export function MergeDuplicatesModal({ open, onClose, duplicates, onMerged }: Pr
     }
     try {
       const res = await mergeContacts(contactA.id, contactB.id, overrides);
-      if (res.error) { toast.error(res.error); return; }
-      toast.success("Contatti uniti. Storico e dati collegati conservati.");
-      await Promise.resolve(onMerged()).catch(() => toast.error("Unione completata. Aggiorna la pagina per ricaricare i contatti."));
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      setMergeNotice("Contatti uniti. Storico e dati collegati conservati.");
+      await Promise.resolve(onMerged()).catch(() =>
+        toast.error("Unione completata. Aggiorna la pagina per ricaricare i contatti."),
+      );
       setChoices({});
       if (group!.contacts.length > 2) {
-        const merged: Contact = { ...contactA, ...overrides, firstName: overrides.firstName ?? contactA.firstName,
-          lastName: overrides.lastName ?? null, email: overrides.email ?? null, phone: overrides.phone ?? null,
-          jobTitle: overrides.jobTitle ?? null, companyId: overrides.companyId ?? null,
-          company: overrides.companyId === contactA.companyId ? contactA.company : contactB.company };
-        setGroups(previous => previous.map((item, index) => index === currentIdx ? { ...item, contacts: [merged, ...item.contacts.slice(2)] } : item));
-      } else if (currentIdx < groups.length - 1) setCurrentIdx(i => i + 1);
-      else onClose();
-    } catch { toast.error("Unione non riuscita. Riprova."); }
-    finally { setMerging(false); }
+        const merged: Contact = {
+          ...contactA,
+          ...overrides,
+          firstName: overrides.firstName ?? contactA.firstName,
+          lastName: overrides.lastName ?? null,
+          email: overrides.email ?? null,
+          phone: overrides.phone ?? null,
+          jobTitle: overrides.jobTitle ?? null,
+          companyId: overrides.companyId ?? null,
+          company: overrides.companyId === contactA.companyId ? contactA.company : contactB.company,
+        };
+        setGroups((previous) =>
+          previous.map((item, index) =>
+            index === currentIdx
+              ? { ...item, contacts: [merged, ...item.contacts.slice(2)] }
+              : item,
+          ),
+        );
+      } else if (currentIdx < groups.length - 1) setCurrentIdx((i) => i + 1);
+      else {
+        onClose();
+        toast.success("Contatti uniti. Storico e dati collegati conservati.");
+      }
+    } catch {
+      toast.error("Unione non riuscita. Riprova.");
+    } finally {
+      setMerging(false);
+    }
   }
 
   return (
-    <Sheet open={open} onOpenChange={(v) => { if (!v && !merging) onClose(); }}>
+    <Sheet
+      open={open}
+      onOpenChange={(v) => {
+        if (!v && !merging) onClose();
+      }}
+    >
       <SheetContent className="sm:max-w-xl">
         <SheetHeader>
-          <SheetTitle>Unisci duplicati ({currentIdx + 1}/{duplicates.length})</SheetTitle>
+          <SheetTitle>
+            Unisci duplicati ({currentIdx + 1}/{duplicates.length})
+          </SheetTitle>
         </SheetHeader>
         <SheetBody>
-          <p className="text-sm text-[var(--crm-neutral-500)] mb-4">
-            Email condivisa: <span className="font-medium text-[var(--crm-neutral-700)]">{group.key}</span>.
-            Scegli quale valore mantenere per ogni campo. {group.contacts.length} contatti nel gruppo.
+          <p className="mb-4 text-sm text-[var(--crm-neutral-500)]">
+            Email condivisa:{" "}
+            <span className="font-medium text-[var(--crm-neutral-700)]">{group.key}</span>. Scegli
+            quale valore mantenere per ogni campo. {group.contacts.length} contatti nel gruppo.
           </p>
 
           <div className="space-y-3">
             {/* Header row */}
-            <div className="grid grid-cols-[100px_1fr_1fr] gap-2 text-xs font-semibold text-[var(--crm-neutral-500)] uppercase tracking-wide">
+            <div className="grid grid-cols-[100px_1fr_1fr] gap-2 text-xs font-semibold tracking-wide text-[var(--crm-neutral-500)] uppercase">
               <div>Campo</div>
               <div className="flex items-center gap-1.5">
                 <div className="h-2 w-2 rounded-full bg-[var(--crm-primary)]" />
@@ -108,20 +142,22 @@ export function MergeDuplicatesModal({ open, onClose, duplicates, onMerged }: Pr
             </div>
 
             {/* Field rows */}
-            {FIELDS.map(f => {
+            {FIELDS.map((f) => {
               const valA = getFieldValue(contactA, f.key);
               const valB = getFieldValue(contactB, f.key);
               const selected = choices[f.key] ?? (contactA[f.key] ? "a" : "b");
 
               return (
                 <div key={f.key} className="grid grid-cols-[100px_1fr_1fr] gap-2">
-                  <div className="text-xs font-medium text-[var(--crm-neutral-600)] py-2">{f.label}</div>
+                  <div className="py-2 text-xs font-medium text-[var(--crm-neutral-600)]">
+                    {f.label}
+                  </div>
                   <button
                     disabled={merging}
                     aria-label={`${f.label}: mantieni ${valA} dal contatto A`}
                     aria-pressed={selected === "a"}
                     onClick={() => selectChoice(f.key, "a")}
-                    className={`rounded-lg border px-3 py-2 text-sm text-left transition-all ${
+                    className={`rounded-lg border px-3 py-2 text-left text-sm transition-all ${
                       selected === "a"
                         ? "border-[var(--crm-primary)] bg-[var(--crm-primary)]/5 ring-1 ring-[var(--crm-primary)]"
                         : "border-[var(--crm-neutral-100)] hover:border-[var(--crm-neutral-300)]"
@@ -129,7 +165,9 @@ export function MergeDuplicatesModal({ open, onClose, duplicates, onMerged }: Pr
                   >
                     <div className="flex items-center justify-between">
                       <span className="truncate">{valA}</span>
-                      {selected === "a" && <Check className="h-3.5 w-3.5 text-[var(--crm-primary)] flex-shrink-0" />}
+                      {selected === "a" && (
+                        <Check className="h-3.5 w-3.5 flex-shrink-0 text-[var(--crm-primary)]" />
+                      )}
                     </div>
                   </button>
                   <button
@@ -137,7 +175,7 @@ export function MergeDuplicatesModal({ open, onClose, duplicates, onMerged }: Pr
                     aria-label={`${f.label}: mantieni ${valB} dal contatto B`}
                     aria-pressed={selected === "b"}
                     onClick={() => selectChoice(f.key, "b")}
-                    className={`rounded-lg border px-3 py-2 text-sm text-left transition-all ${
+                    className={`rounded-lg border px-3 py-2 text-left text-sm transition-all ${
                       selected === "b"
                         ? "border-orange-500 bg-orange-50 ring-1 ring-orange-500"
                         : "border-[var(--crm-neutral-100)] hover:border-[var(--crm-neutral-300)]"
@@ -145,7 +183,9 @@ export function MergeDuplicatesModal({ open, onClose, duplicates, onMerged }: Pr
                   >
                     <div className="flex items-center justify-between">
                       <span className="truncate">{valB}</span>
-                      {selected === "b" && <Check className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />}
+                      {selected === "b" && (
+                        <Check className="h-3.5 w-3.5 flex-shrink-0 text-orange-500" />
+                      )}
                     </div>
                   </button>
                 </div>
@@ -153,19 +193,28 @@ export function MergeDuplicatesModal({ open, onClose, duplicates, onMerged }: Pr
             })}
           </div>
 
-          <div className="mt-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3">
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
             <p className="text-xs text-amber-700 dark:text-amber-400">
-              <strong>Cosa succede:</strong> Il contatto B verrà unito al contatto A. Affari, attività, email, lead, note e tag vengono trasferiti. I campi personalizzati mancanti vengono recuperati; quelli in conflitto e i valori originali restano nella nota di storico. L&apos;unione è definitiva.
+              <strong>Cosa succede:</strong> Il contatto B verrà unito al contatto A. Affari,
+              attività, email, lead, note e tag vengono trasferiti. I campi personalizzati mancanti
+              vengono recuperati; quelli in conflitto e i valori originali restano nella nota di
+              storico. L&apos;unione è definitiva.
             </p>
           </div>
 
-          <div className="flex items-center justify-end gap-3 mt-6">
+          {mergeNotice && (
+            <p role="status" className="mt-4 text-sm text-green-700 dark:text-green-400">
+              {mergeNotice}
+            </p>
+          )}
+          <div className="mt-6 flex items-center justify-end gap-3">
             {duplicates.length > 1 && currentIdx < duplicates.length - 1 && (
               <button
                 disabled={merging}
                 onClick={() => {
-                  setCurrentIdx(i => i + 1);
+                  setCurrentIdx((i) => i + 1);
                   setChoices({});
+                  setMergeNotice(null);
                 }}
                 className="text-xs text-[var(--crm-neutral-500)] hover:underline"
               >
@@ -178,9 +227,13 @@ export function MergeDuplicatesModal({ open, onClose, duplicates, onMerged }: Pr
             <Button
               onClick={handleMerge}
               disabled={merging}
-              className="bg-[var(--crm-primary)] hover:bg-[var(--crm-primary-dark)] text-white gap-1.5"
+              className="gap-1.5 bg-[var(--crm-primary)] text-white hover:bg-[var(--crm-primary-dark)]"
             >
-              {merging ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+              {merging ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ArrowRight className="h-4 w-4" />
+              )}
               Unisci contatti
             </Button>
           </div>

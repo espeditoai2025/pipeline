@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
+import { crmPermissionError } from "@/lib/crm-permissions";
 import { db } from "@/lib/db";
 import type { Pipeline } from "@/types/deals";
-import { getOrgPlan, checkPipelineLimit } from "@/lib/plan";
+import { crmTransaction, assertPipelineCapacity } from "@/lib/crm-transaction";
 
 function daysBetween(a: Date, b: Date) {
   return Math.floor((b.getTime() - a.getTime()) / 86_400_000);
@@ -46,8 +47,13 @@ export async function getPipeline(): Promise<Pipeline | null> {
   });
 
   if (!pipeline) {
+    if (await crmPermissionError(session, "write")) return null;
     // First login: create a default pipeline with 5 stages
-    const created = await db.pipeline.create({
+    const created = await crmTransaction(async tx => {
+    const existing = await tx.pipeline.findFirst({ where: { organizationId: orgId }, include: { stages: { orderBy: { position: "asc" } } } });
+    if (existing) return existing;
+    await assertPipelineCapacity(tx, orgId);
+    return tx.pipeline.create({
       data: {
         name: "Pipeline Principale",
         organizationId: orgId,
@@ -69,6 +75,7 @@ export async function getPipeline(): Promise<Pipeline | null> {
           include: { deals: false },
         },
       },
+    });
     });
     return {
       id: created.id,
@@ -144,25 +151,26 @@ export async function getPipeline(): Promise<Pipeline | null> {
 
 export async function createPipeline(name: string): Promise<{ error: string | null; id?: string }> {
   const session = await auth();
-  if (!session?.user) return { error: "Non autorizzato" };
+  if ((!session?.user) || (await crmPermissionError(session, "manage"))) return { error: "Non autorizzato" };
   const orgId = (session.user as { organizationId?: string }).organizationId;
   if (!orgId) return { error: "Non autorizzato" };
 
-  const plan = await getOrgPlan(orgId);
-  const currentCount = await db.pipeline.count({ where: { organizationId: orgId } });
-  const limitError = checkPipelineLimit(plan, currentCount);
-  if (limitError) return { error: limitError };
-
-  const row = await db.pipeline.create({
+  if (!name.trim() || name.length > 200) return { error: "Nome pipeline non valido" };
+  try {
+  const row = await crmTransaction(async tx => {
+  const currentCount = await assertPipelineCapacity(tx, orgId);
+  return tx.pipeline.create({
     data: {
-      name,
+      name: name.trim(),
       organizationId: orgId,
       position: currentCount,
     },
   });
+  });
 
   revalidatePath("/pipeline");
   return { error: null, id: row.id };
+  } catch (error) { return { error: error instanceof Error ? error.message : "Impossibile creare la pipeline" }; }
 }
 
 export async function getPipelineOwners() {
