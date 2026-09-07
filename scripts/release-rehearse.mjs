@@ -30,6 +30,8 @@ try {
     if (attempt === 14) throw new Error("Temporary PostgreSQL not ready");
     await new Promise(resolve => setTimeout(resolve, 500));
   }
+  // This is the empty database created by this script, never the source CRM.
+  docker(["exec", name, "psql", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "pipely_restore", "-c", "DROP SCHEMA public;"]);
   docker(["exec", name, "pg_restore", "--exit-on-error", "--no-owner", "--no-privileges", "-U", "postgres", "-d", "pipely_restore", `/backup/${manifest.file}`]);
   client = new pg.Client({ host: "127.0.0.1", port: 55439, user: "postgres", password, database: "pipely_restore", ssl: false, connectionTimeoutMillis: 5000 });
   await client.connect();
@@ -47,7 +49,7 @@ try {
   const tableCount = Number((await client.query("SELECT count(*) FROM pg_tables WHERE schemaname='public'")).rows[0].count);
   const result = { checkedAt: new Date().toISOString(), restoredArchiveSha256: digest, appliedToCopy: migrations, originalTables: Object.keys(manifest.counts).length, tablesAfter: tableCount, originalCountsPreserved: true };
   await fs.writeFile(path.join(backupDir, `rehearsal-${label}.json`), JSON.stringify(result, null, 2));
-  console.log(JSON.stringify(result));
+  process.stdout.write(JSON.stringify(result) + "\n");
 } finally {
   await client?.end();
   if (started) docker(["rm", "--force", "--volumes", name]);
