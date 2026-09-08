@@ -169,8 +169,15 @@ Funzionalità chiave di Pipely (per domande su come si usa):
 - Pagine di dettaglio: affari, contatti, aziende e lead hanno pagine dedicate. Contatti includono pannello note. Aziende mostrano contatti e affari collegati. Lead mostrano status, score e pulsante conversione.
 - Notifiche in-app: campana nella topbar con badge non lette, notifiche da workflow automatici (azione SEND_NOTIFICATION), pulsante "Segna tutte lette".
 - Automazioni: 8 trigger (DEAL_CREATED, DEAL_STAGE_CHANGED, DEAL_WON, DEAL_LOST, DEAL_VALUE_CHANGED, CONTACT_CREATED, ACTIVITY_OVERDUE, LEAD_CREATED) e 6 azioni (SEND_EMAIL, CREATE_ACTIVITY, UPDATE_DEAL_STAGE, ASSIGN_OWNER, SEND_NOTIFICATION, WAIT). WAIT mette in pausa il workflow per N giorni. Testa workflow prima di attivarlo. Log esecuzioni con stato SUCCESS/FAILED.
-- Importazione contatti: CSV/XLS/XLSX, crea automaticamente le aziende collegate.
-- Mobile: navigazione con hamburger menu e drawer laterale, tabelle scrollabili orizzontalmente.
+- Importazione contatti: CSV/XLS/XLSX, crea automaticamente le aziende collegate. Le automazioni non scattano sui contatti importati, salvo attivare esplicitamente l'opzione sul workflow.
+- Note vocali: registrazione dal browser, massimo 2 minuti e 3 MB per nota, 50 MB complessivi per organizzazione, 10 note con Starter e 100 con Pro/Enterprise. Ogni nota si collega a un affare OPPURE a un contatto. Trascrizione automatica in italiano solo con piano che include l'AI.
+- Comandi CRM: dalla scheda di un affare o contatto si scrive un comando in italiano ("chiamato oggi, sposta in negoziazione, ricordamelo lunedì alle 10"). L'AI propone le azioni, l'utente conferma prima che vengano applicate. Azioni possibili: aggiungere una nota, creare un'attività con scadenza, aggiornare stato/valore/fase di un affare. Massimo 5 azioni per comando, sempre e solo sul record aperto.
+- Limite AI: trascrizioni e comandi CRM condividono 50 elaborazioni al giorno per organizzazione. Una trascrizione fallita per un guasto del servizio non consuma il limite.
+- Fatturazione elettronica: integrazione con Fatture in Cloud (piano Pro/Enterprise). Si collega l'account, si sceglie l'azienda (la partita IVA deve coincidere con quella dell'organizzazione), si crea il documento dai dati della fattura Pipely e da lì parte l'invio allo SdI. Una fattura gia' inviata non torna mai in stato "da inviare".
+- Lead Finder: si descrive il cliente ideale (località, settore, parole chiave) e Pipely cerca aziende reali dal registro imprese e da Google Maps. Ogni contatto trovato indica la propria origine, "verificato" o "da verificare". Starter: 1 ricerca al giorno e 10 candidati; Pro/Enterprise: nessun limite giornaliero e 50 candidati.
+- Google Calendar: integrazione attiva, si collega dalla pagina Attività ed è per singolo utente, non per organizzazione.
+- Mobile: navigazione con hamburger menu e drawer laterale, tabelle scrollabili orizzontalmente. Pipely si installa come app dal browser (PWA), non è su App Store o Google Play.
+- Accesso: solo email e password. Il login con Google non esiste più. Cambiare la password chiude tutte le sessioni aperte su ogni dispositivo.
 
 ${modeContext}${sectorContext ? `\n\n${sectorContext}` : ""}
 

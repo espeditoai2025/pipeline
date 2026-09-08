@@ -5,12 +5,12 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Pipely — CRM italiano con AI, pipeline Kanban e automazioni",
   description:
-    "Chiudi più affari con Pipely: CRM per team italiani con pipeline Kanban, contatti, campagne email, workflow automatizzati e AI Assistant integrato. Inizia gratis.",
+    "Chiudi più affari con Pipely: CRM per team italiani con pipeline Kanban, note vocali, comandi in italiano, fattura elettronica via Fatture in Cloud, campagne email e automazioni. Inizia gratis.",
   alternates: { canonical: "https://www.pipely.it" },
   openGraph: {
     title: "Pipely — CRM italiano con AI, pipeline e automazioni",
     description:
-      "CRM italiano con AI Assistant, pipeline Kanban, automazioni reali e campagne email. Gratis per sempre nel piano Starter.",
+      "CRM italiano con note vocali, comandi in italiano, fattura elettronica, pipeline Kanban e automazioni. Gratis per sempre nel piano Starter.",
     url: "https://www.pipely.it",
     images: [
       {
@@ -44,6 +44,9 @@ import {
   Megaphone,
   XCircle,
   ChevronDown,
+  Mic,
+  Receipt,
+  Radar,
 } from "lucide-react";
 import { PipelyAppIcon, PipelyWordmark } from "@/components/shared/PipelyLogo";
 import { KanbanPreview } from "@/components/marketing/KanbanPreview";
@@ -133,6 +136,34 @@ const features = [
     title: "Import XLS / CSV",
     description:
       "Importa contatti da Excel o CSV. Rilevamento colonne automatico, gestione duplicati e aggiornamento live della lista.",
+  },
+  {
+    icon: Mic,
+    color: "bg-rose-500",
+    title: "Note vocali",
+    description:
+      "Detta il resoconto dopo la visita invece di scriverlo. La nota resta collegata all'affare o al contatto e la trascrizione automatica la rende cercabile.",
+  },
+  {
+    icon: Sparkles,
+    color: "bg-violet-500",
+    title: "Comandi in italiano",
+    description:
+      "\"Chiamato oggi, sposta in negoziazione, ricordamelo lunedì\": l'AI propone le modifiche, tu confermi. Nessun campo da compilare a mano.",
+  },
+  {
+    icon: Receipt,
+    color: "bg-emerald-600",
+    title: "Fattura elettronica",
+    description:
+      "Integrazione con Fatture in Cloud: il documento nasce dai dati già presenti nel CRM e da lì parte l'invio allo SdI, senza reinserire nulla.",
+  },
+  {
+    icon: Radar,
+    color: "bg-orange-500",
+    title: "Lead Finder",
+    description:
+      "Descrivi il cliente ideale e trova aziende reali dal registro imprese e da Google Maps, con l'origine di ogni contatto dichiarata.",
   },
 ];
 
