@@ -18,7 +18,10 @@ le disinnesca prima che le funzioni entrino in uso.
 | Doppia consegna dei webhook dai cron sovrapposti | alta | corretto: presa in carico atomica della riga prima dell'invio, con i tentativi incrementati nella stessa scrittura |
 | Il webhook Stripe declassa gli ENTERPRISE | alta | corretto: `planAfterSubscription` conserva ENTERPRISE e le automazioni non vengono più disattivate |
 | `deleteVoiceNote` accetta un filtro al posto dell'id | alta | corretto, insieme alla stessa falla in altre cinque azioni fuori ambito |
-| Gli altri nove confermati | media e bassa | **non ancora corretti** |
+| Doppio invio allo SdI (mai verificato dai revisori) | alta | corretto: uno stato SENT non torna piu a CREATED |
+| Gli altri nove confermati | media e bassa | corretti |
+| Tre dei quattro mai verificati | media e bassa | corretti |
+| Lock tenuto durante le chiamate a Stripe | media | **non corretto per scelta**: la duplicazione lato Stripe e gia esclusa dalle chiavi di idempotenza e la durata del lock e limitata dai timeout, quindi ristrutturare il codice di fatturazione avrebbe rischiato piu di quanto risolvesse. Il motivo e ora scritto nel codice |
 
 La stessa falla dell'id non validato esisteva in `deleteBookingPage`, `deleteChatMessage`,
 `revokeInvitation`, `deleteSurvey` e `toggleSurvey`: codice preesistente, fuori dall'intervallo

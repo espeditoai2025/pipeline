@@ -35,6 +35,12 @@ export async function POST() {
         { status: 503 },
       );
     }
+    // Il lock sulla riga Organization copre anche le chiamate a Stripe, e questo è voluto: serve
+    // a impedire che due richieste concorrenti scrivano due sessioni di checkout diverse sulla
+    // stessa organizzazione. La duplicazione lato Stripe è già esclusa dalle chiavi di idempotenza
+    // qui sotto, e la durata del lock è limitata dal timeout di 8 secondi del client Stripe
+    // (src/lib/stripe.ts) e dal timeout della transazione: nel caso peggiore l'organizzazione
+    // resta bloccata per la durata di un checkout, non indefinitamente.
     const result = await db.$transaction(
       async (tx) => {
         await tx.$queryRaw(

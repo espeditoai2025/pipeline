@@ -13,6 +13,7 @@ import type { Contact, Company } from "@/types/contacts";
 import { enqueueWorkflows, enqueueImportedRecords } from "@/lib/workflow-events";
 import { wakeWorkflows } from "@/lib/workflow-wake";
 import { crmTransaction, assertContactCapacity } from "@/lib/crm-transaction";
+import { isRecordId } from "@/lib/record-id";
 import { dispatchWebhook } from "@/lib/webhook-delivery";
 
 function getOrgId(s: Session | null) {
@@ -413,15 +414,17 @@ export async function mergeContacts(
   const session = await auth();
   const orgId = getOrgId(session);
   if ((!orgId || !session?.user?.id) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
-  if (!primaryId || !duplicateId) return { error: "Contatto non valido" };
+  if (!isRecordId(primaryId) || !isRecordId(duplicateId)) return { error: "Contatto non valido" };
   if (primaryId === duplicateId) return { error: "Non puoi unire un contatto con se stesso" };
   const parsed = mergeContactSchema.safeParse(overrides);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Dati non validi" };
 
   try {
-    await db.$transaction(
-      (tx) => mergeContactRecords(tx, orgId, session.user!.id!, primaryId, duplicateId, parsed.data),
-      { isolationLevel: "Serializable" },
+    // L'unica scrittura CRM rimasta fuori da crmTransaction: usava il timeout predefinito di
+    // Prisma (5 secondi) e non riprovava i conflitti di serializzazione, quindi la fusione di un
+    // contatto con molti affari e attività falliva sotto concorrenza invece di riprovare.
+    await crmTransaction((tx) =>
+      mergeContactRecords(tx, orgId, session.user!.id!, primaryId, duplicateId, parsed.data),
     );
     revalidatePath("/contacts");
     revalidatePath("/contacts/[id]", "page");

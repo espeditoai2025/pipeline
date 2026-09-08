@@ -49,7 +49,10 @@ export async function selectInvoicingCompany(companyId: number) {
     if (!org.vatNumber || !company.vatNumber || normalizeItalianVat(org.vatNumber) !== normalizeItalianVat(company.vatNumber)) throw new CrmError("La partita IVA in Impostazioni → Organizzazione deve coincidere con l’azienda Fatture in Cloud.");
     await db.$transaction(async tx => {
       await tx.$queryRaw`SELECT "organizationId" FROM "InvoicingConnection" WHERE "organizationId" = ${orgId} FOR UPDATE`;
-      if (await tx.invoiceExport.count({ where: { organizationId: orgId, companyId: { not: companyId } } })) throw new CrmError("Sono presenti documenti collegati a un’altra azienda Fatture in Cloud. Ricollega l’azienda originaria.");
+      // Solo i documenti davvero creati sul gestionale bloccano il cambio azienda. Le anteprime e
+      // i tentativi falliti hanno documentId nullo: non esistono da nessuna parte, e contarli
+      // bloccava per sempre il cambio azienda e la riconnessione dopo un singolo errore.
+      if (await tx.invoiceExport.count({ where: { organizationId: orgId, companyId: { not: companyId }, documentId: { not: null } } })) throw new CrmError("Sono presenti documenti collegati a un’altra azienda Fatture in Cloud. Ricollega l’azienda originaria.");
       await tx.invoicingConnection.update({ where: { organizationId: orgId }, data: { companyId, companyName: company.name, companyVat: company.vatNumber } });
     });
     revalidatePath("/settings/invoicing"); return { ok: true };

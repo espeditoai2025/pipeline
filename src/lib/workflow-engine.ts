@@ -530,13 +530,22 @@ export async function processWorkflowQueue({
   return processed;
 }
 
+/**
+ * Quanto indietro guarda la scansione delle attività scadute.
+ *
+ * Un'attività scaduta da mesi non è "appena scaduta": senza questo limite il primo avvio dopo la
+ * migrazione — che lascia workflowOverdueAt nullo su ogni riga esistente — considera arretrato
+ * storico compreso e riemette un evento per ognuna, a cinquanta ogni cinque minuti.
+ */
+const OVERDUE_LOOKBACK_MS = 30 * 86_400_000;
+
 /** Deadline identity, bounded scan and transaction prevent repeated/starved overdue events. */
 export async function enqueueOverdueActivities(limit = 50, budgetMs = 10_000) {
   const deadline = Date.now() + budgetMs;
   const due = await db.activity.findMany({
     where: {
       completedAt: null,
-      dueDate: { lt: new Date() },
+      dueDate: { lt: new Date(), gte: new Date(Date.now() - OVERDUE_LOOKBACK_MS) },
       OR: [
         { workflowOverdueAt: null },
         { NOT: { workflowOverdueAt: { equals: db.activity.fields.dueDate } } },
