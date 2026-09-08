@@ -4,6 +4,31 @@
 > concluso: mancavano alcuni verificatori, il critico di completezza e il giudizio finale.
 > **Intervallo revisionato:** `ba67b0e..HEAD` (150 file, ~7700 righe aggiunte, 3 migrazioni).
 
+## Stato delle correzioni (8 settembre 2026)
+
+Verificato prima di intervenire, interrogando il database di produzione in sola lettura:
+**nessuno di questi difetti stava causando danni**. Un solo workflow esistente (inattivo, un unico
+passo email, nessun id vuoto), coda vuota, zero consegne webhook pendenti, zero organizzazioni
+ENTERPRISE con abbonamento Stripe, zero note vocali. Erano mine latenti, non incendi: la correzione
+le disinnesca prima che le funzioni entrino in uso.
+
+| Difetto | Gravità | Stato |
+|---|---|---|
+| Passi legacy fanno fallire l'intero job | critica | corretto: ogni passo è validato per conto suo e quello incompleto viene saltato, come faceva il motore precedente |
+| Doppia consegna dei webhook dai cron sovrapposti | alta | corretto: presa in carico atomica della riga prima dell'invio, con i tentativi incrementati nella stessa scrittura |
+| Il webhook Stripe declassa gli ENTERPRISE | alta | corretto: `planAfterSubscription` conserva ENTERPRISE e le automazioni non vengono più disattivate |
+| `deleteVoiceNote` accetta un filtro al posto dell'id | alta | corretto, insieme alla stessa falla in altre cinque azioni fuori ambito |
+| Gli altri nove confermati | media e bassa | **non ancora corretti** |
+
+La stessa falla dell'id non validato esisteva in `deleteBookingPage`, `deleteChatMessage`,
+`revokeInvitation`, `deleteSurvey` e `toggleSurvey`: codice preesistente, fuori dall'intervallo
+rivisto e quindi non segnalato dai revisori, ma identico. Corretto con la guardia condivisa
+`src/lib/record-id.ts`.
+
+Le regressioni sono bloccate da `tests/unit/review-fixes.test.ts`. Restano scoperti da test
+automatici il salto dei passi legacy nel motore e la presa in carico dei webhook: entrambi
+richiedono un database, e Docker non era disponibile.
+
 ## Metodo
 
 Dodici revisori indipendenti, uno per dimensione di rischio, hanno cercato difetti nel diff. Ogni riscontro è

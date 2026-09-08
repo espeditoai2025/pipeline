@@ -10,6 +10,7 @@ import { randomBytes } from "crypto";
 import { compare, hash } from "bcryptjs";
 import { inviteEmailHtml } from "@/lib/email-templates";
 import { sendPlatformMail } from "@/lib/mailer";
+import { isRecordId } from "@/lib/record-id";
 type Role = "OWNER" | "ADMIN" | "MANAGER" | "SALES" | "VIEWER";
 
 function getIds(s: Session | null) {
@@ -186,6 +187,7 @@ export async function revokeInvitation(id: string) {
   const actor = await db.user.findUnique({ where: { id: userId }, select: { role: true } });
   if (!actor || !["OWNER", "ADMIN"].includes(actor.role)) return { error: "Permesso negato" };
 
+  if (!isRecordId(id)) return { error: "Invito non valido" };
   await db.invitation.deleteMany({ where: { id, organizationId: orgId } });
   revalidatePath("/settings");
   return { error: null };

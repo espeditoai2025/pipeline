@@ -8,6 +8,9 @@ function signPayload(payload: string, secret: string): string {
 }
 
 const MAX_ATTEMPTS = 5;
+/** Quanto resta "presa in carico" una consegna mentre la si sta spedendo: piu' del
+ *  timeout della richiesta, cosi' un'altra esecuzione del cron non la rispedisce. */
+const LEASE_MS = 5 * 60_000;
 
 /** Exponential backoff for retries: 1,2,4,8,16 minutes, capped at 2h. */
 function backoffMs(attempts: number): number {
@@ -119,17 +122,27 @@ export async function processWebhookRetries(limit = 50): Promise<number> {
 
   let processed = 0;
   for (const d of due) {
-    processed++;
     // Webhook deleted/deactivated → stop retrying.
     if (!d.webhook || !d.webhook.isActive) {
+      processed++;
       await db.webhookDelivery
         .update({ where: { id: d.id }, data: { nextRetryAt: null } })
         .catch(() => {});
       continue;
     }
+    // Presa in carico atomica prima di spedire. Due cron sovrapposti (backup alle 02:00
+    // e process-webhooks ogni 15 minuti) selezionavano le stesse righe e consegnavano
+    // l'evento due volte, con il contatore dei tentativi che avanzava di uno solo.
+    // La riga viene rivendicata spostando nextRetryAt avanti: chi perde la corsa la salta.
+    const attempts = d.attempts + 1;
+    const claim = await db.webhookDelivery.updateMany({
+      where: { id: d.id, success: false, attempts: d.attempts, nextRetryAt: { lte: new Date() } },
+      data: { attempts, nextRetryAt: new Date(Date.now() + LEASE_MS) },
+    });
+    if (claim.count === 0) continue;
+    processed++;
     const payload = buildPayload(d.event, d.payload);
     const result = await attemptDelivery(d.webhook, d.event, payload);
-    const attempts = d.attempts + 1;
     await db.webhookDelivery
       .update({
         where: { id: d.id },

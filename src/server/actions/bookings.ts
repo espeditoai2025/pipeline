@@ -4,6 +4,7 @@ import { crmPermissionError } from "@/lib/crm-permissions";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { Session } from "next-auth";
+import { isRecordId } from "@/lib/record-id";
 
 function getOrgId(s: Session | null) {
   return (s?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
@@ -149,6 +150,7 @@ export async function deleteBookingPage(id: string): Promise<{ success: boolean 
   const session = await auth();
   const orgId = getOrgId(session);
   if ((!orgId) || (await crmPermissionError(session, "write"))) return { success: false };
+  if (!isRecordId(id)) return { success: false };
 
   await db.bookingPage.deleteMany({ where: { id, organizationId: orgId } });
   return { success: true };

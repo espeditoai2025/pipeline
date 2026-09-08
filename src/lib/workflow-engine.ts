@@ -231,11 +231,20 @@ async function executeDatabaseStep(
 
 async function executeJob(initial: WorkflowQueue, deadline: number) {
   let job = initial;
-  const parsed = workflowStepSchema.array().min(1).max(30).safeParse(job.steps);
+  // Ogni passo viene validato per conto suo. Una configurazione salvata da una versione
+  // precedente del builder (ASSIGN_OWNER o UPDATE_DEAL_STAGE con id vuoto, che l'interfaccia
+  // di allora non permetteva di compilare) va SALTATA come faceva il motore precedente:
+  // validare l'intero array in blocco faceva fallire il job insieme ai passi validi,
+  // e la riattivazione dell'automazione ricadeva nello stesso errore.
+  const rawSteps = Array.isArray(job.steps) ? (job.steps as unknown[]).slice(0, 30) : [];
+  const steps = rawSteps.map((s) => workflowStepSchema.safeParse(s));
+  const actionAt = (i: number) => {
+    const s = steps[i];
+    return s && s.success ? s.data.action.type : "CONFIG";
+  };
   try {
-    if (!parsed.success)
-      throw new CrmError(`Configurazione non valida: ${parsed.error.issues[0]?.message}`);
-    const steps = parsed.data;
+    if (!steps.some((s) => s.success))
+      throw new CrmError("Configurazione non valida: nessun passo eseguibile");
     while (job.stepIndex < steps.length && Date.now() < deadline) {
       const workflow = await db.workflow.findFirst({
         where: { id: job.workflowId, organizationId: job.orgId },
@@ -256,7 +265,28 @@ async function executeJob(initial: WorkflowQueue, deadline: number) {
         );
         return;
       }
-      const step = steps[job.stepIndex]!;
+      const current = steps[job.stepIndex]!;
+      if (!current.success) {
+        // Passo non configurato: registrato come saltato e superato, senza fermare il resto.
+        job = await crmTransaction((tx) =>
+          checkpoint(tx, job, {
+            stepIndex: job.stepIndex + 1,
+            attempts: 0,
+            logs: [
+              ...job.logs,
+              {
+                at: new Date().toISOString(),
+                step: job.stepIndex,
+                action: "CONFIG",
+                status: "SKIPPED",
+                message: `Passo ignorato: ${current.error.issues[0]?.message ?? "configurazione incompleta"}`,
+              },
+            ],
+          }),
+        );
+        continue;
+      }
+      const step = current.data;
       const entry: StepLog = {
         at: new Date().toISOString(),
         step: job.stepIndex,
@@ -411,7 +441,7 @@ async function executeJob(initial: WorkflowQueue, deadline: number) {
           {
             at: new Date().toISOString(),
             step: job.stepIndex,
-            action: parsed.success ? (parsed.data[job.stepIndex]?.action.type ?? "END") : "CONFIG",
+            action: actionAt(job.stepIndex),
             status: "FAILED",
             message,
           },

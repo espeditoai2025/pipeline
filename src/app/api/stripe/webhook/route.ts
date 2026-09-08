@@ -9,6 +9,18 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 const ACTIVE = new Set<Stripe.Subscription.Status>(["active", "trialing", "past_due"]);
 
+/**
+ * Piano risultante dopo un evento di abbonamento.
+ *
+ * ENTERPRISE e' assegnato a mano dall'amministratore e fatturato fuori da Stripe, mentre i
+ * campi Stripe dell'organizzazione restano valorizzati: la fine di quell'abbonamento non deve
+ * declassarlo, altrimenti un cliente a contratto perde piano e automazioni.
+ */
+export function planAfterSubscription(currentPlan: string, isActive: boolean): "ENTERPRISE" | "PRO" | "STARTER" {
+  if (currentPlan === "ENTERPRISE") return "ENTERPRISE";
+  return isActive ? "PRO" : "STARTER";
+}
+
 async function applySubscription(tx: Prisma.TransactionClient, event: Stripe.Event) {
   let incoming: Stripe.Subscription;
   if (event.type.startsWith("customer.subscription."))
@@ -48,14 +60,14 @@ async function applySubscription(tx: Prisma.TransactionClient, event: Stripe.Eve
   await tx.organization.update({
     where: { id: orgId },
     data: {
-      plan: isActive ? (org.plan === "ENTERPRISE" ? "ENTERPRISE" : "PRO") : "STARTER",
+      plan: planAfterSubscription(org.plan, isActive),
       stripeSubscriptionId: canceled ? null : subscription.id,
       stripePriceId: canceled ? null : (item?.price.id ?? null),
       stripeCurrentPeriodEnd:
         canceled || !item?.current_period_end ? null : new Date(item.current_period_end * 1000),
     },
   });
-  if (!isActive) {
+  if (!isActive && org.plan !== "ENTERPRISE") {
     await tx.workflow.updateMany({ where: { organizationId: orgId }, data: { isActive: false } });
     await tx.workflowQueue.updateMany({
       where: { orgId, status: { in: ["PENDING", "PAUSED"] } },

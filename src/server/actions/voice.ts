@@ -55,6 +55,9 @@ export async function saveVoiceTranscript(id: string, transcript: string) {
 export async function deleteVoiceNote(id: string) {
   try {
     const { orgId, userId, role } = await featureAccess("write");
+    // Senza questo controllo un oggetto al posto della stringa diventa un filtro Prisma
+    // (per esempio {"not":""}) e la cancellazione di una nota si allarga all'intero archivio.
+    if (!z.string().min(1).max(100).safeParse(id).success) throw new CrmError("Nota non valida.");
     const result = await db.voiceNote.deleteMany({ where: { id, organizationId: orgId, ...(role === "OWNER" || role === "ADMIN" ? {} : { authorId: userId }) } });
     if (!result.count) throw new CrmError("Nota non disponibile o permesso negato.");
     revalidatePath("/voice"); return { ok: true };
