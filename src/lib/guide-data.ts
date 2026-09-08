@@ -2256,6 +2256,26 @@ export function getGuideContext(query: string): string {
   );
 }
 
+/**
+ * Mappa compatta di cosa sa fare Pipely, ricavata dalle sezioni della guida.
+ *
+ * L'assistente AI teneva questo elenco scritto a mano dentro il proprio prompt, e invecchiava in
+ * silenzio a ogni funzione aggiunta: a chi chiedeva delle note vocali rispondeva che non
+ * esistevano. Ora la guida è l'unica fonte da aggiornare.
+ *
+ * Solo titoli, senza estratti: questo indice viaggia in ogni richiesta e deve rispondere a
+ * "Pipely sa fare X?", non a "come si fa X". Il testo completo degli articoli pertinenti lo
+ * recupera getGuideContext a partire dalla domanda.
+ */
+export function getGuideFeatureMap(): string {
+  const lines = ["=== COSA SA FARE PIPELY (indice della guida) ==="];
+  for (const section of GUIDE_SECTIONS) {
+    lines.push(`\n[${section.label}] ${section.description}`);
+    for (const article of section.articles) lines.push(`- ${article.title}`);
+  }
+  return lines.join("\n");
+}
+
 function getGuideIndex(): string {
   const lines = ["=== GUIDA PIPELY — INDICE ==="];
   for (const s of GUIDE_SECTIONS) {
