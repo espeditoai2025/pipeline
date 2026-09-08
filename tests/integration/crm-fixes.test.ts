@@ -287,6 +287,25 @@ describe("migrazione e motore con PostgreSQL locale", () => {
     expect((await job()).status).toBe("FAILED");
     expect((await db.deal.findUniqueOrThrow({ where: { id: "deal" } })).stageId).toBe("stage");
   });
+  it("salta la fase di un'altra pipeline della stessa organizzazione senza fermare i passi successivi", async () => {
+    // La validazione al salvataggio non lega la fase a una pipeline quando il trigger non filtra
+    // per fase: la stessa automazione incontra legittimamente affari di un'altra pipeline.
+    await db.pipeline.create({ data: { id: "pipeline-2", name: "Assistenza", organizationId: "a" } });
+    await db.stage.create({
+      data: { id: "stage-2", name: "Presa in carico", pipelineId: "pipeline-2", position: 0 },
+    });
+    const move: WorkflowStep = {
+      id: "move",
+      action: { type: "UPDATE_DEAL_STAGE", stageId: "stage-2" },
+    };
+    await workflow([move, notify]);
+    await enqueue();
+    await processWorkflowQueue({ orgId: "a" });
+    expect((await job()).status).not.toBe("FAILED");
+    // Il punto della correzione: prima l'errore definitivo impediva per sempre i passi successivi.
+    expect(await db.notification.count()).toBeGreaterThan(0);
+    expect((await db.deal.findUniqueOrThrow({ where: { id: "deal" } })).stageId).toBe("stage");
+  });
   it("validare non esegue azioni e non incrementa i contatori", async () => {
     const wf = await workflow();
     expect((await testWorkflow(wf.id)).stepsRun).toBe(1);

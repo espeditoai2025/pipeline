@@ -84,6 +84,19 @@ export const workflowSchema = z
           path: ["steps", index],
           message: "La riassegnazione richiede un affare, contatto o lead",
         });
+      // Un'attività creata con scadenza "adesso" è già scaduta alla scansione successiva e
+      // rialimenta lo stesso trigger: il ciclo non si ferma, perché la scansione delle attività
+      // scadute riparte sempre da profondità zero e la barriera anti-ricorsione non la vede.
+      if (
+        step.action.type === "CREATE_ACTIVITY" &&
+        step.action.dueDays === 0 &&
+        value.trigger.type === "ACTIVITY_OVERDUE"
+      )
+        ctx.addIssue({
+          code: "custom",
+          path: ["steps", index],
+          message: "Su attività scaduta servono almeno 1 giorno, altrimenti l'automazione si richiama da sola",
+        });
       if (
         step.action.type === "SEND_EMAIL" &&
         step.action.to === "lead" &&

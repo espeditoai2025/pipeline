@@ -11,6 +11,7 @@ import { enqueueWorkflows, enqueueDealChanges } from "@/lib/workflow-events";
 import { wakeWorkflows } from "@/lib/workflow-wake";
 import { crmTransaction } from "@/lib/crm-transaction";
 import { dispatchWebhook } from "@/lib/webhook-delivery";
+import { isRecordId } from "@/lib/record-id";
 
 function getOrgId(session: Session | null) {
   return (session?.user as { organizationId?: string } | undefined)?.organizationId ?? null;
@@ -357,21 +358,28 @@ export async function deleteDeals(ids: string[]): Promise<{ count: number; error
   }
 }
 
+/** Quanti affari tratta un singolo aggiornamento massivo: oltre, la transazione diventa troppo lunga. */
+const BULK_STATUS_LIMIT = 500;
+
 export async function updateDealsStatus(
   ids: string[],
   status: "OPEN" | "WON" | "LOST",
-): Promise<{ count: number; error?: string }> {
+): Promise<{ count: number; error?: string; truncated?: boolean }> {
   const session = await auth();
   const orgId = getOrgId(session);
   if ((!orgId) || (await crmPermissionError(session, "write"))) return { count: 0, error: "Non autorizzato" };
   if (!z.enum(["OPEN", "WON", "LOST"]).safeParse(status).success) return { count: 0, error: "Stato non valido" };
+  // Gli id arrivano dal client: senza controllo un oggetto al posto della stringa diventa un
+  // filtro Prisma e allarga la selezione oltre quella scelta dall'utente.
+  if (!Array.isArray(ids) || ids.length > 5000 || !ids.every(isRecordId))
+    return { count: 0, error: "Selezione non valida" };
   if (!ids.length) return { count: 0 };
 
   try {
     const count = await crmTransaction(async tx => {
     const rows = await tx.deal.findMany({
       where: { id: { in: ids }, organizationId: orgId, status: { notIn: [status, "DELETED"] } },
-      take: 500,
+      take: BULK_STATUS_LIMIT,
     });
     for (const previous of rows) {
       const updated = await tx.deal.update({ where: { id: previous.id, organizationId: orgId, status: previous.status, updatedAt: previous.updatedAt }, data: { status, closedAt: status === "OPEN" ? null : new Date(), ...(status !== "LOST" ? { lostReason: null } : {}) } });
@@ -381,7 +389,8 @@ export async function updateDealsStatus(
     });
     revalidatePath("/deals");
     wakeWorkflows(orgId);
-    return { count };
+    // Il taglio va detto: prima l'utente vedeva "500 affari aggiornati" e credeva finito il lavoro.
+    return { count, truncated: count === BULK_STATUS_LIMIT };
   } catch {
     return { count: 0, error: "Errore durante l'aggiornamento" };
   }

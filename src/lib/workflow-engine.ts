@@ -157,7 +157,19 @@ async function executeDatabaseStep(
           pipeline: { organizationId: job.orgId },
         },
       });
-      if (!stage) throw new CrmError("Fase non disponibile nella pipeline dell'affare");
+      if (!stage) {
+        // Due casi diversi, con esiti diversi. Una fase che esiste nell'organizzazione ma
+        // appartiene a un'altra pipeline e' una configurazione legittima (il salvataggio non
+        // lega la fase a una pipeline quando il trigger non filtra per fase) incontrata da un
+        // affare della pipeline sbagliata: passo saltato, il resto dell'automazione prosegue.
+        // Una fase che nell'organizzazione non esiste e' un riferimento esterno: errore definitivo.
+        const inOrganization = await tx.stage.findFirst({
+          where: { id: a.stageId, pipeline: { organizationId: job.orgId } },
+          select: { id: true },
+        });
+        if (!inOrganization) throw new CrmError("Fase non disponibile nella pipeline dell'affare");
+        throw new SkipStep("Fase di un'altra pipeline: passo saltato");
+      }
       if (ctx.deal.status !== "OPEN") throw new SkipStep("Affare già chiuso");
       if (ctx.deal.stageId === a.stageId) throw new SkipStep("Affare già nella fase selezionata");
       const before = ctx.deal.stageId;

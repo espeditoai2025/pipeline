@@ -16,6 +16,23 @@ export async function reserveVoiceAi(orgId: string) {
   if (!rows.length) throw new CrmError("Raggiunte le 50 elaborazioni giornaliere per trascrizioni e comandi. Riprova domani.");
 }
 
+/**
+ * Restituisce la chiamata riservata quando l'elaborazione non è avvenuta.
+ * Il limite giornaliero deve contare le trascrizioni riuscite, non i tentativi persi per un
+ * guasto del servizio esterno: altrimenti un provider che risponde male consuma la quota
+ * dell'organizzazione senza produrre un solo testo.
+ */
+export async function releaseVoiceAi(orgId: string) {
+  try {
+    await db.$executeRaw`
+      UPDATE "AiUsageDay" SET "calls" = "calls" - 1
+      WHERE "organizationId" = ${orgId} AND "day" = ${todayInItaly()} AND "calls" > 0
+    `;
+  } catch {
+    // La restituzione è un favore all'utente: se fallisce, non deve nascondere l'errore vero.
+  }
+}
+
 export async function transcribeAudio(audio: Uint8Array, mimeType: string) {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) throw new CrmError("Trascrizione non configurata. La nota resta salvata e puoi scrivere il testo manualmente.");

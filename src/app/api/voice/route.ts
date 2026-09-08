@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       if (!member) throw new CrmError("Permesso negato");
       const org = await tx.organization.findUniqueOrThrow({ where: { id: orgId }, select: { plan: true } });
       const usage = await tx.voiceNote.aggregate({ where: { organizationId: orgId }, _count: true, _sum: { byteSize: true } });
-      if (usage._count >= getLimits(org.plan).maxVoiceNotes || (usage._sum.byteSize ?? 0) + audio.length > VOICE_STORAGE_BYTES) throw new CrmError("Spazio note vocali esaurito. Elimina le note che non servono piÃ¹.");
+      if (usage._count >= getLimits(org.plan).maxVoiceNotes || (usage._sum.byteSize ?? 0) + audio.length > VOICE_STORAGE_BYTES) throw new CrmError("Spazio note vocali esaurito. Elimina le note che non servono più.");
       if (dealId && !await tx.deal.findFirst({ where: { id: dealId, organizationId: orgId, status: { not: "DELETED" } } })) throw new CrmError("Affare non disponibile");
       if (contactId && !await tx.contact.findFirst({ where: { id: contactId, organizationId: orgId } })) throw new CrmError("Contatto non disponibile");
       await tx.voiceNote.create({ data: { id, title, duration, audio, byteSize: audio.length, mimeType, organizationId: orgId, authorId: userId, dealId: dealId || null, contactId: contactId || null } });

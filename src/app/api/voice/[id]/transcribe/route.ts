@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { featureAccess, featureError } from "@/lib/feature-access";
 import { CrmError } from "@/lib/crm-transaction";
-import { reserveVoiceAi, transcribeAudio } from "@/lib/voice-ai";
+import { releaseVoiceAi, reserveVoiceAi, transcribeAudio } from "@/lib/voice-ai";
 export const runtime = "nodejs";
 export const maxDuration = 90;
 
@@ -20,7 +20,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!claimed.count) throw new CrmError("Trascrizione già in corso. Attendi e aggiorna l’elenco.");
     try {
       await reserveVoiceAi(orgId);
-      const text = await transcribeAudio(note.audio, note.mimeType);
+      let text: string;
+      try {
+        text = await transcribeAudio(note.audio, note.mimeType);
+      } catch (error) {
+        // Il servizio non ha prodotto nulla: la chiamata riservata torna nel conteggio.
+        await releaseVoiceAi(orgId);
+        throw error;
+      }
       await featureAccess("write", "ai");
       await db.voiceNote.updateMany({ where: { ...where, transcribingAt: lease, transcript: "" }, data: { transcript: text, transcribingAt: null } });
       return NextResponse.json({ text });

@@ -29,18 +29,18 @@ export async function prepareCrmCommand(input: z.infer<typeof inputSchema>): Pro
     const context = { kind, id: targetId, name: deal?.title ?? [contact?.firstName, contact?.lastName].filter(Boolean).join(" "), version: (deal?.updatedAt ?? contact!.updatedAt).toISOString(), currency: deal?.currency ?? "EUR", stages: deal?.pipeline.stages ?? [] };
     await reserveVoiceAi(orgId);
     const raw = await chatCompletion(crmCommandMessages(text, context), { maxTokens: 2200, temperature: 0, retries: 0, timeoutMs: 45000 });
-    let json: unknown; try { json = JSON.parse(raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "")); } catch { throw new CrmError("Comando non riconosciuto. Specifica una nota, unâ€™attivitÃ  con data o una modifica allâ€™affare selezionato."); }
+    let json: unknown; try { json = JSON.parse(raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "")); } catch { throw new CrmError("Comando non riconosciuto. Specifica una nota, un’attività con data o una modifica all’affare selezionato."); }
     const proposal = crmProposalSchema.safeParse(json);
-    if (!proposal.success) throw new CrmError("Comando non riconosciuto o ambiguo. Specifica lâ€™operazione per il record selezionato.");
+    if (!proposal.success) throw new CrmError("Comando non riconosciuto o ambiguo. Specifica l’operazione per il record selezionato.");
     const actions = proposal.data.actions.map(action => {
       if (action.type === "CREATE_NOTE") return "Aggiungi nota: " + action.content;
       if (action.type === "CREATE_ACTIVITY") {
-        let due: Date; try { due = italianLocalDateTime(action.dueLocal); } catch { throw new CrmError("La data proposta non Ã¨ valida. Specifica data e ora nel comando."); }
-        return "Crea attivitÃ  " + action.activityType + ": " + action.subject + " â€” " + due.toLocaleString("it-IT", { timeZone: "Europe/Rome" }) + " (ora italiana), assegnata a te" + (action.notes ? ". Note: " + action.notes : "");
+        let due: Date; try { due = italianLocalDateTime(action.dueLocal); } catch { throw new CrmError("La data proposta non è valida. Specifica data e ora nel comando."); }
+        return "Crea attività " + action.activityType + ": " + action.subject + " — " + due.toLocaleString("it-IT", { timeZone: "Europe/Rome" }) + " (ora italiana), assegnata a te" + (action.notes ? ". Note: " + action.notes : "");
       }
-      if (!deal) throw new CrmError("Le modifiche allâ€™affare richiedono la selezione di un affare.");
+      if (!deal) throw new CrmError("Le modifiche all’affare richiedono la selezione di un affare.");
       const stage = action.stageId ? context.stages.find(stage => stage.id === action.stageId) : null;
-      if (action.stageId && !stage) throw new CrmError("Fase non disponibile nella pipeline dellâ€™affare.");
+      if (action.stageId && !stage) throw new CrmError("Fase non disponibile nella pipeline dell’affare.");
       return "Aggiorna affare: " + [action.status ? "stato " + ({ OPEN: "Aperto", WON: "Vinto", LOST: "Perso" }[action.status]) : "", action.value !== undefined ? "valore " + action.value + " " + context.currency : "", stage ? "fase " + stage.name : ""].filter(Boolean).join(", ");
     });
     await featureAccess("write", "ai");
@@ -55,7 +55,7 @@ export async function executeCrmCommand(id: string) {
     if (typeof id !== "string" || id.length > 100) throw new CrmError("Comando non valido");
     const result = await crmTransaction(async tx => {
       const member = await tx.user.findFirst({ where: { id: userId, organizationId: orgId, role: { in: ["OWNER", "ADMIN", "MANAGER", "SALES"] } }, include: { organization: { select: { plan: true } } } });
-      if (!member || checkFeature(member.organization.plan, "ai")) throw new CrmError("Permesso o piano non piÃ¹ disponibile.");
+      if (!member || checkFeature(member.organization.plan, "ai")) throw new CrmError("Permesso o piano non più disponibile.");
       await tx.$queryRaw`SELECT id FROM "CrmCommand" WHERE id = ${id} AND "organizationId" = ${orgId} AND "authorId" = ${userId} FOR UPDATE`;
       const command = await tx.crmCommand.findFirst({ where: { id, organizationId: orgId, authorId: userId } });
       if (!command) throw new CrmError("Comando non disponibile");
@@ -64,7 +64,7 @@ export async function executeCrmCommand(id: string) {
       const context = contextSchema.parse(command.context); const proposal = crmProposalSchema.parse(command.proposal);
       let deal = context.kind === "deal" ? await tx.deal.findFirst({ where: { id: context.id, organizationId: orgId, status: { not: "DELETED" } } }) : null;
       const contact = context.kind === "contact" ? await tx.contact.findFirst({ where: { id: context.id, organizationId: orgId } }) : null;
-      if ((!deal && !contact) || (deal?.updatedAt ?? contact!.updatedAt).toISOString() !== context.version) throw new CrmError("Il record Ã¨ cambiato dopo lâ€™anteprima. Interpreta nuovamente il comando.");
+      if ((!deal && !contact) || (deal?.updatedAt ?? contact!.updatedAt).toISOString() !== context.version) throw new CrmError("Il record è cambiato dopo l’anteprima. Interpreta nuovamente il comando.");
       const links = { dealId: deal?.id ?? null, contactId: contact?.id ?? null };
       const records: { type: string; id: string }[] = [];
       for (const action of proposal.actions) {
@@ -95,6 +95,6 @@ export async function executeCrmCommand(id: string) {
       }
     }
     for (const path of ["/voice", "/deals", "/contacts", "/activities", "/dashboard"]) revalidatePath(path, "layout");
-    return { ok: true, message: result.duplicate ? "Comando giÃ  eseguito, nessuna modifica duplicata." : "Comando eseguito: " + result.count + " operazioni." };
+    return { ok: true, message: result.duplicate ? "Comando già eseguito, nessuna modifica duplicata." : "Comando eseguito: " + result.count + " operazioni." };
   } catch (error) { return { error: featureError(error) }; }
 }

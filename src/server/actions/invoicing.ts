@@ -142,8 +142,13 @@ async function saveRemoteDocument(invoiceId: string, orgId: string, document: Fi
   return db.$transaction(async tx => {
     const previous = await tx.invoiceExport.findUniqueOrThrow({ where: { invoiceId, organizationId: orgId } });
     const stillUncertain = ["UNKNOWN", "SENDING"].includes(previous.status) && previous.documentId !== null && document.ei_status === "not_sent";
+    // Un invio confermato non torna mai indietro. Dopo un invio riuscito il gestionale puo'
+    // riportare ancora ei_status "not_sent" finche' la sua coda non aggiorna il documento:
+    // riportare la riga a CREATED riaprirebbe il pulsante di invio e la fattura partirebbe
+    // allo SdI una seconda volta.
+    const alreadySent = previous.status === "SENT";
     const sent = ["attempt", "sent", "pending", "processing", "not_delivered", "accepted", "rejected", "no_response", "manual_accepted", "manual_rejected"].includes(document.ei_status ?? "");
-    const row = await tx.invoiceExport.update({ where: { invoiceId, organizationId: orgId }, data: { documentId: document.id, remoteNumber: String(document.number) + (document.numeration ?? ""), remoteTotal: document.amount_gross, eInvoiceStatus: document.ei_status ?? null, status: stillUncertain ? "UNKNOWN" : "CREATED", error: stillUncertain ? "Il precedente invio resta incerto. Attendi l’aggiornamento del gestionale prima di procedere." : null } });
+    const row = await tx.invoiceExport.update({ where: { invoiceId, organizationId: orgId }, data: { documentId: document.id, remoteNumber: String(document.number) + (document.numeration ?? ""), remoteTotal: document.amount_gross, eInvoiceStatus: document.ei_status ?? null, status: alreadySent ? "SENT" : stillUncertain ? "UNKNOWN" : "CREATED", error: stillUncertain ? "Il precedente invio resta incerto. Attendi l’aggiornamento del gestionale prima di procedere." : null } });
     const fiscal = z.object({ name: z.string(), vat_number: z.string(), tax_code: z.string(), address_street: z.string(), address_city: z.string(), ei_code: z.string(), certified_email: z.string() }).parse(payloadSchema.parse(previous.payload).request.data.entity);
     if (!previous.documentId) await tx.invoice.updateMany({ where: { id: invoiceId, organizationId: orgId, status: "DRAFT" }, data: { recipientName: fiscal.name, recipientVat: fiscal.vat_number || fiscal.tax_code, recipientAddress: fiscal.address_street, recipientCity: fiscal.address_city, recipientSdi: fiscal.certified_email || fiscal.ei_code } });
     if (sent) await tx.invoice.updateMany({ where: { id: invoiceId, organizationId: orgId, status: "DRAFT" }, data: { status: "SENT" } });

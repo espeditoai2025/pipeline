@@ -1,6 +1,6 @@
 import { createHmac } from "crypto";
 import { db } from "@/lib/db";
-import { assertPublicUrl } from "@/lib/ssrf";
+import { assertPublicUrl, safeFetch } from "@/lib/ssrf";
 import type { WebhookEvent } from "@/server/actions/webhooks";
 
 function signPayload(payload: string, secret: string): string {
@@ -41,7 +41,11 @@ async function attemptDelivery(
     };
   }
   try {
-    const res = await fetch(webhook.url, {
+    // safeFetch segue i redirect rivalidando OGNI salto con assertPublicUrl, quindi la
+    // protezione contro il redirect verso indirizzi interni resta intatta. Rifiutarli in
+    // blocco, come prima, faceva contare ogni 30x come fallimento: un endpoint che
+    // reindirizza perdeva definitivamente l'evento dopo cinque tentativi.
+    const res = await safeFetch(webhook.url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -51,9 +55,6 @@ async function attemptDelivery(
       },
       body: payload,
       signal: AbortSignal.timeout(10_000),
-      // No redirect following: a 30x would bypass the SSRF check above
-      // (public URL redirecting to an internal/metadata address).
-      redirect: "manual",
     });
     const response = (await res.text().catch(() => null))?.slice(0, 1000) ?? null;
     return { success: res.ok, statusCode: res.status, response };

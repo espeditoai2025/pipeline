@@ -23,7 +23,7 @@ export async function findCompanySuggestions(query: string): Promise<{ data?: Co
     orderBy: { updatedAt: "desc" }, take: 8,
   });
   return { data: companies.map(company => ({
-    source: "Azienda giÃ  in Pipely: " + company.name,
+    source: "Azienda già in Pipely: " + company.name,
     fields: Object.fromEntries(Object.entries(company).filter(([, value]) => Boolean(value))) as CompanySuggestion["fields"],
     warnings: ["Dati del tuo archivio, non verificati con il Registro Imprese."],
   })) };

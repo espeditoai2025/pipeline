@@ -310,11 +310,15 @@ export async function resumeWorkflowJob(
       error:
         "Esito email incerto. Verifica il provider e conferma esplicitamente il nuovo tentativo.",
     };
+  // Un'attesa programmata dal passo WAIT va rispettata anche dopo una sospensione: azzerare
+  // resumeAt faceva partire subito i passi successivi, per esempio la seconda email di una
+  // sequenza a 30 giorni inviata il giorno stesso della riattivazione del piano.
+  const pending = job.resumeAt.getTime() > Date.now();
   await db.workflowQueue.updateMany({
     where: { id, orgId: guard.orgId, status: job.status, lockToken: null },
     data: {
-      status: "PENDING",
-      resumeAt: new Date(),
+      status: pending ? "PAUSED" : "PENDING",
+      resumeAt: pending ? job.resumeAt : new Date(),
       emailInFlight: false,
       attempts: 0,
       error: null,

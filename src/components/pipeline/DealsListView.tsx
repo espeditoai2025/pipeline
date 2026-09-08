@@ -125,10 +125,14 @@ export function DealsListView({ deals, onDealClick }: Props) {
   function handleBulkStatus(status: "OPEN" | "WON" | "LOST") {
     const label = status === "WON" ? "Vinto" : status === "LOST" ? "Perso" : "Aperto";
     startBulkUpdate(async () => {
-      const { count, error } = await updateDealsStatus(selectedIds, status);
+      const { count, error, truncated } = await updateDealsStatus(selectedIds, status);
       if (error) { toast.error(error); return; }
       setRowSelection({});
-      toast.success(`${count} affare/i contrassegnat${count === 1 ? "o" : "i"} come "${label}"`);
+      const done = `${count} affare/i contrassegnat${count === 1 ? "o" : "i"} come "${label}"`;
+      // Con la selezione tagliata al limite il lavoro non è finito: dirlo evita che l'utente
+      // creda aggiornati anche gli affari rimasti indietro.
+      if (truncated) toast.warning(`${done}. Selezione troppo ampia: ripeti l'operazione per i restanti.`);
+      else toast.success(done);
     });
   }
 
