@@ -1,0 +1,17 @@
+{
+  "checkedAt": "2026-10-03T07:59:05.751Z",
+  "endpoint": "https://www.pipely.it/api/mcp",
+  "syntheticFixture": true,
+  "checks": {
+    "officialClient12Tools": true,
+    "isolatedTenant": true,
+    "idempotentContactCreation": true,
+    "noteCreated": true,
+    "noteReadBack": true,
+    "databaseReceiptsAndStarterPolicy": true,
+    "liveReadOnlyScope": true,
+    "revocationAndNoStore": true,
+    "bearerAuthWithoutLoginRedirect": true
+  },
+  "removed": true
+}

@@ -54,4 +54,17 @@ Build di produzione completata, incluse compilazione, verifica TypeScript e gene
 
 ## Pubblicazione
 
-Da completare dopo build e verifica del deployment.
+Commit applicativo `909a300` pubblicato su `main`. Deployment Vercel `dpl_7HgZyUJH6gefy6KSeSTzw3sQKNjS` **READY**, con alias `www.pipely.it` e `pipely.it`. GitHub conferma l'esito positivo del deployment. Migrazione `20261003120000_mcp_integrations` applicata: 12 migrazioni complessive; tutti i conteggi delle tabelle CRM preesistenti invariati, con la sola nuova riga di registrazione della migrazione.
+
+Verificato realmente `https://www.pipely.it/api/mcp` con il client MCP ufficiale e un'organizzazione Starter sintetica isolata, senza workflow o destinatari esterni:
+
+- Connessione e lista dei 12 tool riuscite.
+- Contesto limitato all'organizzazione della chiave.
+- Creazione contatto e retry con lo stesso ID: un solo contatto e una sola ricevuta.
+- Creazione nota e lettura della nota nel dettaglio contatto.
+- Ricevute in database coerenti con due scritture; nessun workflow Pro eseguito su Starter.
+- Passaggio della chiave a sola lettura: disponibili solo sette tool.
+- Revoca: HTTP 401, risposta privata/no-store, nessun redirect al login.
+- Organizzazione, credenziale e record di prova eliminati al termine; conteggi preesistenti nuovamente verificati.
+
+Prova ripetibile e risultati: [MCP-PRODUZIONE-2026-10-03.json](MCP-PRODUZIONE-2026-10-03.json). Nessun errore di runtime trovato nel controllo dei log del deployment. I container temporanei di ripristino e test sono stati rimossi.
