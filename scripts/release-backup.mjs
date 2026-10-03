@@ -12,9 +12,11 @@ const action = process.argv[2];
 if (!["backup", "verify"].includes(action)) throw new Error("Use backup or verify");
 const label = process.argv[3] ?? "workflow";
 if (!/^[a-z0-9-]{1,40}$/.test(label)) throw new Error("Invalid backup label");
+const releaseDate = process.argv[4] ?? "20260907";
+if (!/^\d{8}$/.test(releaseDate)) throw new Error("Invalid release date (YYYYMMDD)");
 const backupDir = path.resolve("backups");
-const dumpName = `pipely-prod-20260907-pre-${label}.dump`;
-const manifestName = label === "workflow" ? "release-20260907-manifest.json" : `release-20260907-${label}-manifest.json`;
+const dumpName = `pipely-prod-${releaseDate}-pre-${label}.dump`;
+const manifestName = label === "workflow" ? `release-${releaseDate}-manifest.json` : `release-${releaseDate}-${label}-manifest.json`;
 const connection = new URL(process.env.DIRECT_URL);
 if (!process.env.DATABASE_CA_CERT) throw new Error("Verified CA required");
 const ca = process.env.DATABASE_CA_CERT.replace(/\\n/g, "\n");
@@ -103,7 +105,7 @@ try {
       "run",
       "--rm",
       "--name",
-      `pipely-release-backup-20260907-${label}`,
+      `pipely-release-backup-${releaseDate}-${label}`,
       "--mount",
       `type=bind,source=${backupDir},target=/backup`,
     ];

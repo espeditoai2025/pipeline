@@ -51,6 +51,6 @@ export const PRO_FEATURES = [
   "Lead Finder: ricerche illimitate, fino a 50 candidati per ricerca",
 ];
 
-export const STARTER_FEATURES = ["1 pipeline", "Fino a 500 contatti", "Attività e calendario", "Fino a 10 note vocali (2 minuti ciascuna)", "Compilazione aziende da testo e archivio Pipely", "Catalogo prodotti", "Importazione CSV / Excel", "Report vendite ed esportazione CSV", "Lead Finder: 1 ricerca al giorno, fino a 10 candidati", "API REST e webhook per integrazioni"];
+export const STARTER_FEATURES = ["1 pipeline", "Fino a 500 contatti", "Attività e calendario", "Fino a 10 note vocali (2 minuti ciascuna)", "Compilazione aziende da testo e archivio Pipely", "Catalogo prodotti", "Importazione CSV / Excel", "Report vendite ed esportazione CSV", "Lead Finder: 1 ricerca al giorno, fino a 10 candidati", "API REST, webhook e MCP per integrazioni"];
 export const ENTERPRISE_FEATURES = ["Tutte le funzionalità Pro", "Progetto di adozione da concordare", "Assistenza e condizioni definite nel preventivo"];
 export const PLAN_LABELS: Record<PlanTier, string> = { starter: "Starter", pro: "Pro", enterprise: "Enterprise" };

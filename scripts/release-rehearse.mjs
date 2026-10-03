@@ -6,9 +6,11 @@ import pg from "pg";
 
 const label = process.argv[2];
 if (!label || !/^[a-z0-9-]{1,40}$/.test(label)) throw new Error("Provide the backup label");
+const releaseDate = process.argv[3] ?? "20260907";
+if (!/^\d{8}$/.test(releaseDate)) throw new Error("Invalid release date (YYYYMMDD)");
 const backupDir = path.resolve("backups");
-const manifest = JSON.parse(await fs.readFile(path.join(backupDir, `release-20260907-${label}-manifest.json`), "utf8"));
-if (manifest.file !== `pipely-prod-20260907-pre-${label}.dump`) throw new Error("Unexpected archive path");
+const manifest = JSON.parse(await fs.readFile(path.join(backupDir, `release-${releaseDate}-${label}-manifest.json`), "utf8"));
+if (manifest.file !== `pipely-prod-${releaseDate}-pre-${label}.dump`) throw new Error("Unexpected archive path");
 const digest = createHash("sha256").update(await fs.readFile(path.join(backupDir, manifest.file))).digest("hex");
 if (digest !== manifest.sha256) throw new Error("Archive checksum mismatch");
 const name = `pipely-rehearse-${label}`;

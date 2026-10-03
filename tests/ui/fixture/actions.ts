@@ -91,3 +91,13 @@ export const prepareInvoiceExport = async (input: import('@/lib/invoicing-schema
 export const createInvoiceInCloud = async () => { document.documentElement.dataset.invoiceCreated = 'true'; cloudStatus = { documentId: 100, remoteNumber: '8/P', status: 'CREATED', eInvoiceStatus: 'not_sent', remoteTotal: 1220, error: null, updatedAt: new Date().toISOString() }; return { ok: true }; };
 export const refreshInvoiceExport = async () => ({ ok: true });
 export const sendInvoiceToSdi = async () => { document.documentElement.dataset.invoiceSent = 'true'; cloudStatus = { ...cloudStatus!, status: 'SENT', eInvoiceStatus: 'pending' }; return { ok: true }; };
+
+export const fixtureMcpSettings: import('@/server/actions/mcp').McpSettingsData = { tokens: [], operations: [] };
+export const getMcpSettings = async () => ({ data: fixtureMcpSettings });
+export const createMcpToken = async (input: { name: string; canWrite: boolean; expiresInDays: number }) => {
+  document.documentElement.dataset.mcpCreated = JSON.stringify(input);
+  if (input.name === 'Quota piena') return { error: 'Hai già 10 connessioni MCP attive.' };
+  fixtureMcpSettings.tokens.push({ id: 'mcp-fixture', name: input.name, canWrite: input.canWrite, prefix: 'pip_mcp_fixture_', createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + input.expiresInDays * 86400000).toISOString(), revokedAt: null, lastUsedAt: null });
+  return { key: 'pip_mcp_' + '0'.repeat(64) };
+};
+export const revokeMcpToken = async (id: string) => { fixtureMcpSettings.tokens.find(token => token.id === id)!.revokedAt = new Date().toISOString(); return {}; };

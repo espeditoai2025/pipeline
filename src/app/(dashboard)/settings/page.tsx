@@ -484,6 +484,12 @@ export default function SettingsPage() {
                 </button>
               </div>
 
+              <div className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] p-6 space-y-3">
+                <h2 className="text-base font-semibold">Agenti AI e piattaforme esterne</h2>
+                <p className="text-sm text-[var(--crm-neutral-500)]">Collega strumenti compatibili con MCP, scegli i permessi e controlla le scritture effettuate nel CRM.</p>
+                <Link href="/settings/mcp" className="inline-flex rounded-lg border px-4 py-2 text-sm text-[var(--crm-primary)]">Gestisci connessioni MCP</Link>
+              </div>
+
               {/* API Keys */}
               <div className="rounded-xl border border-[var(--crm-neutral-100)] bg-white dark:bg-[#1a1a2e] p-6 space-y-3">
                 <h2 className="text-base font-semibold flex items-center gap-2">

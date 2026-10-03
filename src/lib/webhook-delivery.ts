@@ -113,9 +113,9 @@ export async function dispatchWebhook(
  * Retries failed webhook deliveries whose nextRetryAt is due. Called by the cron.
  * Uses exponential backoff and gives up after MAX_ATTEMPTS. Returns count processed.
  */
-export async function processWebhookRetries(limit = 50): Promise<number> {
+export async function processWebhookRetries(limit = 50, orgId?: string): Promise<number> {
   const due = await db.webhookDelivery.findMany({
-    where: { success: false, attempts: { lt: MAX_ATTEMPTS }, nextRetryAt: { lte: new Date() } },
+    where: { success: false, attempts: { lt: MAX_ATTEMPTS }, nextRetryAt: { lte: new Date() }, ...(orgId ? { webhook: { organizationId: orgId } } : {}) },
     include: { webhook: true },
     orderBy: { nextRetryAt: "asc" },
     take: limit,

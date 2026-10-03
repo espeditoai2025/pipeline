@@ -1,6 +1,10 @@
 # Pipely — Lavori Svolti
 
-> Ultimo aggiornamento del registro: 2026-09-07. Le sezioni precedenti sono conservate come storico.
+> Ultimo aggiornamento del registro: 2026-10-03. Le sezioni precedenti sono conservate come storico.
+
+## Sessione del 2026-10-03 — MCP per SaaS e agenti AI
+
+Implementato il server MCP HTTP con 12 tool CRM, credenziali dedicate di sola lettura o scrittura, scadenza, revoca, controlli di organizzazione e ruolo, ricevute idempotenti e integrazione transazionale con workflow e webhook. Aggiunta la gestione in `/settings/mcp` e allineate guida e caratteristiche dei piani. Passati 182 test unitari, 70 di integrazione e 50 UI desktop/mobile; i 19 test MCP sono passati anche su PostgreSQL 17 Docker. Backup delle 49 tabelle esistenti ripristinato e migrazione provata sulla copia senza alterare i dati. Stato del rilascio, file modificati, prove e attività successive: [RILASCIO-MCP-2026-10-03.md](RILASCIO-MCP-2026-10-03.md). Istruzioni per il collegamento: [MCP.md](MCP.md).
 
 ## Sessione del 2026-09-07 — Pubblicazione e completamento delle note vocali
 

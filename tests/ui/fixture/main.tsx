@@ -18,6 +18,8 @@ import { VoiceWorkspace } from "@/components/voice/VoiceWorkspace";
 import { CompanyAutofill } from "@/components/companies/CompanyAutofill";
 import { InvoiceCloudPanel } from "@/components/invoices/InvoiceCloudPanel";
 import { InvoicingSettings } from "@/components/settings/InvoicingSettings";
+import { McpSettings } from "@/components/settings/McpSettings";
+import { fixtureMcpSettings } from "./actions";
 import type { CompanySuggestion } from "@/lib/company-autofill";
 import type { Activity } from "@/types/activities";
 import "@/app/globals.css";
@@ -48,6 +50,7 @@ function App() {
     : view === "company-autofill" ? <><p data-testid="company-fields">{JSON.stringify(companyFields)}</p><CompanyAutofill current={() => companyFields} onApply={fields => setCompanyFields(prev => ({ ...prev, ...fields }))} /></>
     : view === "invoice-cloud" ? <InvoiceCloudPanel invoice={{ ...fixtureInvoice, status: "DRAFT", recipientVat: "12345678903" }} canWrite />
     : view === "invoicing-settings" ? <InvoicingSettings initial={{ configured: false, connected: false, connection: null, available: true, canManage: true }} />
+    : view === "mcp" ? <McpSettings initial={fixtureMcpSettings} />
     : view === "workflow" ? <><p data-testid="saved-workflow">{savedWorkflow}</p><WorkflowBuilder open={open} onClose={() => setOpen(false)} workflow={fixtureWorkflow} onSaved={row => setSavedWorkflow(JSON.stringify(row))} /></>
     : view === "workflow-logs" ? <AutomationLogView logs={fixtureLogs} />
     : view === "billing" ? <BillingClient canManage org={{ plan: params.get("plan") ?? "ESSENTIAL", stripeCustomerId: null, stripeSubscriptionId: null, stripeCurrentPeriodEnd: null }} />

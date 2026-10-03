@@ -28,6 +28,7 @@ export const authConfig: NextAuthConfig = {
         nextUrl.pathname.startsWith("/api/track/") ||
         nextUrl.pathname === "/api/stripe/webhook" ||
         nextUrl.pathname.startsWith("/api/v1/") ||
+        nextUrl.pathname === "/api/mcp" ||
         nextUrl.pathname.startsWith("/emails/unsubscribe") ||
         nextUrl.pathname.startsWith("/api/emails/unsubscribe") ||
         nextUrl.pathname.startsWith("/privacy") ||

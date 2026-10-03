@@ -71,6 +71,8 @@ model Organization {
   invoicingConnection InvoicingConnection?
   invoiceExports      InvoiceExport[]
   aiUsageDays         AiUsageDay[]
+  mcpTokens           McpToken[]
+  mcpOperations       McpOperation[]
 }
 
 model Invitation {
@@ -121,6 +123,7 @@ model User {
   emailAccounts  EmailAccount[]
   notifications  Notification[]
   apiKeys        ApiKey[]
+  mcpTokens      McpToken[]
   invoicesCreated Invoice[]    @relation("InvoiceCreator")
   paymentsRecorded InvoicePayment[] @relation("PaymentRecorder")
   paymentsVoided   InvoicePayment[] @relation("PaymentVoider")
@@ -722,6 +725,43 @@ model ApiKey {
 }
 
 // ============ WEBHOOKS ============
+
+// Dedicated MCP credentials cannot be used as unrestricted REST API keys.
+model McpToken {
+  id             String       @id @default(cuid())
+  name           String
+  keyHash        String       @unique
+  prefix         String
+  canWrite       Boolean      @default(false)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy      String
+  creator        User         @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  lastUsedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  operations     McpOperation[]
+
+  @@index([organizationId, createdAt])
+}
+
+// One committed receipt per client request; no raw prompts or input PII retained.
+model McpOperation {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tokenId        String
+  token          McpToken     @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  requestId      String
+  tool           String
+  inputHash      String
+  result         Json
+  createdAt      DateTime     @default(now())
+
+  @@unique([tokenId, requestId])
+  @@index([organizationId, createdAt])
+}
 
 model Webhook {
   id             String       @id @default(cuid())
