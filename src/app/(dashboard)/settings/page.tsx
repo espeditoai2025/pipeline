@@ -651,7 +651,7 @@ export default function SettingsPage() {
                             className={plan.id !== "enterprise" ? "bg-[var(--crm-primary)] hover:bg-[var(--crm-primary-dark)] text-white w-full" : "w-full"}
                             onClick={() => {
                               if (plan.id === "enterprise") {
-                                window.location.href = "mailto:support@pipely.it?subject=Piano%20Enterprise";
+                                window.location.href = "mailto:info@pipely.it?subject=Piano%20Enterprise";
                               } else {
                                 handleUpgrade();
                               }

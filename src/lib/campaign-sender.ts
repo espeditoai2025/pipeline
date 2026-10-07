@@ -111,7 +111,7 @@ export async function deliverCampaign(campaignId: string, orgId: string): Promis
 </div>`;
 
     // List-Unsubscribe header (RFC 2369 + RFC 8058) — punta all'endpoint POST one-click.
-    const listUnsubscribeHeader = `<mailto:unsubscribe@pipely.it?subject=unsubscribe&body=${contact.id}>, <${appUrl}/api/emails/unsubscribe?${unsubscribeQs}>`;
+    const listUnsubscribeHeader = `<${appUrl}/api/emails/unsubscribe?${unsubscribeQs}>`;
 
     const result = await sendOrgMail(orgId, {
       to: contact.email,

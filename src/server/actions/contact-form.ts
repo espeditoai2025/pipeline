@@ -4,7 +4,7 @@ import { z } from "zod";
 import { isEmailEnabled } from "@/lib/resend";
 import { sendPlatformMail } from "@/lib/mailer";
 
-const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL ?? "support@pipely.it";
+const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL?.trim() || "info@pipely.it";
 
 const schema = z.object({
   name: z.string().min(2, "Nome troppo corto").max(100),
@@ -56,11 +56,7 @@ export async function submitContactForm(data: unknown): Promise<ContactFormResul
   const subjectLabel = SUBJECT_LABELS[subject];
 
   if (!isEmailEnabled()) {
-    console.warn(
-      `[contact-form] RESEND_API_KEY non configurato. Messaggio ricevuto ma non inviato.\n` +
-      `Da: ${email} (${name}) | Argomento: ${subjectLabel}\n${message}`
-    );
-    return { success: true };
+    return { success: false, error: "Il modulo contatti non è disponibile. Scrivici direttamente a info@pipely.it." };
   }
 
   // Il messaggio al supporto è l'unico che conta: se non parte, chi ha scritto
@@ -88,7 +84,7 @@ export async function submitContactForm(data: unknown): Promise<ContactFormResul
   }
 
   // Conferma di cortesia: un fallimento qui non cambia l'esito per l'utente.
-  void sendPlatformMail("modulo-contatti-conferma", {
+  await sendPlatformMail("modulo-contatti-conferma", {
     to: email,
     subject: "Abbiamo ricevuto il tuo messaggio — Pipely",
     html: `
@@ -105,7 +101,7 @@ export async function submitContactForm(data: unknown): Promise<ContactFormResul
           <a href="https://pipely.it" style="color:#2563eb">pipely.it</a>.
         </p>
         <p style="color:#94a3b8;font-size:12px;margin-top:24px">
-          Pipely · <a href="mailto:support@pipely.it" style="color:#94a3b8">support@pipely.it</a>
+          Pipely · <a href="mailto:info@pipely.it" style="color:#94a3b8">info@pipely.it</a>
         </p>
       </div>
     `,

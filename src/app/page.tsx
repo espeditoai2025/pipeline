@@ -273,7 +273,7 @@ const jsonLd = {
       logo: "https://www.pipely.it/pipely-app-icon-blue.svg",
       contactPoint: {
         "@type": "ContactPoint",
-        email: "support@pipely.it",
+        email: "info@pipely.it",
         contactType: "customer support",
         availableLanguage: "Italian",
       },
@@ -319,7 +319,7 @@ const jsonLd = {
       "@id": "https://www.pipely.it/#localbusiness",
       name: "Pipely",
       url: "https://www.pipely.it",
-      email: "support@pipely.it",
+      email: "info@pipely.it",
       areaServed: { "@type": "Country", "name": "Italia" },
       knowsLanguage: "it",
       priceRange: "€–€€",

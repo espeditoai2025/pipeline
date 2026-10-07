@@ -42,7 +42,7 @@ export default function PrivacyPage() {
         <p>
           Il Titolare del trattamento dei dati personali è <strong>Pipely</strong> (di seguito "Pipely",
           "noi" o "ci"), raggiungibile all'indirizzo email{" "}
-          <a href="mailto:privacy@pipely.it" className="text-blue-600 hover:underline">privacy@pipely.it</a>.
+          <a href="mailto:info@pipely.it" className="text-blue-600 hover:underline">info@pipely.it</a>.
         </p>
         <p>
           Per qualsiasi richiesta relativa al trattamento dei tuoi dati personali puoi contattarci
@@ -191,7 +191,7 @@ export default function PrivacyPage() {
         <p>
           In qualità di interessato hai i seguenti diritti, esercitabili inviando una
           richiesta a{" "}
-          <a href="mailto:privacy@pipely.it" className="text-blue-600 hover:underline">privacy@pipely.it</a>:
+          <a href="mailto:info@pipely.it" className="text-blue-600 hover:underline">info@pipely.it</a>:
         </p>
         <ul>
           <li><strong>Accesso (art. 15):</strong> ottenere conferma che siano trattati dati che ti riguardano e riceverne una copia.</li>
@@ -243,7 +243,7 @@ export default function PrivacyPage() {
 
       <div className="mt-10 rounded-xl bg-slate-50 border border-slate-200 p-6 text-sm text-slate-600">
         <strong>Contatti:</strong> Per qualsiasi domanda sulla privacy scrivi a{" "}
-        <a href="mailto:privacy@pipely.it" className="text-blue-600 hover:underline">privacy@pipely.it</a>.
+        <a href="mailto:info@pipely.it" className="text-blue-600 hover:underline">info@pipely.it</a>.
       </div>
     </article>
     </>

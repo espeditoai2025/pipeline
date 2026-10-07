@@ -20,9 +20,9 @@ export function UpgradeModal({ message, onClose }: UpgradeModalProps) {
       const res = await fetch("/api/stripe/checkout", { method: "POST" });
       const data = await res.json() as { url?: string; error?: string };
       if (data.url) { window.location.href = data.url; return; }
-      setError(data.error ?? "Impossibile avviare il checkout. Riprova o scrivici a support@pipely.it");
+      setError(data.error ?? "Impossibile avviare il checkout. Riprova o scrivici a info@pipely.it");
     } catch {
-      setError("Impossibile avviare il checkout. Riprova o scrivici a support@pipely.it");
+      setError("Impossibile avviare il checkout. Riprova o scrivici a info@pipely.it");
     } finally {
       setLoading(false);
     }

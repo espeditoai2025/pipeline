@@ -309,7 +309,7 @@ async function geocodeLocation(location: string): Promise<GeoResult | null> {
     const q = encodeURIComponent((location.split(",")[0] ?? location).trim());
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?q=${q}&format=json&countrycodes=it&limit=1&addressdetails=1`,
-      { headers: { "User-Agent": "Pipely-CRM/1.0 (contact@pipely.it)" } }
+      { headers: { "User-Agent": "Pipely-CRM/1.0 (info@pipely.it)" } }
     );
     if (!res.ok) return null;
     const data = (await res.json()) as Array<{

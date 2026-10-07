@@ -37,7 +37,7 @@ export function UnsubscribeConfirm({ cid, lid, sig }: Props) {
       <>
         <div className="mb-4 flex justify-center"><XCircle className="h-12 w-12 text-red-400" /></div>
         <h1 className="mb-3 text-xl font-semibold text-slate-900">Errore</h1>
-        <p className="mb-6 text-slate-500">Link non valido o errore durante la disiscrizione. Scrivi a <a href="mailto:privacy@pipely.it" className="underline">privacy@pipely.it</a>.</p>
+        <p className="mb-6 text-slate-500">Link non valido o errore durante la disiscrizione. Scrivi a <a href="mailto:info@pipely.it" className="underline">info@pipely.it</a>.</p>
       </>
     );
   }

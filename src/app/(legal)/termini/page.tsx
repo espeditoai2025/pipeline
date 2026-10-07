@@ -243,7 +243,7 @@ export default function TerminiPage() {
       <Section title="13. Contatti">
         <p>
           Per qualsiasi domanda sui presenti Termini scrivi a{" "}
-          <a href="mailto:support@pipely.it" className="text-blue-600 hover:underline">support@pipely.it</a>.
+          <a href="mailto:info@pipely.it" className="text-blue-600 hover:underline">info@pipely.it</a>.
         </p>
       </Section>
     </article>

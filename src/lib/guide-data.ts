@@ -1881,7 +1881,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         ]},
         { type: "heading", text: "Account bloccato per troppi tentativi" },
         { type: "para", text: "Dopo troppi tentativi di accesso falliti l'account viene bloccato temporaneamente. Aspetta 15 minuti prima di riprovare. Se il problema persiste, contatta il supporto." },
-        { type: "tip", text: "Se non ricevi l'email di recupero password entro 5 minuti, controlla la cartella spam. Aggiungi noreply@pipely.it ai tuoi contatti attendibili per evitare futuri problemi." },
+        { type: "tip", text: "Se non ricevi l'email di recupero password entro 5 minuti, controlla la cartella spam. Aggiungi info@pipely.it ai tuoi contatti attendibili per evitare futuri problemi." },
       ]},
       { id: "pb2", title: "I dati non si sincronizzano correttamente", excerpt: "Cause comuni di mancata sincronizzazione e come forzare l'aggiornamento.", readTime: 4, blocks: [
         { type: "heading", text: "Passaggi di base" },

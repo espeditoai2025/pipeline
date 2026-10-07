@@ -65,6 +65,14 @@ describe("invio di piattaforma", () => {
     expect(r).toMatchObject({ ok: false, error: "fetch failed" });
   });
 
+  it("indirizza le risposte alla casella attiva e conserva il replyTo esplicito", async () => {
+    state.send.mockResolvedValue({ data: { id: "re_1" }, error: null });
+    await sendPlatformMail("reset-password", mail);
+    expect(state.send.mock.calls[0]![0].replyTo).toBe("info@pipely.it");
+    await sendPlatformMail("modulo-contatti", { ...mail, replyTo: "visitatore@esempio.it" });
+    expect(state.send.mock.calls[1]![0].replyTo).toBe("visitatore@esempio.it");
+  });
+
   it("usa il nome mittente scelto ma tiene l'indirizzo verificato", async () => {
     state.send.mockResolvedValue({ data: { id: "re_1" }, error: null });
     await sendPlatformMail("campagna", { ...mail, fromName: 'Rossi "Srl"' });
@@ -89,6 +97,7 @@ describe("invio per conto di un'organizzazione", () => {
     state.send.mockResolvedValue({ data: { id: "re_1" }, error: null });
     await expect(sendOrgMail("org_1", mail)).resolves.toEqual({ ok: true, via: "resend" });
     expect(state.smtpCalls).toHaveLength(0);
+    expect(state.send.mock.calls[0]![0].replyTo).toBeUndefined();
   });
 
   it("non ripiega su Resend se l'SMTP del cliente fallisce", async () => {

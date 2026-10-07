@@ -38,7 +38,7 @@ export function ContactForm() {
       if (result.success) {
         setSuccess(true);
       } else {
-        setServerError("Si è verificato un errore. Riprova o scrivici direttamente a support@pipely.it");
+        setServerError("Si è verificato un errore. Riprova o scrivici direttamente a info@pipely.it");
       }
     });
   }

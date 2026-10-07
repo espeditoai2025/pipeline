@@ -22,7 +22,7 @@ const jsonLd = {
   url: "https://www.pipely.it",
   logo: "https://www.pipely.it/pipely-logo.svg",
   description: "Pipely è il CRM italiano con AI e automazioni per PMI e team di vendita.",
-  email: "support@pipely.it",
+  email: "info@pipely.it",
   areaServed: "IT",
   knowsLanguage: "it",
 };
@@ -170,8 +170,8 @@ export default function ChiSiamoPage() {
             <h2 className="mb-4 text-2xl font-semibold text-slate-900">Contattaci</h2>
             <p className="text-slate-600">Per domande sul prodotto, supporto tecnico o informazioni commerciali:</p>
             <ul className="mt-4 space-y-2 text-slate-600">
-              <li>Supporto generale: <a href="mailto:support@pipely.it" className="text-blue-600 hover:underline">support@pipely.it</a></li>
-              <li>Privacy e GDPR: <a href="mailto:privacy@pipely.it" className="text-blue-600 hover:underline">privacy@pipely.it</a></li>
+              <li>Supporto generale: <a href="mailto:info@pipely.it" className="text-blue-600 hover:underline">info@pipely.it</a></li>
+              <li>Privacy e GDPR: <a href="mailto:info@pipely.it" className="text-blue-600 hover:underline">info@pipely.it</a></li>
               <li>Pagina contatti: <Link href="/contatti" className="text-blue-600 hover:underline">pipely.it/contatti</Link></li>
             </ul>
           </div>

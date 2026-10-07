@@ -70,7 +70,7 @@ async function sendViaResend(opts: MailOptions): Promise<MailResult> {
  * che altrimenti resterebbero invisibili.
  */
 export async function sendPlatformMail(context: string, opts: MailOptions): Promise<MailResult> {
-  const result = await sendViaResend(opts);
+  const result = await sendViaResend({ ...opts, replyTo: opts.replyTo ?? "info@pipely.it" });
   if (!result.ok) {
     // Nessun indirizzo nei log: basta il contesto per risalire al flusso.
     logger.error("mailer", `Invio email non riuscito (${context})`, { error: result.error });

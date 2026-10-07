@@ -181,7 +181,7 @@ export default function CookiePage() {
         Per maggiori informazioni consulta la nostra{" "}
         <Link href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</Link>{" "}
         o scrivi a{" "}
-        <a href="mailto:privacy@pipely.it" className="text-blue-600 hover:underline">privacy@pipely.it</a>.
+        <a href="mailto:info@pipely.it" className="text-blue-600 hover:underline">info@pipely.it</a>.
       </div>
     </article>
     </>

@@ -133,7 +133,7 @@ export async function sendEmail(input: z.infer<typeof composeSchema>): Promise<{
   const { to, cc, subject, body, dealId, contactId } = parsed.data;
   const referenceError = await validateCrmReferences(orgId, { dealId, contactId });
   if (referenceError) return { data: null, error: referenceError };
-  const fromAddress = session.user?.email ?? "noreply@pipely.app";
+  const fromAddress = session.user?.email ?? "info@pipely.it";
   const fromName = session.user?.name ?? "Pipely CRM";
   const threadId = `thread-${Date.now()}`;
   const now = new Date();

@@ -1,6 +1,12 @@
 # Pipely — Lavori Svolti
 
-> Ultimo aggiornamento del registro: 2026-10-03. Le sezioni precedenti sono conservate come storico.
+> Ultimo aggiornamento del registro: 2026-10-07. Le sezioni precedenti sono conservate come storico.
+
+## Sessione del 2026-10-07 — Unica casella di contatto su Aruba
+
+Allineati contatti pubblici, dati strutturati della home e di Chi siamo, privacy/cookie/termini, errori di checkout e contatti, richieste Enterprise, guida e template email a `info@pipely.it`. Il modulo contatti recapita a questa casella e mantiene il Reply-To del visitatore; le altre email della piattaforma usano `info@pipely.it` per le risposte. Mittente Resend predefinito aggiornato e variabile `RESEND_FROM` di produzione impostata a `Pipely CRM <info@pipely.it>`. Il canale SMTP e il Reply-To delle organizzazioni restano governati dalle loro impostazioni.
+
+Rimosso l'indirizzo inattivo `unsubscribe@pipely.it` dall'header delle campagne: restano il collegamento di disiscrizione visibile e l'endpoint HTTP one-click firmato. Corretto il falso successo del modulo senza provider e attesa la conferma di cortesia prima di terminare la richiesta. Cinque nuove regressioni su recapito, risposte ed errori; 187 test unitari superati. DNS pubblici controllati in sola lettura: MX del dominio principale `mx.pipely.it`, MX/SPF di ritorno su `send.pipely.it` e DKIM Resend presenti. Nessuna modifica DNS e nessun invio reale eseguito. Il file temporaneo per la lettura delle variabili Vercel è stato rimosso; la CLI non ha restituito i valori riservati, quindi lo stato del dominio nel pannello Resend non è stato confermato tramite API. Per l'indirizzo non serve una nuova verifica su Resend se `pipely.it` resta verificato. Build di produzione e controllo TypeScript completati; ESLint dei moduli di invio e dei test senza errori. Rilascio tramite il ramo `main` su Vercel.
 
 ## Sessione del 2026-10-03 — MCP per SaaS e agenti AI
 

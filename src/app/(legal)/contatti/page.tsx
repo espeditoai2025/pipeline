@@ -4,7 +4,7 @@ import { ContactForm } from "./ContactForm";
 
 export const metadata: Metadata = {
   title: "Contattaci — Supporto Pipely CRM",
-  description: "Hai domande su Pipely? Scrivici a support@pipely.it — ti risponderemo entro 1 giorno lavorativo. Siamo disponibili dal lunedì al venerdì, 9:00–18:00 CET.",
+  description: "Hai domande su Pipely? Scrivici a info@pipely.it — ti risponderemo entro 1 giorno lavorativo. Siamo disponibili dal lunedì al venerdì, 9:00–18:00 CET.",
   alternates: { canonical: "https://www.pipely.it/contatti" },
   openGraph: {
     title: "Contattaci — Supporto Pipely CRM",
@@ -27,8 +27,8 @@ const contacts = [
   {
     icon: Mail,
     title: "Email",
-    value: "support@pipely.it",
-    href: "mailto:support@pipely.it",
+    value: "info@pipely.it",
+    href: "mailto:info@pipely.it",
     desc: "Per supporto, informazioni e partnership",
   },
   {

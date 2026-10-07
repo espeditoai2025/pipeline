@@ -42,7 +42,7 @@ export function welcomeEmailHtml({
           </ul>
           <p style="margin:0;font-size:13px;color:#94a3b8;">
             Hai bisogno di aiuto? Scrivici a
-            <a href="mailto:support@pipely.it" style="color:#3b82f6;text-decoration:none;">support@pipely.it</a>
+            <a href="mailto:info@pipely.it" style="color:#3b82f6;text-decoration:none;">info@pipely.it</a>
           </p>
         </td></tr>
         <!-- Footer -->
