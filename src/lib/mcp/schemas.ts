@@ -84,6 +84,25 @@ export const createContactSchema = z
     ownerId: id.optional(),
   })
   .strict();
+export const contactUpdateFields = {
+  firstName: text(100).optional(),
+  lastName: z.string().trim().max(100).nullable().optional(),
+  email: z.string().trim().email().max(254).nullable().optional(),
+  phone: z.string().trim().max(50).nullable().optional(),
+  jobTitle: z.string().trim().max(100).nullable().optional(),
+  companyId: id.nullable().optional(),
+  ownerId: id.optional(),
+};
+export const updateContactSchema = z
+  .object({ requestId, id, expectedUpdatedAt, ...contactUpdateFields })
+  .strict()
+  .refine(
+    (value) =>
+      Object.keys(contactUpdateFields).some(
+        (field) => value[field as keyof typeof contactUpdateFields] !== undefined,
+      ),
+    "Specifica almeno una modifica",
+  );
 export const createDealSchema = z
   .object({
     requestId,

@@ -188,6 +188,7 @@ beforeEach(async () => {
       organizationId: orgId,
       events: [
         "contact.created",
+        "contact.updated",
         "deal.created",
         "deal.updated",
         "deal.won",
@@ -234,6 +235,7 @@ describe("connessioni e autenticazione MCP", () => {
     for (const name of [
       "pipely_create_company",
       "pipely_update_company",
+      "pipely_update_contact",
       "pipely_complete_activity",
     ]) {
       const denied = await client.callTool({ name, arguments: {} }).catch((error) => error);
@@ -334,7 +336,7 @@ describe("trasporto HTTP e compatibilità", () => {
       request("POST", undefined, { "MCP-Protocol-Version": "2025-11-25" }),
     );
     expect(listed.status).toBe(200);
-    expect((await rpcBody(listed)).result.tools).toHaveLength(15);
+    expect((await rpcBody(listed)).result.tools).toHaveLength(16);
     expect((await handleMcpRequest(request("GET"))).status).toBe(405);
     expect((await handleMcpRequest(request("DELETE"))).status).toBe(405);
   });
@@ -351,9 +353,9 @@ describe("trasporto HTTP e compatibilità", () => {
   });
 });
 describe("tool CRM attraverso il client MCP ufficiale", () => {
-  it("elenca 15 tool e consulta solo l'organizzazione della chiave", async () => {
+  it("elenca 16 tool e consulta solo l'organizzazione della chiave", async () => {
     const client = await connect();
-    expect((await client.listTools()).tools).toHaveLength(15);
+    expect((await client.listTools()).tools).toHaveLength(16);
     const context = await client.callTool({ name: "pipely_get_context", arguments: {} });
     expect(text(context)).toContain("Studio MCP");
     for (const tool of [
@@ -418,6 +420,261 @@ describe("tool CRM attraverso il client MCP ufficiale", () => {
       arguments: { ...contactInput, firstName: "Diverso" },
     });
     expect(mismatch.isError).toBe(true);
+  });
+  it("collega tre contatti esistenti alle aziende anche a quota Starter piena", async () => {
+    await db.organization.update({ where: { id: orgId }, data: { plan: "STARTER" } });
+    await db.contact.createMany({
+      data: Array.from({ length: 499 }, (_, index) => ({
+        id: `mcp-existing-${index}`,
+        firstName: `Cliente ${index}`,
+        email: `cliente-${index}@example.test`,
+        organizationId: orgId,
+        ownerId: userId,
+      })),
+    });
+    const client = await connect();
+    for (const id of ["mcp-contact-a", "mcp-existing-0", "mcp-existing-1"]) {
+      const record = (
+        await client.callTool({
+          name: "pipely_get_record",
+          arguments: { kind: "contact", id },
+        })
+      ).structuredContent as { data: { updatedAt: string } };
+      expect(
+        (
+          await client.callTool({
+            name: "pipely_update_contact",
+            arguments: {
+              requestId: `link-${id}`,
+              id,
+              expectedUpdatedAt: record.data.updatedAt,
+              companyId: "mcp-company-a",
+            },
+          })
+        ).isError,
+      ).not.toBe(true);
+    }
+    const listed = (
+      await client.callTool({
+        name: "pipely_list_contacts",
+        arguments: { companyId: "mcp-company-a" },
+      })
+    ).structuredContent as { data: { id: string }[] };
+    expect(listed.data.map((row) => row.id).sort()).toEqual([
+      "mcp-contact-a",
+      "mcp-existing-0",
+      "mcp-existing-1",
+    ]);
+    expect(await db.contact.count({ where: { organizationId: orgId } })).toBe(500);
+    expect((await db.contact.findUniqueOrThrow({ where: { id: "mcp-existing-0" } })).email).toBe(
+      "cliente-0@example.test",
+    );
+    expect(await db.workflowQueue.count({ where: { orgId } })).toBe(0);
+    expect(await db.webhookDelivery.count({ where: { event: "contact.updated" } })).toBe(3);
+  });
+  it("aggiorna parzialmente il contatto e ripete la ricevuta senza duplicare eventi", async () => {
+    const client = await connect();
+    const before = await db.contact.update({
+      where: { id: "mcp-contact-a" },
+      data: { lastName: "Rossi", email: "anna@example.test", phone: "123", jobTitle: "CEO" },
+    });
+    const input = {
+      requestId: "contact-update-1",
+      id: before.id,
+      expectedUpdatedAt: before.updatedAt.toISOString(),
+      companyId: "mcp-company-a",
+      phone: null,
+    };
+    const first = receipt(
+      await client.callTool({ name: "pipely_update_contact", arguments: input }),
+    );
+    expect(first).toMatchObject({ id: before.id, entityType: "contact", replayed: false });
+    expect(new Date(first.updatedAt).getTime()).toBeGreaterThan(before.updatedAt.getTime());
+    const row = await db.contact.findUniqueOrThrow({ where: { id: before.id } });
+    expect(row).toMatchObject({
+      firstName: "Anna",
+      lastName: "Rossi",
+      email: "anna@example.test",
+      jobTitle: "CEO",
+      ownerId: userId,
+      companyId: "mcp-company-a",
+      phone: null,
+    });
+    expect(
+      receipt(await client.callTool({ name: "pipely_update_contact", arguments: input })),
+    ).toEqual({ ...first, replayed: true });
+    expect(
+      (
+        await client.callTool({
+          name: "pipely_update_contact",
+          arguments: { ...input, companyId: null },
+        })
+      ).isError,
+    ).toBe(true);
+    expect(await db.mcpOperation.count({ where: { organizationId: orgId } })).toBe(1);
+    expect(await db.webhookDelivery.count({ where: { event: "contact.updated" } })).toBe(1);
+    expect(await db.workflowQueue.count({ where: { orgId } })).toBe(0);
+    const delivery = await db.webhookDelivery.findFirstOrThrow({
+      where: { event: "contact.updated" },
+    });
+    expect(delivery.payload).toMatchObject({
+      id: row.id,
+      companyId: row.companyId,
+      ownerId: userId,
+    });
+  });
+  it("riassegna azienda e responsabile e può rimuovere azienda e recapiti", async () => {
+    const client = await connect();
+    await db.user.create({
+      data: { id: "mcp-member-a", email: "member@example.test", organizationId: orgId },
+    });
+    await db.company.create({
+      data: { id: "mcp-company-other", name: "Seconda azienda", organizationId: orgId },
+    });
+    const before = await db.contact.update({
+      where: { id: "mcp-contact-a" },
+      data: { companyId: "mcp-company-a", email: "anna@example.test", lastName: "Rossi" },
+    });
+    const updated = receipt(
+      await client.callTool({
+        name: "pipely_update_contact",
+        arguments: {
+          requestId: "contact-reassign-1",
+          id: before.id,
+          expectedUpdatedAt: before.updatedAt.toISOString(),
+          firstName: "Annamaria",
+          companyId: "mcp-company-other",
+          ownerId: "mcp-member-a",
+        },
+      }),
+    );
+    expect(await db.contact.findUniqueOrThrow({ where: { id: before.id } })).toMatchObject({
+      firstName: "Annamaria",
+      companyId: "mcp-company-other",
+      ownerId: "mcp-member-a",
+    });
+    expect(
+      (
+        await client.callTool({
+          name: "pipely_update_contact",
+          arguments: {
+            requestId: "contact-unlink-1",
+            id: before.id,
+            expectedUpdatedAt: updated.updatedAt,
+            companyId: null,
+            email: null,
+            lastName: "   ",
+            jobTitle: null,
+          },
+        })
+      ).isError,
+    ).not.toBe(true);
+    expect(await db.contact.findUniqueOrThrow({ where: { id: before.id } })).toMatchObject({
+      companyId: null,
+      email: null,
+      lastName: null,
+      jobTitle: null,
+      ownerId: "mcp-member-a",
+    });
+  });
+  it("nega contatti e riferimenti esterni o mancanti senza scritture parziali", async () => {
+    const client = await connect();
+    const before = await db.contact.findUniqueOrThrow({ where: { id: "mcp-contact-a" } });
+    const common = {
+      requestId: "contact-forbidden-1",
+      id: before.id,
+      expectedUpdatedAt: before.updatedAt.toISOString(),
+      firstName: "Modificata",
+    };
+    for (const extra of [
+      { id: "mcp-contact-b" },
+      { id: "missing-contact" },
+      { companyId: "mcp-company-b" },
+      { companyId: "missing-company" },
+      { ownerId: "mcp-owner-b" },
+      { ownerId: "missing-owner" },
+    ]) {
+      expect(
+        (
+          await client.callTool({
+            name: "pipely_update_contact",
+            arguments: { ...common, ...extra },
+          })
+        ).isError,
+      ).toBe(true);
+    }
+    expect(await db.contact.findUniqueOrThrow({ where: { id: before.id } })).toEqual(before);
+    expect(await db.mcpOperation.count({ where: { organizationId: orgId } })).toBe(0);
+    expect(await db.webhookDelivery.count({ where: { webhookId: "mcp-hook" } })).toBe(0);
+  });
+  it("rifiuta versioni obsolete, aggiornamenti vuoti e campi invalidi o di sistema", async () => {
+    const client = await connect();
+    const before = await db.contact.findUniqueOrThrow({ where: { id: "mcp-contact-a" } });
+    const common = {
+      requestId: "contact-invalid-1",
+      id: before.id,
+      expectedUpdatedAt: before.updatedAt.toISOString(),
+    };
+    for (const extra of [
+      {},
+      { firstName: " " },
+      { firstName: null },
+      { firstName: "x".repeat(101) },
+      { email: "non-email" },
+      { phone: "x".repeat(51) },
+      { ownerId: null },
+      { companyId: "" },
+      { companyId: "mcp-company-a", organizationId: "mcp-org-b" },
+      { companyId: "mcp-company-a", updatedAt: "2030-01-01T00:00:00Z" },
+      { companyId: "mcp-company-a", expectedUpdatedAt: "invalid" },
+    ]) {
+      expect(
+        (
+          await client.callTool({
+            name: "pipely_update_contact",
+            arguments: { ...common, ...extra },
+          })
+        ).isError,
+      ).toBe(true);
+    }
+    await db.contact.update({
+      where: { id: before.id },
+      data: {
+        firstName: "Nuova",
+        updatedAt: new Date(before.updatedAt.getTime() + 1000),
+      },
+    });
+    expect(
+      (
+        await client.callTool({
+          name: "pipely_update_contact",
+          arguments: { ...common, companyId: "mcp-company-a" },
+        })
+      ).isError,
+    ).toBe(true);
+    expect((await db.contact.findUniqueOrThrow({ where: { id: before.id } })).companyId).toBeNull();
+    expect(await db.mcpOperation.count({ where: { organizationId: orgId } })).toBe(0);
+    expect(await db.webhookDelivery.count({ where: { webhookId: "mcp-hook" } })).toBe(0);
+  });
+  it("due aggiornamenti concorrenti non sovrascrivono la stessa versione del contatto", async () => {
+    const client = await connect();
+    const before = await db.contact.findUniqueOrThrow({ where: { id: "mcp-contact-a" } });
+    const outcomes = await Promise.all(
+      ["Prima", "Seconda"].map((firstName) =>
+        client.callTool({
+          name: "pipely_update_contact",
+          arguments: {
+            requestId: `contact-race-${firstName}`,
+            id: before.id,
+            expectedUpdatedAt: before.updatedAt.toISOString(),
+            firstName,
+          },
+        }),
+      ),
+    );
+    expect(outcomes.filter((result) => result.isError)).toHaveLength(1);
+    expect(await db.mcpOperation.count({ where: { organizationId: orgId } })).toBe(1);
+    expect(await db.webhookDelivery.count({ where: { event: "contact.updated" } })).toBe(1);
   });
   it("due richieste simultanee con lo stesso identificativo producono una scrittura", async () => {
     const client = await connect();

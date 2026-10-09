@@ -165,8 +165,8 @@ export function McpSettings({ initial }: { initial: McpSettingsData }) {
               Consenti anche la scrittura nel CRM
               <span className="mt-1 block text-xs text-[var(--crm-neutral-500)]">
                 La piattaforma potrà creare contatti, aziende, trattative, attività e note,
-                aggiornare aziende e trattative e completare attività. Queste azioni possono
-                attivare automazioni e webhook configurati.
+                aggiornare contatti, aziende e trattative e completare attività. Queste azioni
+                possono attivare automazioni e webhook configurati.
               </span>
             </span>
           </label>

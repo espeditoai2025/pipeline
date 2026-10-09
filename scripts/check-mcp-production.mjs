@@ -6,8 +6,8 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 
 if (process.argv[2] !== "--synthetic-fixture") throw new Error("Use --synthetic-fixture");
-const reportPath = process.argv[3] ?? "docs/MCP-PRODUZIONE-2026-10-09.json";
-if (!/^docs\/MCP-PRODUZIONE-\d{4}-\d{2}-\d{2}\.json$/.test(reportPath))
+const reportPath = process.argv[3] ?? "docs/MCP-PRODUZIONE-CONTATTI-2026-10-09.json";
+if (!/^docs\/MCP-PRODUZIONE(?:-CONTATTI)?-\d{4}-\d{2}-\d{2}\.json$/.test(reportPath))
   throw new Error("Use a dated MCP report under docs");
 dotenv.config({ path: ".env.local", quiet: true });
 const origin = "https://www.pipely.it";
@@ -64,7 +64,7 @@ try {
       authProvider: { token: async () => raw },
     }),
   );
-  assert((await client.listTools()).tools.length === 15, "officialClient15Tools");
+  assert((await client.listTools()).tools.length === 16, "officialClient16Tools");
   const context = await client.callTool({ name: "pipely_get_context", arguments: {} });
   assert(value(context)?.organization?.id === id, "isolatedTenant");
   const input = { requestId: randomUUID(), firstName: "Cliente sintetico MCP" };
@@ -141,6 +141,55 @@ try {
     arguments: { ...companyUpdate, requestId: randomUUID(), city: "Torino" },
   });
   assert(stale.isError, "staleCompanyVersionRejected");
+  const contactUpdate = {
+    requestId: randomUUID(),
+    id: value(first).id,
+    expectedUpdatedAt: value(record).data.updatedAt,
+    companyId: value(company).id,
+  };
+  const contactLinked = await client.callTool({
+    name: "pipely_update_contact",
+    arguments: contactUpdate,
+  });
+  const contactRetry = await client.callTool({
+    name: "pipely_update_contact",
+    arguments: contactUpdate,
+  });
+  const linkedContacts = await client.callTool({
+    name: "pipely_list_contacts",
+    arguments: { companyId: value(company).id },
+  });
+  assert(
+    value(contactLinked)?.id === value(first).id &&
+      value(contactRetry)?.replayed &&
+      value(linkedContacts)?.data?.length === 1 &&
+      value(linkedContacts).data[0].id === value(first).id &&
+      value(linkedContacts).data[0].firstName === input.firstName,
+    "existingContactLinkedAndRetry",
+  );
+  const staleContact = await client.callTool({
+    name: "pipely_update_contact",
+    arguments: { ...contactUpdate, requestId: randomUUID(), companyId: null },
+  });
+  assert(staleContact.isError, "staleContactVersionRejected");
+  const contactUnlinked = await client.callTool({
+    name: "pipely_update_contact",
+    arguments: {
+      ...contactUpdate,
+      requestId: randomUUID(),
+      expectedUpdatedAt: value(contactLinked).updatedAt,
+      companyId: null,
+    },
+  });
+  const unlinkedRecord = await client.callTool({
+    name: "pipely_get_record",
+    arguments: { kind: "contact", id: value(first).id },
+  });
+  assert(
+    value(contactUnlinked)?.id === value(first).id &&
+      value(unlinkedRecord)?.data?.companyId === null,
+    "contactCompanyRemoved",
+  );
   const activity = await client.callTool({
     name: "pipely_create_activity",
     arguments: {
@@ -184,7 +233,7 @@ try {
     counts.rows[0].contacts === 1 &&
       counts.rows[0].companies === 1 &&
       counts.rows[0].activities === 1 &&
-      counts.rows[0].operations === 7 &&
+      counts.rows[0].operations === 9 &&
       counts.rows[0].workflows === 0,
     "databaseReceiptsAndStarterPolicy",
   );

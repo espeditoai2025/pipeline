@@ -12,7 +12,7 @@ import type { WebhookEvent } from "@/server/actions/webhooks";
 import { assertMcpWrite, type McpContext } from "./auth";
 import { logger } from "@/lib/logger";
 import type { z } from "zod";
-import { companyFields } from "./schemas";
+import { companyFields, contactUpdateFields } from "./schemas";
 import type {
   pageSchema,
   contactsSchema,
@@ -20,6 +20,7 @@ import type {
   activitiesSchema,
   recordSchema,
   createContactSchema,
+  updateContactSchema,
   createDealSchema,
   createActivitySchema,
   createNoteSchema,
@@ -470,6 +471,43 @@ export async function createMcpContact(
       firstName: row.firstName,
       lastName: row.lastName,
       email: row.email,
+    });
+    return { entityType: "contact", id: row.id, updatedAt: row.updatedAt.toISOString() };
+  });
+}
+export async function updateMcpContact(
+  context: McpContext,
+  input: z.infer<typeof updateContactSchema>,
+) {
+  return write(context, "pipely_update_contact", input, async (tx) => {
+    const before = await tx.contact.findFirst({
+      where: { id: input.id, organizationId: context.organizationId },
+    });
+    if (!before) throw new CrmError("Contatto non disponibile nella tua organizzazione");
+    if (before.updatedAt.getTime() !== new Date(input.expectedUpdatedAt).getTime())
+      throw new CrmError(
+        "Il contatto è cambiato. Rileggilo e verifica le modifiche prima di riprovare.",
+      );
+    await checkRefs(tx, context.organizationId, input);
+    const changes = Object.fromEntries(
+      (Object.keys(contactUpdateFields) as Array<keyof typeof contactUpdateFields>)
+        .filter((field) => input[field] !== undefined)
+        .map((field) => [field, input[field] === "" ? null : input[field]]),
+    );
+    const row = await tx.contact.update({
+      where: { id: before.id, organizationId: context.organizationId },
+      data: {
+        ...changes,
+        updatedAt: new Date(Math.max(Date.now(), before.updatedAt.getTime() + 1)),
+      },
+    });
+    await enqueueWebhook(tx, context.organizationId, "contact.updated", {
+      id: row.id,
+      firstName: row.firstName,
+      lastName: row.lastName,
+      email: row.email,
+      companyId: row.companyId,
+      ownerId: row.ownerId,
     });
     return { entityType: "contact", id: row.id, updatedAt: row.updatedAt.toISOString() };
   });

@@ -25,6 +25,7 @@ Le chiavi `pip_mcp_` sono separate dalle chiavi REST `pip_live_`. Una chiave MCP
 | `pipely_list_activities` | Ricerca attività per oggetto, completamento e collegamenti |
 | `pipely_get_record` | Dettaglio contatto/azienda/trattativa/attività; ultime 20 note per contatto/trattativa |
 | `pipely_create_contact` | Crea contatto, verifica quota e riferimenti dell'organizzazione |
+| `pipely_update_contact` | Aggiorna i campi indicati e collega, cambia o rimuove l'azienda, con controllo della versione |
 | `pipely_create_deal` | Crea trattativa OPEN con pipeline/fase coerenti |
 | `pipely_create_activity` | Crea attività attribuita al creatore della chiave |
 | `pipely_create_note` | Aggiunge una nota testuale a contatto o trattativa |
@@ -33,7 +34,7 @@ Le chiavi `pip_mcp_` sono separate dalle chiavi REST `pip_live_`. Una chiave MCP
 | `pipely_update_company` | Aggiorna solo i campi indicati, con controllo della versione e cancellazione tramite null |
 | `pipely_complete_activity` | Completa un'attività; se già conclusa mantiene la data originale |
 
-Il server 1.1.0 espone 15 tool: le chiavi di lettura espongono solo i primi sette. Gli altri otto sono registrati solo quando la chiave autorizza la scrittura; il server ricontrolla credenziale e ruolo anche nella transazione di scrittura. I riferimenti a contatti, aziende, fasi, pipeline e responsabili devono appartenere all'organizzazione della chiave. Le chiavi di scrittura esistenti abilitano anche le nuove operazioni; ricarica l'elenco strumenti nel client.
+Il server 1.2.0 espone 16 tool: le chiavi di lettura espongono solo i primi sette. Gli altri nove sono registrati solo quando la chiave autorizza la scrittura; il server ricontrolla credenziale e ruolo anche nella transazione di scrittura. I riferimenti a contatti, aziende, fasi, pipeline e responsabili devono appartenere all'organizzazione della chiave. Le chiavi di scrittura esistenti abilitano anche le nuove operazioni; ricarica l'elenco strumenti nel client dopo il rilascio.
 
 Le liste accettano `page` (1–10.000), `perPage` (1–50, predefinito 25) e `search` (massimo 200 caratteri). Il dettaglio restituisce al massimo 20 note, con 10.000 caratteri ciascuna e indicazione di eventuale troncamento. Non espone audio, credenziali di servizi, dettagli di abbonamento o dati di altre organizzazioni.
 
@@ -41,7 +42,11 @@ Le liste accettano `page` (1–10.000), `perPage` (1–50, predefinito 25) e `se
 
 Ogni scrittura richiede un `requestId` univoco, per esempio un UUID, di 8–100 caratteri alfanumerici, trattini o underscore. Riutilizza lo stesso ID e gli stessi dati nei retry. Il CRM, la ricevuta, i workflow e le consegne webhook sono salvati in un'unica transazione serializzabile. Un retry restituisce l'ID originale con `replayed: true`. Riutilizzare un ID per altri dati o per un altro tool viene rifiutato. La schermata mostra le ultime 30 ricevute, con connessione, operazione, record e identificativo della richiesta; non memorizza il testo del prompt o i parametri della scrittura, ma un hash di confronto.
 
-`pipely_update_deal` e `pipely_update_company` richiedono anche `expectedUpdatedAt`, ricavato da una lettura recente. Se il record è cambiato, la modifica viene rifiutata: rileggi la scheda, verifica che l'intento sia ancora valido e usa un nuovo `requestId`. Mantieni l'ID originale se stai invece ripetendo la medesima richiesta interrotta per scoprire se era già riuscita.
+`pipely_update_contact`, `pipely_update_deal` e `pipely_update_company` richiedono anche `expectedUpdatedAt`, ricavato da una lettura recente. Se il record è cambiato, la modifica viene rifiutata: rileggi la scheda, verifica che l'intento sia ancora valido e usa un nuovo `requestId`. Mantieni l'ID originale se stai invece ripetendo la medesima richiesta interrotta per scoprire se era già riuscita.
+
+Per collegare un contatto già creato a un'azienda, leggi il contatto con `pipely_get_record` (`kind: "contact"`) o `pipely_list_contacts`, cerca l'azienda con `pipely_list_companies` e invoca `pipely_update_contact` con `id`, `expectedUpdatedAt`, `requestId` e `companyId`. Ripeti per ogni contatto usando un requestId distinto. Il contatto conserva il proprio ID e tutti i campi omessi. `companyId: null` rimuove il collegamento; un altro ID cambia l'azienda. Non vengono creati duplicati né consumata quota contatti.
+
+Il tool può anche modificare nome, cognome, email, telefono, ruolo lavorativo e responsabile (`ownerId`). `null` cancella i campi facoltativi; cognome, telefono e ruolo accettano anche una stringa vuota. Nome e responsabile restano obbligatori; l'email deve essere valida oppure null. Il responsabile deve essere un membro della stessa organizzazione.
 
 Le aziende supportano nome, sito, settore, dimensione, indirizzo, città, paese, email, telefono, partita IVA, descrizione, LinkedIn e nome/ruolo/email/telefono del referente. Gli aggiornamenti sono parziali: i campi omessi restano invariati e `null` cancella un campo facoltativo. Nome, email e URL non validi vengono rifiutati; i limiti dei campi sono indicati nello schema del tool. Il server salva i dati forniti, senza verificare partita IVA o recapiti su servizi esterni.
 
@@ -49,7 +54,8 @@ Le aziende supportano nome, sito, settore, dimensione, indirizzo, città, paese,
 
 | Scrittura | Workflow | Webhook |
 | --- | --- | --- |
-| Contatto | `CONTACT_CREATED` | `contact.created` |
+| Contatto nuovo | `CONTACT_CREATED` | `contact.created` |
+| Contatto modificato | Nessun trigger di aggiornamento contatti disponibile | `contact.updated`, con azienda e responsabile risultanti |
 | Trattativa nuova | `DEAL_CREATED` | `deal.created` |
 | Trattativa modificata | Eventi condivisi per fase, valore, vinta/persa | `deal.updated`, eventuali `deal.won`, `deal.lost`, `deal.stage_changed` |
 | Attività | Nessun trigger di creazione; resta applicabile la gestione ordinaria delle scadenze | `activity.created` |
