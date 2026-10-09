@@ -1,5 +1,17 @@
 # Estensione MCP Pipely — 9 ottobre 2026
 
+## Aggiornamento contatti — server 1.2.0
+
+Pubblicato il commit applicativo `add7a23` su `main`. Deployment [3jPjcprSvBvC1CfViAGVUqnMzxe4](https://vercel.com/espeditoai2025-1690s-projects/pipeline/3jPjcprSvBvC1CfViAGVUqnMzxe4) verificato **READY / Production**, con alias `www.pipely.it` e `pipely.it`.
+
+Il server espone ora 16 tool (sette di lettura e nove di scrittura). `pipely_update_contact` aggiorna parzialmente anagrafica, azienda e responsabile dei contatti esistenti, conservando ID e campi omessi. Per collegare un'azienda richiede `id`, `companyId`, `expectedUpdatedAt` e `requestId`; `companyId: null` rimuove il collegamento. Nome e responsabile non possono essere cancellati. I riferimenti devono appartenere alla stessa organizzazione; il controllo di versione impedisce sovrascritture concorrenti. Scrittura, ricevuta idempotente e webhook `contact.updated` sono atomici. Non crea contatti duplicati, non consuma quota contatti e non attiva `CONTACT_CREATED`.
+
+Verificati 187 test unitari, 85 di integrazione (34 MCP), sei test UI desktop/mobile, TypeScript, ESLint dei moduli applicativi e build di produzione con 113 pagine statiche. Le sei nuove prove MCP coprono tre contatti a quota Starter piena, aggiornamento parziale e retry, riassegnazione/rimozione, isolamento, validazione/versioni obsolete e concorrenza. Lo script remoto conserva il warning console preesistente, senza errori di lint.
+
+Il collaudo pubblico del 9 ottobre 2026 alle 20:09, ora italiana, ha superato 17 controlli: catalogo di 16 tool, collegamento aziendale, retry, rifiuto della versione obsoleta e rimozione del collegamento, oltre alle precedenti operazioni aziendali e attività, ricevute Starter, sola lettura e revoca. Rapporto separato, che conserva la prova del rilascio precedente: [MCP-PRODUZIONE-CONTATTI-2026-10-09.json](MCP-PRODUZIONE-CONTATTI-2026-10-09.json). Rimossa la sola organizzazione sintetica; nessuna email, pagamento o modifica dei dati cliente. Nessuna nuova migrazione o variabile ambiente. Le chiavi di scrittura esistenti abilitano il nuovo tool: ricaricare il catalogo nel client.
+
+Aggiornati `src/lib/mcp/schemas.ts`, `src/lib/mcp/crm.ts`, `src/lib/mcp/server.ts`, il consenso in `src/components/settings/McpSettings.tsx`, `src/lib/guide-data.ts`, i test MCP, lo script remoto e la documentazione. La modifica preesistente ad `AGENTS.md` resta esclusa dai commit. Le sezioni seguenti conservano il dettaglio del rilascio 1.1.0.
+
 ## Funzioni
 
 Server `pipely` versione 1.1.0, con 15 strumenti (sette di lettura e otto di scrittura).
@@ -44,4 +56,4 @@ La modifica preesistente ad `AGENTS.md` è stata conservata ed esclusa dal commi
 
 ## Attività successive
 
-Restano separati da questa estensione OAuth, scopes per singola risorsa, aggiornamento dei contatti e gestione dei lead. Non sono esposti cancellazioni, riapertura attività, campagne, pagamenti o invio di fatture.
+Restano separati da questa estensione OAuth, scopes per singola risorsa e gestione dei lead. L'aggiornamento dei contatti è disponibile dal server 1.2.0 descritto sopra. Non sono esposti cancellazioni, riapertura attività, campagne, pagamenti o invio di fatture.
