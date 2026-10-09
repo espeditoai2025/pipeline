@@ -21,7 +21,12 @@ Disponibile negli stessi piani del precedente MCP. Le chiavi di scrittura già a
 - TypeScript ed ESLint dei moduli modificati completati senza errori.
 - Build di produzione completata: TypeScript e 113 pagine statiche generati senza errori.
 - Docker Desktop non ha reso disponibile il motore durante questa verifica; le prove di integrazione sopra usano PGlite, non un container.
-- Pubblicazione e verifica remota in corso; lo script di produzione usa soltanto una propria organizzazione sintetica e rimuove i dati al termine.
+- Verifica remota completata con il client ufficiale: 14 controlli superati su `https://www.pipely.it/api/mcp`, compresi creazione/aggiornamento aziende, retry, versione obsoleta, creazione/conclusione attività, conservazione della data, ricevute, piano Starter, sola lettura e revoca. Rapporto: [MCP-PRODUZIONE-2026-10-09.json](MCP-PRODUZIONE-2026-10-09.json).
+- La sola organizzazione sintetica della prova è stata rimossa con i suoi record; nessuna email o pagamento eseguito e nessun dato cliente modificato.
+
+## Pubblicazione
+
+Commit applicativo `cd2bf20` pubblicato su `main`. Deployment [B4oi5Ckkia66Ptoew4CVZLmUNbXG](https://vercel.com/espeditoai2025-1690s-projects/pipeline/B4oi5Ckkia66Ptoew4CVZLmUNbXG) verificato **READY / Production**, assegnato a `www.pipely.it` e `pipely.it`. La prova remota è stata eseguita il 9 ottobre 2026 alle 18:36, ora italiana. Nessuna migrazione aggiuntiva.
 
 ## File modificati
 
@@ -33,6 +38,9 @@ Disponibile negli stessi piani del precedente MCP. Le chiavi di scrittura già a
 - `tests/integration/mcp.test.ts`: nuove regressioni e aggiornamento del catalogo atteso.
 - `scripts/check-mcp-production.mjs`: verifica aziende/attività, retry, versione obsoleta e rapporti datati senza sovrascrivere la prova del 3 ottobre.
 - `docs/MCP.md`, `docs/LAVORI_SVOLTI.md`, questo rapporto: documentazione aggiornata.
+- `docs/MCP-PRODUZIONE-2026-10-09.json`: esito del collaudo pubblico senza credenziali o contenuti cliente.
+
+La modifica preesistente ad `AGENTS.md` è stata conservata ed esclusa dal commit applicativo.
 
 ## Attività successive
 
