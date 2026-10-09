@@ -31,8 +31,17 @@ const key = "pip_mcp_" + "a".repeat(64);
 const url = "http://localhost:3000/api/mcp";
 const clients: Client[] = [];
 const receipt = (result: unknown) =>
-  (result as { structuredContent: { id: string; replayed: boolean; updatedAt: string } })
-    .structuredContent;
+  (
+    result as {
+      structuredContent: {
+        id: string;
+        replayed: boolean;
+        updatedAt: string;
+        completedAt: string;
+        alreadyCompleted: boolean;
+      };
+    }
+  ).structuredContent;
 const text = (result: unknown) => JSON.stringify(result);
 async function rpcBody(response: Response) {
   const value = await response.text();
@@ -177,7 +186,16 @@ beforeEach(async () => {
       url: "https://example.test/never-deliver",
       secret: "fixture",
       organizationId: orgId,
-      events: ["contact.created", "deal.created", "deal.updated", "deal.won", "activity.created"],
+      events: [
+        "contact.created",
+        "deal.created",
+        "deal.updated",
+        "deal.won",
+        "activity.created",
+        "activity.completed",
+        "company.created",
+        "company.updated",
+      ],
     },
   });
   mocks.auth.mockResolvedValue({ user: { id: userId, organizationId: orgId, role: "OWNER" } });
@@ -213,6 +231,14 @@ describe("connessioni e autenticazione MCP", () => {
     expect(text(settings)).not.toContain(stored.keyHash);
     const client = await connect(created.key);
     expect((await client.listTools()).tools).toHaveLength(7);
+    for (const name of [
+      "pipely_create_company",
+      "pipely_update_company",
+      "pipely_complete_activity",
+    ]) {
+      const denied = await client.callTool({ name, arguments: {} }).catch((error) => error);
+      expect(text(denied)).not.toContain('"replayed":false');
+    }
   });
   it("nega la gestione dopo una variazione del ruolo anche con una sessione OWNER precedente", async () => {
     await db.user.update({ where: { id: userId }, data: { role: "VIEWER" } });
@@ -308,7 +334,7 @@ describe("trasporto HTTP e compatibilità", () => {
       request("POST", undefined, { "MCP-Protocol-Version": "2025-11-25" }),
     );
     expect(listed.status).toBe(200);
-    expect((await rpcBody(listed)).result.tools).toHaveLength(12);
+    expect((await rpcBody(listed)).result.tools).toHaveLength(15);
     expect((await handleMcpRequest(request("GET"))).status).toBe(405);
     expect((await handleMcpRequest(request("DELETE"))).status).toBe(405);
   });
@@ -325,9 +351,9 @@ describe("trasporto HTTP e compatibilità", () => {
   });
 });
 describe("tool CRM attraverso il client MCP ufficiale", () => {
-  it("elenca 12 tool e consulta solo l'organizzazione della chiave", async () => {
+  it("elenca 15 tool e consulta solo l'organizzazione della chiave", async () => {
     const client = await connect();
-    expect((await client.listTools()).tools).toHaveLength(12);
+    expect((await client.listTools()).tools).toHaveLength(15);
     const context = await client.callTool({ name: "pipely_get_context", arguments: {} });
     expect(text(context)).toContain("Studio MCP");
     for (const tool of [
@@ -507,6 +533,286 @@ describe("tool CRM attraverso il client MCP ufficiale", () => {
     expect(await db.mcpOperation.count({ where: { organizationId: orgId } })).toBe(4);
     expect(await db.webhookDelivery.count({ where: { webhookId: "mcp-hook" } })).toBe(4);
     expect((await getMcpSettings()).data?.operations).toHaveLength(4);
+  });
+  it("crea l'anagrafica aziendale completa e deduplica record e webhook nei retry", async () => {
+    const client = await connect();
+    const input = {
+      requestId: "company-create-1",
+      name: "Studio Rossi",
+      website: "https://example.test",
+      industry: "Consulenza",
+      size: "1-10",
+      address: "Via Roma 1",
+      city: "Roma",
+      country: "Italia",
+      email: "info@example.test",
+      phone: "+390612345",
+      vatNumber: "IT12345678901",
+      description: "Studio professionale",
+      linkedinUrl: "https://linkedin.com/company/example",
+      referentName: "Mario Rossi",
+      referentRole: "Titolare",
+      referentEmail: "mario@example.test",
+      referentPhone: "+3933312345",
+    };
+    const first = receipt(
+      await client.callTool({ name: "pipely_create_company", arguments: input }),
+    );
+    const retry = receipt(
+      await client.callTool({ name: "pipely_create_company", arguments: input }),
+    );
+    expect(first.replayed).toBe(false);
+    expect(retry).toMatchObject({ id: first.id, updatedAt: first.updatedAt, replayed: true });
+    const { requestId, ...fields } = input;
+    expect(await db.company.findUniqueOrThrow({ where: { id: first.id } })).toMatchObject({
+      ...fields,
+      organizationId: orgId,
+    });
+    expect(await db.company.count({ where: { organizationId: orgId } })).toBe(2);
+    expect(await db.mcpOperation.count({ where: { organizationId: orgId } })).toBe(1);
+    expect(await db.webhookDelivery.count({ where: { event: "company.created" } })).toBe(1);
+    const detail = await client.callTool({
+      name: "pipely_get_record",
+      arguments: { kind: "company", id: first.id },
+    });
+    expect(text(detail)).toContain(input.referentEmail);
+    expect(text(detail)).toContain(input.description);
+    expect(
+      (
+        await client.callTool({
+          name: "pipely_create_company",
+          arguments: { ...input, name: "Diversa" },
+        })
+      ).isError,
+    ).toBe(true);
+    expect(requestId).toBeTruthy();
+  });
+  it("aggiorna solo i campi indicati, cancella con null e ripete la ricevuta originale", async () => {
+    const client = await connect();
+    const before = await db.company.update({
+      where: { id: "mcp-company-a" },
+      data: { city: "Roma", phone: "123", referentEmail: "anna@example.test" },
+    });
+    const input = {
+      requestId: "company-update-1",
+      id: before.id,
+      expectedUpdatedAt: before.updatedAt.toISOString(),
+      phone: null,
+      city: "Milano",
+    };
+    const first = receipt(
+      await client.callTool({ name: "pipely_update_company", arguments: input }),
+    );
+    expect(first.updatedAt).not.toBe(input.expectedUpdatedAt);
+    const row = await db.company.findUniqueOrThrow({ where: { id: before.id } });
+    expect(row).toMatchObject({
+      name: before.name,
+      city: "Milano",
+      phone: null,
+      referentEmail: before.referentEmail,
+    });
+    expect(
+      receipt(await client.callTool({ name: "pipely_update_company", arguments: input })),
+    ).toMatchObject({ ...first, replayed: true });
+    expect(await db.webhookDelivery.count({ where: { event: "company.updated" } })).toBe(1);
+  });
+  it("rifiuta aziende esterne, versioni obsolete e aggiornamenti vuoti senza ricevute", async () => {
+    const client = await connect();
+    const before = await db.company.findUniqueOrThrow({ where: { id: "mcp-company-a" } });
+    await db.company.update({
+      where: { id: before.id },
+      data: { name: "Aggiornata", updatedAt: new Date(before.updatedAt.getTime() + 1000) },
+    });
+    const input = {
+      requestId: "company-stale-1",
+      id: before.id,
+      expectedUpdatedAt: before.updatedAt.toISOString(),
+      city: "Milano",
+    };
+    expect(
+      (await client.callTool({ name: "pipely_update_company", arguments: input })).isError,
+    ).toBe(true);
+    expect(
+      (
+        await client.callTool({
+          name: "pipely_update_company",
+          arguments: { ...input, id: "mcp-company-b" },
+        })
+      ).isError,
+    ).toBe(true);
+    expect(
+      (
+        await client.callTool({
+          name: "pipely_update_company",
+          arguments: {
+            requestId: "company-empty-1",
+            id: before.id,
+            expectedUpdatedAt: input.expectedUpdatedAt,
+          },
+        })
+      ).isError,
+    ).toBe(true);
+    expect(await db.mcpOperation.count({ where: { organizationId: orgId } })).toBe(0);
+    expect(await db.webhookDelivery.count({ where: { webhookId: "mcp-hook" } })).toBe(0);
+    expect((await db.company.findUniqueOrThrow({ where: { id: before.id } })).city).toBeNull();
+  });
+  it("non accetta dati aziendali invalidi o campi di sistema dal client", async () => {
+    const client = await connect();
+    for (const extra of [
+      { name: "   " },
+      { name: "x".repeat(301) },
+      { email: "non-email" },
+      { website: "non-url" },
+      { referentEmail: "non-email" },
+      { organizationId: "mcp-org-b" },
+      { updatedAt: "2030-01-01T00:00:00Z" },
+    ]) {
+      expect(
+        (
+          await client.callTool({
+            name: "pipely_create_company",
+            arguments: { requestId: "company-invalid-1", name: "Studio", ...extra },
+          })
+        ).isError,
+      ).toBe(true);
+    }
+    expect(await db.company.count({ where: { organizationId: orgId } })).toBe(1);
+    expect(await db.mcpOperation.count({ where: { organizationId: orgId } })).toBe(0);
+  });
+  it("due aggiornamenti concorrenti non sovrascrivono la stessa versione aziendale", async () => {
+    const client = await connect();
+    const before = await db.company.findUniqueOrThrow({ where: { id: "mcp-company-a" } });
+    const common = { id: before.id, expectedUpdatedAt: before.updatedAt.toISOString() };
+    const outcomes = await Promise.all(
+      ["Roma", "Milano"].map((city) =>
+        client.callTool({
+          name: "pipely_update_company",
+          arguments: { ...common, city, requestId: `company-race-${city}` },
+        }),
+      ),
+    );
+    expect(outcomes.filter((r) => r.isError)).toHaveLength(1);
+    expect(await db.mcpOperation.count({ where: { organizationId: orgId } })).toBe(1);
+    expect(await db.webhookDelivery.count({ where: { event: "company.updated" } })).toBe(1);
+  });
+  it("completa un'attività una sola volta e conserva la data anche con un nuovo requestId", async () => {
+    const client = await connect();
+    const activity = await db.activity.create({
+      data: {
+        type: "TASK",
+        subject: "Richiamare",
+        userId,
+        organizationId: orgId,
+        contactId: "mcp-contact-a",
+      },
+    });
+    const input = { id: activity.id, requestId: "activity-complete-1" };
+    const first = receipt(
+      await client.callTool({ name: "pipely_complete_activity", arguments: input }),
+    );
+    expect(first).toMatchObject({ id: activity.id, alreadyCompleted: false, replayed: false });
+    expect(first.completedAt).toBeTruthy();
+    expect(
+      receipt(await client.callTool({ name: "pipely_complete_activity", arguments: input })),
+    ).toMatchObject({ ...first, replayed: true });
+    const again = receipt(
+      await client.callTool({
+        name: "pipely_complete_activity",
+        arguments: { ...input, requestId: "activity-complete-2" },
+      }),
+    );
+    expect(again).toMatchObject({ completedAt: first.completedAt, alreadyCompleted: true });
+    expect(
+      (
+        await db.activity.findUniqueOrThrow({ where: { id: activity.id } })
+      ).completedAt?.toISOString(),
+    ).toBe(first.completedAt);
+    expect(await db.webhookDelivery.count({ where: { event: "activity.completed" } })).toBe(1);
+    expect(await db.workflowQueue.count({ where: { orgId } })).toBe(0);
+    const listed = await client.callTool({
+      name: "pipely_list_activities",
+      arguments: { completed: true },
+    });
+    expect(text(listed)).toContain(activity.id);
+    expect(
+      text(
+        await client.callTool({ name: "pipely_list_activities", arguments: { completed: false } }),
+      ),
+    ).not.toContain(activity.id);
+  });
+  it("completamenti concorrenti da chiavi diverse producono un unico evento", async () => {
+    const secondKey = "pip_mcp_" + "b".repeat(64);
+    await db.mcpToken.create({
+      data: {
+        name: "Secondo agente",
+        keyHash: hashMcpKey(secondKey),
+        prefix: secondKey.slice(0, 16),
+        canWrite: true,
+        organizationId: orgId,
+        createdBy: userId,
+        expiresAt: new Date(Date.now() + 86400000),
+      },
+    });
+    const activity = await db.activity.create({
+      data: { type: "CALL", subject: "Chiamare", userId, organizationId: orgId },
+    });
+    const first = await connect(),
+      second = await connect(secondKey);
+    const outcomes = await Promise.all(
+      [first, second].map((client, i) =>
+        client.callTool({
+          name: "pipely_complete_activity",
+          arguments: { id: activity.id, requestId: `complete-concurrent-${i}` },
+        }),
+      ),
+    );
+    expect(outcomes.every((r) => !r.isError)).toBe(true);
+    expect(outcomes.map((r) => receipt(r).alreadyCompleted).sort()).toEqual([false, true]);
+    expect(receipt(outcomes[0]).completedAt).toBe(receipt(outcomes[1]).completedAt);
+    expect(await db.webhookDelivery.count({ where: { event: "activity.completed" } })).toBe(1);
+  });
+  it("completa in Starter ma non può concludere attività di altre organizzazioni", async () => {
+    await db.organization.update({ where: { id: orgId }, data: { plan: "STARTER" } });
+    const client = await connect();
+    const own = await db.activity.create({
+      data: { type: "TASK", subject: "Propria", userId, organizationId: orgId },
+    });
+    const foreign = await db.activity.create({
+      data: {
+        type: "TASK",
+        subject: "Esterna",
+        userId: "mcp-owner-b",
+        organizationId: "mcp-org-b",
+      },
+    });
+    for (const id of [foreign.id, "missing-activity"]) {
+      expect(
+        (
+          await client.callTool({
+            name: "pipely_complete_activity",
+            arguments: { id, requestId: "complete-forbidden-1" },
+          })
+        ).isError,
+      ).toBe(true);
+    }
+    expect(await db.mcpOperation.count({ where: { organizationId: orgId } })).toBe(0);
+    expect(
+      receipt(
+        await client.callTool({
+          name: "pipely_complete_activity",
+          arguments: { id: own.id, requestId: "complete-starter-1" },
+        }),
+      ).completedAt,
+    ).toBeTruthy();
+    const company = await client.callTool({
+      name: "pipely_create_company",
+      arguments: { requestId: "company-starter-1", name: "Microimpresa" },
+    });
+    expect(company.isError).not.toBe(true);
+    expect(
+      (await db.activity.findUniqueOrThrow({ where: { id: foreign.id } })).completedAt,
+    ).toBeNull();
+    expect(await db.workflowQueue.count({ where: { orgId } })).toBe(0);
   });
   it("blocca versioni vecchie, trattative eliminate e aggiornamenti di altre organizzazioni", async () => {
     const client = await connect();

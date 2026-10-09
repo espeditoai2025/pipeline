@@ -29,8 +29,11 @@ Le chiavi `pip_mcp_` sono separate dalle chiavi REST `pip_live_`. Una chiave MCP
 | `pipely_create_activity` | Crea attività attribuita al creatore della chiave |
 | `pipely_create_note` | Aggiunge una nota testuale a contatto o trattativa |
 | `pipely_update_deal` | Modifica titolo/valore/stato/fase/motivo perdita, con controllo della versione |
+| `pipely_create_company` | Crea azienda con anagrafica, partita IVA e referente |
+| `pipely_update_company` | Aggiorna solo i campi indicati, con controllo della versione e cancellazione tramite null |
+| `pipely_complete_activity` | Completa un'attività; se già conclusa mantiene la data originale |
 
-Le chiavi di lettura espongono solo i primi sette tool. Gli ultimi cinque sono registrati solo quando la chiave autorizza la scrittura; il server ricontrolla credenziale e ruolo anche nella transazione di scrittura. I riferimenti a contatti, aziende, fasi, pipeline e responsabili devono appartenere all'organizzazione della chiave.
+Il server 1.1.0 espone 15 tool: le chiavi di lettura espongono solo i primi sette. Gli altri otto sono registrati solo quando la chiave autorizza la scrittura; il server ricontrolla credenziale e ruolo anche nella transazione di scrittura. I riferimenti a contatti, aziende, fasi, pipeline e responsabili devono appartenere all'organizzazione della chiave. Le chiavi di scrittura esistenti abilitano anche le nuove operazioni; ricarica l'elenco strumenti nel client.
 
 Le liste accettano `page` (1–10.000), `perPage` (1–50, predefinito 25) e `search` (massimo 200 caratteri). Il dettaglio restituisce al massimo 20 note, con 10.000 caratteri ciascuna e indicazione di eventuale troncamento. Non espone audio, credenziali di servizi, dettagli di abbonamento o dati di altre organizzazioni.
 
@@ -38,7 +41,11 @@ Le liste accettano `page` (1–10.000), `perPage` (1–50, predefinito 25) e `se
 
 Ogni scrittura richiede un `requestId` univoco, per esempio un UUID, di 8–100 caratteri alfanumerici, trattini o underscore. Riutilizza lo stesso ID e gli stessi dati nei retry. Il CRM, la ricevuta, i workflow e le consegne webhook sono salvati in un'unica transazione serializzabile. Un retry restituisce l'ID originale con `replayed: true`. Riutilizzare un ID per altri dati o per un altro tool viene rifiutato. La schermata mostra le ultime 30 ricevute, con connessione, operazione, record e identificativo della richiesta; non memorizza il testo del prompt o i parametri della scrittura, ma un hash di confronto.
 
-`pipely_update_deal` richiede anche `expectedUpdatedAt`, ricavato da una lettura recente. Se il record è cambiato, la modifica viene rifiutata: rileggi la scheda, verifica che l'intento sia ancora valido e usa un nuovo `requestId`. Mantieni l'ID originale se stai invece ripetendo la medesima richiesta interrotta per scoprire se era già riuscita.
+`pipely_update_deal` e `pipely_update_company` richiedono anche `expectedUpdatedAt`, ricavato da una lettura recente. Se il record è cambiato, la modifica viene rifiutata: rileggi la scheda, verifica che l'intento sia ancora valido e usa un nuovo `requestId`. Mantieni l'ID originale se stai invece ripetendo la medesima richiesta interrotta per scoprire se era già riuscita.
+
+Le aziende supportano nome, sito, settore, dimensione, indirizzo, città, paese, email, telefono, partita IVA, descrizione, LinkedIn e nome/ruolo/email/telefono del referente. Gli aggiornamenti sono parziali: i campi omessi restano invariati e `null` cancella un campo facoltativo. Nome, email e URL non validi vengono rifiutati; i limiti dei campi sono indicati nello schema del tool. Il server salva i dati forniti, senza verificare partita IVA o recapiti su servizi esterni.
+
+`pipely_complete_activity` richiede `id` e `requestId`, senza `expectedUpdatedAt` perché non cambia l'anagrafica né riapre l'attività. Usa la data corrente del server. Restituisce `completedAt` e `alreadyCompleted`: un'attività già conclusa mantiene la data originale e non genera un nuovo evento di completamento, anche con un nuovo requestId. Un retry della stessa richiesta restituisce la ricevuta originale con `replayed: true`. Non invia email.
 
 | Scrittura | Workflow | Webhook |
 | --- | --- | --- |
@@ -46,6 +53,8 @@ Ogni scrittura richiede un `requestId` univoco, per esempio un UUID, di 8–100 
 | Trattativa nuova | `DEAL_CREATED` | `deal.created` |
 | Trattativa modificata | Eventi condivisi per fase, valore, vinta/persa | `deal.updated`, eventuali `deal.won`, `deal.lost`, `deal.stage_changed` |
 | Attività | Nessun trigger di creazione; resta applicabile la gestione ordinaria delle scadenze | `activity.created` |
+| Azienda nuova o modificata | Nessun trigger aziendale disponibile | `company.created` oppure `company.updated` |
+| Completamento attività | Nessun trigger di completamento; la gestione ordinaria delle scadenze esclude le attività concluse | `activity.completed`, solo al primo completamento |
 | Nota | Nessuno | Nessuno |
 
 I job workflow sono ripresi dopo il commit e dal cron; i webhook sono accodati nella transazione e consegnati dopo il commit, con i retry ordinari. La consegna remota non è "exactly once": il ricevente deve gestire eventi ripetuti. Un'attività di tipo EMAIL è un promemoria, non invia una email. I workflow già configurati possono invece produrre effetti esterni, compreso l'invio di messaggi: il client deve ottenere l'autorizzazione dell'utente per l'azione CRM richiesta.
@@ -88,5 +97,5 @@ try {
 
 - OAuth con consenso, client registration/discovery e gestione delle autorizzazioni per client che non permettono header Bearer manuali.
 - Scopes per singola risorsa, accesso assegnato a utenti operativi e filtri più restrittivi quando richiesti.
-- Tool aggiuntivi per sincronizzazione di aziende, lead e contatti, mantenendo quota, eventi, concorrenza e ricevute.
+- Tool aggiuntivi per sincronizzazione di lead e contatti, mantenendo quota, eventi, concorrenza e ricevute.
 - Collegamenti pronti per piattaforme specifiche, da validare sul client scelto.

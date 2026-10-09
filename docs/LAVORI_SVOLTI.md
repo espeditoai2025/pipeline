@@ -1,6 +1,10 @@
 # Pipely — Lavori Svolti
 
-> Ultimo aggiornamento del registro: 2026-10-07. Le sezioni precedenti sono conservate come storico.
+> Ultimo aggiornamento del registro: 2026-10-09. Le sezioni precedenti sono conservate come storico.
+
+## Sessione del 2026-10-09 — Estensione MCP per uso quotidiano
+
+Server 1.1.0 con 15 tool: aggiunti creazione e aggiornamento parziale delle aziende, inclusi partita IVA e referente, e completamento delle attività. Aggiornamenti con controllo `expectedUpdatedAt`, pulizia esplicita dei campi facoltativi tramite null, ricevute idempotenti, transazioni serializzabili e webhook accodati atomicamente. Il completamento ripetuto conserva la data originale e non accoda un secondo evento. Nessuna migrazione o nuova variabile richiesta. Le chiavi di sola lettura restano limitate a sette strumenti; le chiavi di scrittura esistenti autorizzano anche i nuovi tool. Documentazione e schermata di consenso aggiornate. Superati 187 test unitari, 79 di integrazione (28 MCP) e 6 UI desktop/mobile; TypeScript ed ESLint dei moduli modificati senza errori. Dettaglio dei file, prove e stato del rilascio: [RILASCIO-MCP-2026-10-09.md](RILASCIO-MCP-2026-10-09.md).
 
 ## Sessione del 2026-10-07 — Unica casella di contatto su Aruba
 

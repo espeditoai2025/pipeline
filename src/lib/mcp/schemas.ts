@@ -9,6 +9,48 @@ const requestId = z
     "Identificativo univoco della scrittura, ad esempio UUID. Mantieni lo stesso valore e gli stessi dati quando riprovi dopo un timeout.",
   );
 const dateTime = z.string().datetime({ offset: true });
+const expectedUpdatedAt = dateTime.describe(
+  "Versione updatedAt letta dal CRM. Rileggi il record se nel frattempo è cambiato.",
+);
+const optionalCompanyText = (max: number) => z.string().trim().max(max).nullable().optional();
+const optionalCompanyUrl = z.string().trim().url().max(2000).nullable().optional();
+const optionalCompanyEmail = z.string().trim().email().max(254).nullable().optional();
+export const companyFields = {
+  name: text(300),
+  website: optionalCompanyUrl,
+  industry: optionalCompanyText(200),
+  size: optionalCompanyText(100),
+  address: optionalCompanyText(500),
+  city: optionalCompanyText(200),
+  country: optionalCompanyText(100),
+  email: optionalCompanyEmail,
+  phone: optionalCompanyText(50),
+  vatNumber: optionalCompanyText(50),
+  description: optionalCompanyText(10000),
+  linkedinUrl: optionalCompanyUrl,
+  referentName: optionalCompanyText(200),
+  referentRole: optionalCompanyText(200),
+  referentEmail: optionalCompanyEmail,
+  referentPhone: optionalCompanyText(50),
+};
+export const createCompanySchema = z.object({ requestId, ...companyFields }).strict();
+export const updateCompanySchema = z
+  .object(companyFields)
+  .partial()
+  .extend({
+    requestId,
+    id,
+    expectedUpdatedAt,
+  })
+  .strict()
+  .refine(
+    (value) =>
+      Object.keys(companyFields).some(
+        (field) => value[field as keyof typeof companyFields] !== undefined,
+      ),
+    "Specifica almeno una modifica",
+  );
+export const completeActivitySchema = z.object({ requestId, id }).strict();
 export const pageSchema = z
   .object({
     search: z.string().trim().max(200).optional(),

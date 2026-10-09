@@ -6,6 +6,9 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 
 if (process.argv[2] !== "--synthetic-fixture") throw new Error("Use --synthetic-fixture");
+const reportPath = process.argv[3] ?? "docs/MCP-PRODUZIONE-2026-10-09.json";
+if (!/^docs\/MCP-PRODUZIONE-\d{4}-\d{2}-\d{2}\.json$/.test(reportPath))
+  throw new Error("Use a dated MCP report under docs");
 dotenv.config({ path: ".env.local", quiet: true });
 const origin = "https://www.pipely.it";
 const id = `mcp-smoke-${randomUUID()}`;
@@ -61,7 +64,7 @@ try {
       authProvider: { token: async () => raw },
     }),
   );
-  assert((await client.listTools()).tools.length === 12, "officialClient12Tools");
+  assert((await client.listTools()).tools.length === 15, "officialClient15Tools");
   const context = await client.callTool({ name: "pipely_get_context", arguments: {} });
   assert(value(context)?.organization?.id === id, "isolatedTenant");
   const input = { requestId: randomUUID(), firstName: "Cliente sintetico MCP" };
@@ -88,13 +91,100 @@ try {
     arguments: { kind: "contact", id: value(first).id },
   });
   assert(value(record)?.recentNotes?.length === 1, "noteReadBack");
+  const companyInput = {
+    requestId: randomUUID(),
+    name: "Azienda sintetica MCP",
+    city: "Roma",
+    phone: "0000000000",
+    referentName: "Referente sintetico",
+  };
+  const company = await client.callTool({ name: "pipely_create_company", arguments: companyInput });
+  const companyRetry = await client.callTool({
+    name: "pipely_create_company",
+    arguments: companyInput,
+  });
+  assert(
+    !!value(company)?.id &&
+      value(companyRetry)?.id === value(company).id &&
+      value(companyRetry).replayed,
+    "idempotentCompanyCreation",
+  );
+  const companyUpdate = {
+    requestId: randomUUID(),
+    id: value(company).id,
+    expectedUpdatedAt: value(company).updatedAt,
+    city: "Milano",
+    phone: null,
+  };
+  const updated = await client.callTool({
+    name: "pipely_update_company",
+    arguments: companyUpdate,
+  });
+  const updatedRetry = await client.callTool({
+    name: "pipely_update_company",
+    arguments: companyUpdate,
+  });
+  const companyRecord = await client.callTool({
+    name: "pipely_get_record",
+    arguments: { kind: "company", id: value(company).id },
+  });
+  assert(
+    value(updated)?.id === value(company).id &&
+      value(updatedRetry)?.replayed &&
+      value(companyRecord)?.data?.city === "Milano" &&
+      value(companyRecord).data.phone === null &&
+      value(companyRecord).data.referentName === companyInput.referentName,
+    "partialCompanyUpdateAndRetry",
+  );
+  const stale = await client.callTool({
+    name: "pipely_update_company",
+    arguments: { ...companyUpdate, requestId: randomUUID(), city: "Torino" },
+  });
+  assert(stale.isError, "staleCompanyVersionRejected");
+  const activity = await client.callTool({
+    name: "pipely_create_activity",
+    arguments: {
+      requestId: randomUUID(),
+      subject: "Attività sintetica MCP",
+      type: "TASK",
+      contactId: value(first).id,
+    },
+  });
+  assert(!!value(activity)?.id, "activityCreated");
+  const completionInput = { requestId: randomUUID(), id: value(activity).id };
+  const completion = await client.callTool({
+    name: "pipely_complete_activity",
+    arguments: completionInput,
+  });
+  const completionRetry = await client.callTool({
+    name: "pipely_complete_activity",
+    arguments: completionInput,
+  });
+  const completedAgain = await client.callTool({
+    name: "pipely_complete_activity",
+    arguments: { ...completionInput, requestId: randomUUID() },
+  });
+  const activityRecord = await client.callTool({
+    name: "pipely_get_record",
+    arguments: { kind: "activity", id: value(activity).id },
+  });
+  assert(
+    !!value(completion)?.completedAt &&
+      value(completionRetry)?.replayed &&
+      value(completedAgain)?.alreadyCompleted &&
+      value(completedAgain).completedAt === value(completion).completedAt &&
+      value(activityRecord)?.data?.completedAt === value(completion).completedAt,
+    "activityCompletionPreservesDate",
+  );
   const counts = await database.query(
-    'SELECT (SELECT count(*) FROM "Contact" WHERE "organizationId"=$1)::int AS contacts, (SELECT count(*) FROM "McpOperation" WHERE "organizationId"=$1)::int AS operations, (SELECT count(*) FROM "WorkflowQueue" WHERE "orgId"=$1)::int AS workflows',
+    'SELECT (SELECT count(*) FROM "Contact" WHERE "organizationId"=$1)::int AS contacts, (SELECT count(*) FROM "Company" WHERE "organizationId"=$1)::int AS companies, (SELECT count(*) FROM "Activity" WHERE "organizationId"=$1)::int AS activities, (SELECT count(*) FROM "McpOperation" WHERE "organizationId"=$1)::int AS operations, (SELECT count(*) FROM "WorkflowQueue" WHERE "orgId"=$1)::int AS workflows',
     [id],
   );
   assert(
     counts.rows[0].contacts === 1 &&
-      counts.rows[0].operations === 2 &&
+      counts.rows[0].companies === 1 &&
+      counts.rows[0].activities === 1 &&
+      counts.rows[0].operations === 7 &&
       counts.rows[0].workflows === 0,
     "databaseReceiptsAndStarterPolicy",
   );
@@ -142,6 +232,6 @@ try {
     proof.removed = remaining.rows[0].count === 0;
   }
   await database.end();
-  await fs.writeFile("docs/MCP-PRODUZIONE-2026-10-03.json", JSON.stringify(proof, null, 2) + "\n");
+  await fs.writeFile(reportPath, JSON.stringify(proof, null, 2) + "\n");
   console.log(JSON.stringify(proof));
 }

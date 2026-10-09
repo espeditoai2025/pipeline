@@ -1527,9 +1527,9 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         ]},
         { type: "list", items: [
           "Lettura: contesto e limiti, pipeline e responsabili, ricerca contatti, aziende, trattative e attività, dettaglio record e ultime note",
-          "Scrittura: crea contatti, trattative, attività e note; aggiorna titolo, valore, fase o stato delle trattative",
+          "Scrittura: crea contatti, aziende, trattative, attività e note; aggiorna l'anagrafica delle aziende e titolo, valore, fase o stato delle trattative; completa attività",
           "Ogni scrittura richiede requestId: riutilizza lo stesso identificativo e gli stessi dati quando riprovi una richiesta interrotta",
-          "Gli aggiornamenti richiedono expectedUpdatedAt: se la scheda è cambiata, rileggila prima di modificare",
+          "Gli aggiornamenti di aziende e trattative richiedono expectedUpdatedAt: se la scheda è cambiata, rileggila prima di modificare. Completare un'attività già conclusa mantiene la data originale",
         ]},
         { type: "warning", text: "Le scritture possono attivare workflow e webhook già configurati. EMAIL crea un promemoria: non invia messaggi. L'agente deve operare solo su istruzioni autorizzate dall'utente. Non sono esposte cancellazioni, campagne, pagamenti o invio di fatture." },
         { type: "para", text: "Massimo 10 chiavi attive, scadenza fino a un anno. Puoi revocarle nella stessa pagina e consultare le ultime 30 scritture. Il cambio del ruolo o dell'organizzazione del creatore blocca l'accesso. Le chiavi MCP non sono utilizzabili sulle API REST." },

@@ -12,6 +12,7 @@ import type { WebhookEvent } from "@/server/actions/webhooks";
 import { assertMcpWrite, type McpContext } from "./auth";
 import { logger } from "@/lib/logger";
 import type { z } from "zod";
+import { companyFields } from "./schemas";
 import type {
   pageSchema,
   contactsSchema,
@@ -23,6 +24,9 @@ import type {
   createActivitySchema,
   createNoteSchema,
   updateDealSchema,
+  createCompanySchema,
+  updateCompanySchema,
+  completeActivitySchema,
 } from "./schemas";
 
 const contactSelect = {
@@ -48,6 +52,14 @@ const companySelect = {
   email: true,
   phone: true,
   vatNumber: true,
+  size: true,
+  description: true,
+  linkedinUrl: true,
+  referentName: true,
+  referentRole: true,
+  referentEmail: true,
+  referentPhone: true,
+  createdAt: true,
   updatedAt: true,
 } as const;
 const dealSelect = {
@@ -275,7 +287,13 @@ async function enqueueWebhook(
       })),
     });
 }
-type Receipt = { id: string; entityType: string; updatedAt?: string };
+type Receipt = {
+  id: string;
+  entityType: string;
+  updatedAt?: string;
+  completedAt?: string;
+  alreadyCompleted?: boolean;
+};
 async function write<T extends { requestId: string }>(
   context: McpContext,
   tool: string,
@@ -327,6 +345,92 @@ async function checkRefs(
 ) {
   const error = await validateCrmReferences(orgId, refs, tx);
   if (error) throw new CrmError(error);
+}
+function companyData(
+  input: z.infer<typeof createCompanySchema> | z.infer<typeof updateCompanySchema>,
+) {
+  return Object.fromEntries(
+    (Object.keys(companyFields) as Array<keyof typeof companyFields>)
+      .filter((field) => input[field] !== undefined)
+      .map((field) => [field, field === "name" ? input[field] : input[field] || null]),
+  ) as Partial<Omit<z.infer<typeof createCompanySchema>, "requestId">>;
+}
+export async function createMcpCompany(
+  context: McpContext,
+  input: z.infer<typeof createCompanySchema>,
+) {
+  return write(context, "pipely_create_company", input, async (tx) => {
+    const row = await tx.company.create({
+      data: { ...companyData(input), name: input.name, organizationId: context.organizationId },
+    });
+    await enqueueWebhook(tx, context.organizationId, "company.created", {
+      id: row.id,
+      name: row.name,
+      vatNumber: row.vatNumber,
+    });
+    return { entityType: "company", id: row.id, updatedAt: row.updatedAt.toISOString() };
+  });
+}
+export async function updateMcpCompany(
+  context: McpContext,
+  input: z.infer<typeof updateCompanySchema>,
+) {
+  return write(context, "pipely_update_company", input, async (tx) => {
+    const before = await tx.company.findFirst({
+      where: { id: input.id, organizationId: context.organizationId },
+    });
+    if (!before) throw new CrmError("Azienda non disponibile nella tua organizzazione");
+    if (before.updatedAt.getTime() !== new Date(input.expectedUpdatedAt).getTime())
+      throw new CrmError(
+        "L'azienda è cambiata. Rileggila e verifica le modifiche prima di riprovare.",
+      );
+    const row = await tx.company.update({
+      where: { id: before.id, organizationId: context.organizationId },
+      data: {
+        ...companyData(input),
+        updatedAt: new Date(Math.max(Date.now(), before.updatedAt.getTime() + 1)),
+      },
+    });
+    await enqueueWebhook(tx, context.organizationId, "company.updated", {
+      id: row.id,
+      name: row.name,
+      vatNumber: row.vatNumber,
+    });
+    return { entityType: "company", id: row.id, updatedAt: row.updatedAt.toISOString() };
+  });
+}
+export async function completeMcpActivity(
+  context: McpContext,
+  input: z.infer<typeof completeActivitySchema>,
+) {
+  return write(context, "pipely_complete_activity", input, async (tx) => {
+    const before = await tx.activity.findFirst({
+      where: { id: input.id, organizationId: context.organizationId },
+    });
+    if (!before) throw new CrmError("Attività non disponibile nella tua organizzazione");
+    if (before.completedAt)
+      return {
+        entityType: "activity",
+        id: before.id,
+        completedAt: before.completedAt.toISOString(),
+        alreadyCompleted: true,
+      };
+    const row = await tx.activity.update({
+      where: { id: before.id, organizationId: context.organizationId },
+      data: { completedAt: new Date() },
+    });
+    await enqueueWebhook(tx, context.organizationId, "activity.completed", {
+      id: row.id,
+      type: row.type,
+      subject: row.subject,
+    });
+    return {
+      entityType: "activity",
+      id: row.id,
+      completedAt: row.completedAt!.toISOString(),
+      alreadyCompleted: false,
+    };
+  });
 }
 export async function createMcpContact(
   context: McpContext,
