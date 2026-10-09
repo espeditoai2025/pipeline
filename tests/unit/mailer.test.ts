@@ -24,7 +24,7 @@ vi.mock("@/lib/smtp-send", () => ({
   },
 }));
 vi.mock("@/lib/db", () => ({
-  db: { organization: { findUnique: async () => ({ plan: state.plan }) }, smtpConfig: { findUnique: async () => state.smtpRow } },
+  db: { recipientPolicy: { findMany: async () => [] }, organization: { findUnique: async () => ({ plan: state.plan }) }, smtpConfig: { findUnique: async () => state.smtpRow } },
 }));
 vi.mock("@/lib/logger", () => ({
   logger: { error: (_s: string, msg: string) => state.logs.push(msg), warn: () => {}, info: () => {} },

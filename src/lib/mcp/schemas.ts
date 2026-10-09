@@ -14,7 +14,19 @@ const expectedUpdatedAt = dateTime.describe(
 );
 const optionalCompanyText = (max: number) => z.string().trim().max(max).nullable().optional();
 const optionalCompanyUrl = z.string().trim().url().max(2000).nullable().optional();
-const optionalCompanyEmail = z.string().trim().email().max(254).nullable().optional();
+const normalizedEmail = z.string().trim().toLowerCase().email().max(254);
+const optionalCompanyEmail = normalizedEmail.nullable().optional();
+const externalSource = z.string().trim().toLowerCase().min(1).max(100);
+const externalId = z.string().trim().min(1).max(200);
+const externalFields = {
+  externalSource: externalSource.nullable().optional(),
+  externalId: externalId.nullable().optional(),
+  operationalEmail: optionalCompanyEmail,
+};
+const validExternalPair = (value: { externalSource?: string | null; externalId?: string | null }) =>
+  (value.externalSource === undefined && value.externalId === undefined) ||
+  (value.externalSource === null && value.externalId === null) ||
+  (typeof value.externalSource === "string" && typeof value.externalId === "string");
 export const companyFields = {
   name: text(300),
   website: optionalCompanyUrl,
@@ -32,8 +44,12 @@ export const companyFields = {
   referentRole: optionalCompanyText(200),
   referentEmail: optionalCompanyEmail,
   referentPhone: optionalCompanyText(50),
+  ...externalFields,
 };
-export const createCompanySchema = z.object({ requestId, ...companyFields }).strict();
+export const createCompanySchema = z
+  .object({ requestId, ...companyFields })
+  .strict()
+  .refine(validExternalPair, "Specifica externalSource ed externalId insieme");
 export const updateCompanySchema = z
   .object(companyFields)
   .partial()
@@ -43,6 +59,7 @@ export const updateCompanySchema = z
     expectedUpdatedAt,
   })
   .strict()
+  .refine(validExternalPair, "Specifica externalSource ed externalId insieme")
   .refine(
     (value) =>
       Object.keys(companyFields).some(
@@ -51,6 +68,33 @@ export const updateCompanySchema = z
     "Specifica almeno una modifica",
   );
 export const completeActivitySchema = z.object({ requestId, id }).strict();
+export const recipientPolicyReadSchema = z.object({ address: normalizedEmail }).strict();
+export const recipientPolicyWriteSchema = z
+  .object({
+    requestId,
+    address: normalizedEmail,
+    status: z.enum(["DO_NOT_CONTACT", "PERMANENT_BOUNCE", "SUSPENDED", "CLEARED"]),
+    reason: text(1000),
+    source: text(200),
+    effectiveAt: dateTime,
+    suspendedUntil: dateTime.nullable().optional(),
+    expectedUpdatedAt: expectedUpdatedAt.optional(),
+    verification: text(2000).optional(),
+  })
+  .strict()
+  .refine(
+    (value) => value.status !== "CLEARED" || !!value.verification,
+    "La rimozione del blocco richiede evidenza verificata; non rappresenta un consenso marketing",
+  )
+  .refine(
+    (value) => value.status === "SUSPENDED" || !value.suspendedUntil,
+    "La scadenza è ammessa solo per una sospensione",
+  )
+  .refine(
+    (value) =>
+      !value.suspendedUntil || new Date(value.suspendedUntil) > new Date(value.effectiveAt),
+    "La scadenza deve seguire la data di efficacia",
+  );
 export const pageSchema = z
   .object({
     search: z.string().trim().max(200).optional(),
@@ -58,7 +102,11 @@ export const pageSchema = z
     perPage: z.number().int().min(1).max(50).default(25),
   })
   .strict();
-export const contactsSchema = pageSchema.extend({ companyId: id.optional() });
+export const companiesSchema = pageSchema.extend({
+  externalSource: externalSource.optional(),
+  externalId: externalId.optional(),
+});
+export const contactsSchema = companiesSchema.extend({ companyId: id.optional() });
 export const dealsSchema = pageSchema.extend({
   status: z.enum(["OPEN", "WON", "LOST"]).optional(),
   pipelineId: id.optional(),
@@ -77,25 +125,29 @@ export const createContactSchema = z
     requestId,
     firstName: text(100),
     lastName: z.string().trim().max(100).optional(),
-    email: z.string().email().max(254).optional(),
+    email: normalizedEmail.optional(),
     phone: z.string().trim().max(50).optional(),
     jobTitle: z.string().trim().max(100).optional(),
     companyId: id.optional(),
     ownerId: id.optional(),
+    ...externalFields,
   })
-  .strict();
+  .strict()
+  .refine(validExternalPair, "Specifica externalSource ed externalId insieme");
 export const contactUpdateFields = {
   firstName: text(100).optional(),
   lastName: z.string().trim().max(100).nullable().optional(),
-  email: z.string().trim().email().max(254).nullable().optional(),
+  email: optionalCompanyEmail,
   phone: z.string().trim().max(50).nullable().optional(),
   jobTitle: z.string().trim().max(100).nullable().optional(),
   companyId: id.nullable().optional(),
   ownerId: id.optional(),
+  ...externalFields,
 };
 export const updateContactSchema = z
   .object({ requestId, id, expectedUpdatedAt, ...contactUpdateFields })
   .strict()
+  .refine(validExternalPair, "Specifica externalSource ed externalId insieme")
   .refine(
     (value) =>
       Object.keys(contactUpdateFields).some(
@@ -103,6 +155,41 @@ export const updateContactSchema = z
       ),
     "Specifica almeno una modifica",
   );
+const syncMetadata = {
+  externalSource,
+  externalId,
+  expectedUpdatedAt: expectedUpdatedAt.optional(),
+};
+export const syncCompanySchema = z
+  .object({ ...companyFields })
+  .partial()
+  .extend(syncMetadata)
+  .strict();
+export const syncContactSchema = z.object(contactUpdateFields).extend(syncMetadata).strict();
+export const upsertCompanySchema = syncCompanySchema.extend({ requestId }).strict();
+export const upsertContactSchema = syncContactSchema.extend({ requestId }).strict();
+export const externalRecordSchema = z
+  .object({ kind: z.enum(["company", "contact"]), externalSource, externalId })
+  .strict();
+export const importBatchSchema = z
+  .object({
+    requestId,
+    dryRun: z.boolean().default(true),
+    withoutSends: z
+      .literal(true)
+      .default(true)
+      .describe("L'importazione non accoda workflow o webhook e non avvia invii"),
+    entries: z
+      .array(
+        z.discriminatedUnion("kind", [
+          z.object({ kind: z.literal("company"), data: syncCompanySchema }).strict(),
+          z.object({ kind: z.literal("contact"), data: syncContactSchema }).strict(),
+        ]),
+      )
+      .min(1)
+      .max(100),
+  })
+  .strict();
 export const createDealSchema = z
   .object({
     requestId,

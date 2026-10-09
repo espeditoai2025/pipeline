@@ -14,7 +14,7 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-export type DeliverResult = { sent: number; failed: number; error?: string };
+export type DeliverResult = { sent: number; failed: number; suppressed?: number; error?: string };
 
 /**
  * Core di invio campagna, senza sessione: usato sia dalla server action
@@ -67,6 +67,7 @@ export async function deliverCampaign(campaignId: string, orgId: string): Promis
   const contacts = campaign.list.contacts.filter((c) => !already.has(c.id));
   let sent = 0;
   let failed = 0;
+  let suppressed = 0;
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
   const orgName = escapeHtml(campaign.list?.organization?.name ?? "Pipely");
@@ -114,6 +115,8 @@ export async function deliverCampaign(campaignId: string, orgId: string): Promis
     const listUnsubscribeHeader = `<${appUrl}/api/emails/unsubscribe?${unsubscribeQs}>`;
 
     const result = await sendOrgMail(orgId, {
+      purpose: "MARKETING",
+      listContactId: contact.id,
       to: contact.email,
       subject: campaign.subject,
       html,
@@ -129,6 +132,8 @@ export async function deliverCampaign(campaignId: string, orgId: string): Promis
       // Traccia il destinatario servito: rende ripetibile l'invio senza duplicati
       // e permette di contare aperture e clic una volta sola per persona.
       await db.campaignDelivery.create({ data: { campaignId, contactId: contact.id } }).catch(() => {});
+    } else if (result.blocked) {
+      suppressed++;
     } else {
       failed++;
       if (failed === 1) {
@@ -150,7 +155,7 @@ export async function deliverCampaign(campaignId: string, orgId: string): Promis
       : { status: "DRAFT", totalSent: 0 },
   });
 
-  return { sent, failed };
+  return suppressed ? { sent, failed, suppressed } : { sent, failed };
 }
 
 /**

@@ -166,7 +166,9 @@ export function McpSettings({ initial }: { initial: McpSettingsData }) {
               <span className="mt-1 block text-xs text-[var(--crm-neutral-500)]">
                 La piattaforma potrà creare contatti, aziende, trattative, attività e note,
                 aggiornare contatti, aziende e trattative e completare attività. Queste azioni
-                possono attivare automazioni e webhook configurati.
+                possono attivare automazioni e webhook configurati. Può inoltre gestire esclusioni
+                dei recapiti e sincronizzare aziende e contatti tramite ID esterni. Gli import MCP
+                non attivano invii, workflow o webhook.
               </span>
             </span>
           </label>

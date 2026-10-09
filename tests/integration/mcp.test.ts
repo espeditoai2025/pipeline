@@ -231,7 +231,7 @@ describe("connessioni e autenticazione MCP", () => {
     expect(text(settings)).not.toContain(created.key);
     expect(text(settings)).not.toContain(stored.keyHash);
     const client = await connect(created.key);
-    expect((await client.listTools()).tools).toHaveLength(7);
+    expect((await client.listTools()).tools).toHaveLength(9);
     for (const name of [
       "pipely_create_company",
       "pipely_update_company",
@@ -336,7 +336,7 @@ describe("trasporto HTTP e compatibilità", () => {
       request("POST", undefined, { "MCP-Protocol-Version": "2025-11-25" }),
     );
     expect(listed.status).toBe(200);
-    expect((await rpcBody(listed)).result.tools).toHaveLength(16);
+    expect((await rpcBody(listed)).result.tools).toHaveLength(22);
     expect((await handleMcpRequest(request("GET"))).status).toBe(405);
     expect((await handleMcpRequest(request("DELETE"))).status).toBe(405);
   });
@@ -353,9 +353,9 @@ describe("trasporto HTTP e compatibilità", () => {
   });
 });
 describe("tool CRM attraverso il client MCP ufficiale", () => {
-  it("elenca 16 tool e consulta solo l'organizzazione della chiave", async () => {
+  it("elenca 22 tool e consulta solo l'organizzazione della chiave", async () => {
     const client = await connect();
-    expect((await client.listTools()).tools).toHaveLength(16);
+    expect((await client.listTools()).tools).toHaveLength(22);
     const context = await client.callTool({ name: "pipely_get_context", arguments: {} });
     expect(text(context)).toContain("Studio MCP");
     for (const tool of [
@@ -381,7 +381,7 @@ describe("tool CRM attraverso il client MCP ufficiale", () => {
   it("le chiavi di lettura non espongono né eseguono tool di scrittura", async () => {
     await db.mcpToken.update({ where: { id: "mcp-token" }, data: { canWrite: false } });
     const client = await connect();
-    expect((await client.listTools()).tools).toHaveLength(7);
+    expect((await client.listTools()).tools).toHaveLength(9);
     const outcome = await client
       .callTool({ name: "pipely_create_contact", arguments: contactInput })
       .catch((error) => error);
@@ -675,6 +675,267 @@ describe("tool CRM attraverso il client MCP ufficiale", () => {
     expect(outcomes.filter((result) => result.isError)).toHaveLength(1);
     expect(await db.mcpOperation.count({ where: { organizationId: orgId } })).toBe(1);
     expect(await db.webhookDelivery.count({ where: { event: "contact.updated" } })).toBe(1);
+  });
+  it("restituisce il contatto aggiornato e rifiuta collisioni email senza perdere relazioni", async () => {
+    const client = await connect();
+    const before = await db.contact.findUniqueOrThrow({ where: { id: "mcp-contact-a" } });
+    await db.note.create({
+      data: { contactId: before.id, authorId: userId, content: "Nota da conservare" },
+    });
+    await db.activity.create({
+      data: {
+        contactId: before.id,
+        userId,
+        organizationId: orgId,
+        subject: "Richiamare",
+        type: "CALL",
+      },
+    });
+    await db.contact.create({
+      data: {
+        firstName: "Altro",
+        email: " COLLISION@EXAMPLE.TEST ",
+        organizationId: orgId,
+        ownerId: userId,
+      },
+    });
+    const common = { id: before.id, expectedUpdatedAt: before.updatedAt.toISOString() };
+    expect(
+      (
+        await client.callTool({
+          name: "pipely_update_contact",
+          arguments: {
+            ...common,
+            requestId: "collision-contact-1",
+            email: "collision@example.test",
+          },
+        })
+      ).isError,
+    ).toBe(true);
+    const result = await client.callTool({
+      name: "pipely_update_contact",
+      arguments: { ...common, requestId: "record-contact-1", companyId: "mcp-company-a" },
+    });
+    expect(result.structuredContent).toMatchObject({
+      record: { id: before.id, companyId: "mcp-company-a" },
+    });
+    expect(await db.note.count({ where: { contactId: before.id } })).toBe(1);
+    expect(await db.activity.count({ where: { contactId: before.id } })).toBe(1);
+  });
+  it("sincronizza tramite ID esterno stabile, mantiene gli ID e isola le organizzazioni", async () => {
+    const client = await connect();
+    const common = {
+      externalSource: " GoBus ",
+      externalId: " 42 ",
+      name: "Azienda GoBus",
+      operationalEmail: " OPERATIVO@EXAMPLE.TEST ",
+    };
+    const first = await client.callTool({
+      name: "pipely_upsert_company",
+      arguments: { ...common, requestId: "sync-company-1" },
+    });
+    const second = await client.callTool({
+      name: "pipely_upsert_company",
+      arguments: { ...common, requestId: "sync-company-2" },
+    });
+    expect(second.structuredContent).toMatchObject({ id: receipt(first).id, status: "unchanged" });
+    const looked = await client.callTool({
+      name: "pipely_get_external_record",
+      arguments: { kind: "company", externalSource: "GoBus", externalId: "42" },
+    });
+    expect(looked.structuredContent).toMatchObject({
+      record: {
+        id: receipt(first).id,
+        externalSource: "gobus",
+        externalId: "42",
+        operationalEmail: "operativo@example.test",
+      },
+    });
+    await db.company.create({
+      data: {
+        name: "Esterno",
+        externalSource: "gobus",
+        externalId: "42",
+        organizationId: "mcp-org-b",
+      },
+    });
+    expect(
+      (
+        await client.callTool({
+          name: "pipely_upsert_company",
+          arguments: { ...common, requestId: "sync-company-stale", name: "Sovrascritta" },
+        })
+      ).isError,
+    ).toBe(true);
+    expect(await db.webhookDelivery.count()).toBe(0);
+    expect(mocks.wake).not.toHaveBeenCalled();
+    expect(mocks.after).not.toHaveBeenCalled();
+  });
+  it("importa lo stesso lotto senza duplicati e recupera la ricevuta dopo un retry", async () => {
+    const client = await connect();
+    const input = {
+      requestId: "batch-sync-1",
+      dryRun: false,
+      entries: [
+        {
+          kind: "company",
+          data: { externalSource: "gobus", externalId: "company-1", name: "GoBus Uno" },
+        },
+        {
+          kind: "contact",
+          data: {
+            externalSource: "gobus",
+            externalId: "contact-1",
+            firstName: "Mario",
+            email: " MARIO@EXAMPLE.TEST ",
+          },
+        },
+      ],
+    };
+    const first = await client.callTool({ name: "pipely_import_batch", arguments: input });
+    const repeated = await client.callTool({ name: "pipely_import_batch", arguments: input });
+    expect(repeated.structuredContent).toMatchObject({
+      ...(first.structuredContent as Record<string, unknown>),
+      replayed: true,
+    });
+    const second = await client.callTool({
+      name: "pipely_import_batch",
+      arguments: { ...input, requestId: "batch-sync-2" },
+    });
+    const rows = (first.structuredContent as { results: { id: string }[] }).results;
+    expect(second.structuredContent).toMatchObject({
+      results: rows.map((row) => ({ id: row.id, status: "unchanged" })),
+    });
+    expect(await db.contact.count({ where: { organizationId: orgId } })).toBe(2);
+    expect(await db.company.count({ where: { organizationId: orgId } })).toBe(2);
+    expect(await db.workflowQueue.count({ where: { orgId } })).toBe(0);
+    expect(await db.webhookDelivery.count()).toBe(0);
+    expect(mocks.wake).not.toHaveBeenCalled();
+    expect(mocks.after).not.toHaveBeenCalled();
+  });
+  it("dry-run e conflitti per voce non attivano workflow o webhook", async () => {
+    const client = await connect();
+    await db.company.update({
+      where: { id: "mcp-company-a" },
+      data: { vatNumber: "IT12345678901", email: " UFFICIO@EXAMPLE.TEST " },
+    });
+    const entries = [
+      {
+        kind: "company",
+        data: {
+          externalSource: "gobus",
+          externalId: "duplicate-vat",
+          name: "Altra",
+          vatNumber: "12345678901",
+        },
+      },
+      {
+        kind: "company",
+        data: {
+          externalSource: "gobus",
+          externalId: "duplicate-email",
+          name: "Altra",
+          email: "ufficio@example.test",
+        },
+      },
+      {
+        kind: "contact",
+        data: { externalSource: "gobus", externalId: "valid", firstName: "Nuovo" },
+      },
+      {
+        kind: "contact",
+        data: {
+          externalSource: "gobus",
+          externalId: "foreign",
+          firstName: "Esterno",
+          companyId: "mcp-company-b",
+        },
+      },
+    ];
+    const input = { requestId: "dry-batch-1", entries };
+    expect(
+      (await client.callTool({ name: "pipely_import_batch", arguments: input })).structuredContent,
+    ).toMatchObject({
+      dryRun: true,
+      conflicts: 3,
+      results: [
+        { status: "conflict" },
+        { status: "conflict" },
+        { status: "would_created" },
+        { status: "conflict" },
+      ],
+    });
+    expect(await db.mcpOperation.count()).toBe(0);
+    expect(await db.contact.count({ where: { organizationId: orgId } })).toBe(1);
+    expect(
+      (
+        await client.callTool({
+          name: "pipely_import_batch",
+          arguments: { ...input, dryRun: false },
+        })
+      ).structuredContent,
+    ).toMatchObject({ conflicts: 3 });
+    expect(await db.contact.count({ where: { organizationId: orgId } })).toBe(2);
+    expect(await db.workflowQueue.count({ where: { orgId } })).toBe(0);
+    expect(await db.webhookDelivery.count()).toBe(0);
+  });
+  it("gestisce esclusioni strutturate con storico, versione e retry senza trasformarle in consensi", async () => {
+    const client = await connect();
+    const input = {
+      requestId: "policy-write-1",
+      address: " CLIENTE@EXAMPLE.TEST ",
+      status: "DO_NOT_CONTACT",
+      reason: "Rifiuto commerciale",
+      source: "GoBus",
+      effectiveAt: new Date().toISOString(),
+    };
+    const created = await client.callTool({
+      name: "pipely_set_recipient_policy",
+      arguments: input,
+    });
+    expect(created.isError).not.toBe(true);
+    const repeat = await client.callTool({ name: "pipely_set_recipient_policy", arguments: input });
+    expect(receipt(repeat)).toMatchObject({ ...receipt(created), replayed: true });
+    expect(await db.recipientPolicyEvent.count()).toBe(1);
+    const read = await client.callTool({
+      name: "pipely_get_recipient_policy",
+      arguments: { address: "Cliente@Example.Test" },
+    });
+    expect(read.structuredContent).toMatchObject({
+      policy: {
+        address: "cliente@example.test",
+        status: "DO_NOT_CONTACT",
+        events: [{ reason: input.reason }],
+      },
+    });
+    expect(
+      (
+        await client.callTool({
+          name: "pipely_set_recipient_policy",
+          arguments: {
+            ...input,
+            requestId: "policy-clear-1",
+            status: "CLEARED",
+            expectedUpdatedAt: receipt(created).updatedAt,
+          },
+        })
+      ).isError,
+    ).toBe(true);
+    expect(
+      (
+        await client.callTool({
+          name: "pipely_set_recipient_policy",
+          arguments: {
+            ...input,
+            requestId: "policy-clear-2",
+            status: "CLEARED",
+            verification: "Correzione verificata",
+          },
+        })
+      ).isError,
+    ).toBe(true);
+    expect(await db.recipientPolicyEvent.count()).toBe(1);
+    expect(mocks.wake).not.toHaveBeenCalled();
   });
   it("due richieste simultanee con lo stesso identificativo producono una scrittura", async () => {
     const client = await connect();

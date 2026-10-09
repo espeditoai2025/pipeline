@@ -16,6 +16,7 @@ import { companyFields, contactUpdateFields } from "./schemas";
 import type {
   pageSchema,
   contactsSchema,
+  companiesSchema,
   dealsSchema,
   activitiesSchema,
   recordSchema,
@@ -41,6 +42,9 @@ const contactSelect = {
   ownerId: true,
   createdAt: true,
   updatedAt: true,
+  externalSource: true,
+  externalId: true,
+  operationalEmail: true,
 } as const;
 const companySelect = {
   id: true,
@@ -62,6 +66,9 @@ const companySelect = {
   referentPhone: true,
   createdAt: true,
   updatedAt: true,
+  externalSource: true,
+  externalId: true,
+  operationalEmail: true,
 } as const;
 const dealSelect = {
   id: true,
@@ -150,6 +157,8 @@ export async function listMcpPipelines(context: McpContext) {
 export async function listMcpContacts(context: McpContext, input: z.infer<typeof contactsSchema>) {
   const where: Prisma.ContactWhereInput = {
     organizationId: context.organizationId,
+    ...(input.externalSource && { externalSource: input.externalSource }),
+    ...(input.externalId && { externalId: input.externalId }),
     ...(input.companyId && { companyId: input.companyId }),
     ...(input.search && {
       OR: ["firstName", "lastName", "email"].map((field) => ({
@@ -168,9 +177,14 @@ export async function listMcpContacts(context: McpContext, input: z.infer<typeof
   ]);
   return { data, meta: meta(total, input) };
 }
-export async function listMcpCompanies(context: McpContext, input: z.infer<typeof pageSchema>) {
+export async function listMcpCompanies(
+  context: McpContext,
+  input: z.infer<typeof companiesSchema>,
+) {
   const where: Prisma.CompanyWhereInput = {
     organizationId: context.organizationId,
+    ...(input.externalSource && { externalSource: input.externalSource }),
+    ...(input.externalId && { externalId: input.externalId }),
     ...(input.search && {
       OR: ["name", "vatNumber"].map((field) => ({
         [field]: { contains: input.search, mode: "insensitive" },
@@ -289,17 +303,19 @@ async function enqueueWebhook(
     });
 }
 type Receipt = {
+  [key: string]: Prisma.InputJsonValue | undefined;
   id: string;
   entityType: string;
   updatedAt?: string;
   completedAt?: string;
   alreadyCompleted?: boolean;
 };
-async function write<T extends { requestId: string }>(
+export async function write<T extends { requestId: string }>(
   context: McpContext,
   tool: string,
   input: T,
   work: (tx: Prisma.TransactionClient) => Promise<Receipt>,
+  options: { wakeEffects?: boolean } = {},
 ) {
   const inputHash = createHash("sha256").update(JSON.stringify(input)).digest("hex");
   const committed = await crmTransaction(async (tx) => {
@@ -327,7 +343,7 @@ async function write<T extends { requestId: string }>(
     });
     return { ...result, replayed: false };
   });
-  if (!committed.replayed) {
+  if (!committed.replayed && options.wakeEffects !== false) {
     wakeWorkflows(context.organizationId);
     after(async () => {
       try {
@@ -356,11 +372,49 @@ function companyData(
       .map((field) => [field, field === "name" ? input[field] : input[field] || null]),
   ) as Partial<Omit<z.infer<typeof createCompanySchema>, "requestId">>;
 }
+export async function assertContactEmailAvailable(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+  email?: string | null,
+  exceptId?: string,
+) {
+  if (!email) return;
+  const matches = await tx.$queryRaw<{ id: string }[]>`
+    SELECT id FROM "Contact" WHERE "organizationId" = ${organizationId}
+      AND lower(btrim(email)) = ${email.trim().toLowerCase()}
+      AND id <> ${exceptId ?? ""} LIMIT 1`;
+  if (matches.length)
+    throw new CrmError(
+      `Conflitto email con il contatto ${matches[0]!.id}; nessuna unione automatica`,
+    );
+}
+export async function assertExternalIdentityAvailable(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+  kind: "contact" | "company",
+  input: { externalSource?: string | null; externalId?: string | null },
+  exceptId?: string,
+) {
+  if (!input.externalSource || !input.externalId) return;
+  const where = {
+    organizationId,
+    externalSource: input.externalSource,
+    externalId: input.externalId,
+    ...(exceptId && { id: { not: exceptId } }),
+  };
+  const found =
+    kind === "contact"
+      ? await tx.contact.findFirst({ where, select: { id: true } })
+      : await tx.company.findFirst({ where, select: { id: true } });
+  if (found)
+    throw new CrmError(`Conflitto ID esterno con ${kind} ${found.id}; nessuna unione automatica`);
+}
 export async function createMcpCompany(
   context: McpContext,
   input: z.infer<typeof createCompanySchema>,
 ) {
   return write(context, "pipely_create_company", input, async (tx) => {
+    await assertExternalIdentityAvailable(tx, context.organizationId, "company", input);
     const row = await tx.company.create({
       data: { ...companyData(input), name: input.name, organizationId: context.organizationId },
     });
@@ -385,6 +439,7 @@ export async function updateMcpCompany(
       throw new CrmError(
         "L'azienda è cambiata. Rileggila e verifica le modifiche prima di riprovare.",
       );
+    await assertExternalIdentityAvailable(tx, context.organizationId, "company", input, input.id);
     const row = await tx.company.update({
       where: { id: before.id, organizationId: context.organizationId },
       data: {
@@ -440,6 +495,8 @@ export async function createMcpContact(
   return write(context, "pipely_create_contact", input, async (tx) => {
     await checkRefs(tx, context.organizationId, input);
     await assertContactCapacity(tx, context.organizationId);
+    await assertExternalIdentityAvailable(tx, context.organizationId, "contact", input);
+    await assertContactEmailAvailable(tx, context.organizationId, input.email);
     const row = await tx.contact.create({
       data: {
         firstName: input.firstName,
@@ -448,6 +505,9 @@ export async function createMcpContact(
         phone: input.phone,
         jobTitle: input.jobTitle,
         companyId: input.companyId,
+        externalSource: input.externalSource,
+        externalId: input.externalId,
+        operationalEmail: input.operationalEmail,
         organizationId: context.organizationId,
         ownerId: input.ownerId ?? context.userId,
       },
@@ -489,6 +549,8 @@ export async function updateMcpContact(
         "Il contatto è cambiato. Rileggilo e verifica le modifiche prima di riprovare.",
       );
     await checkRefs(tx, context.organizationId, input);
+    await assertContactEmailAvailable(tx, context.organizationId, input.email, input.id);
+    await assertExternalIdentityAvailable(tx, context.organizationId, "contact", input, input.id);
     const changes = Object.fromEntries(
       (Object.keys(contactUpdateFields) as Array<keyof typeof contactUpdateFields>)
         .filter((field) => input[field] !== undefined)
@@ -509,7 +571,19 @@ export async function updateMcpContact(
       companyId: row.companyId,
       ownerId: row.ownerId,
     });
-    return { entityType: "contact", id: row.id, updatedAt: row.updatedAt.toISOString() };
+    return {
+      entityType: "contact",
+      id: row.id,
+      updatedAt: row.updatedAt.toISOString(),
+      record: JSON.parse(
+        JSON.stringify(
+          await tx.contact.findUniqueOrThrow({
+            where: { id: row.id },
+            select: contactSelect,
+          }),
+        ),
+      ) as Prisma.InputJsonObject,
+    };
   });
 }
 export async function createMcpDeal(context: McpContext, input: z.infer<typeof createDealSchema>) {

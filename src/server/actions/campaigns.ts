@@ -6,6 +6,7 @@ import type { Session } from "next-auth";
 import { auth } from "@/lib/auth";
 import { crmPermissionError } from "@/lib/crm-permissions";
 import { db } from "@/lib/db";
+import { crmTransaction } from "@/lib/crm-transaction";
 import type { EmailList, EmailListDetail, EmailListContact, EmailCampaign } from "@/types/emails";
 import { getOrgPlan, checkFeature } from "@/lib/plan";
 import { deliverCampaign } from "@/lib/campaign-sender";
@@ -128,7 +129,7 @@ export async function deleteEmailList(id: string): Promise<AR<void>> {
 }
 
 const contactSchema = z.object({
-  email: z.string().email("Email non valida"),
+  email: z.string().trim().toLowerCase().email("Email non valida"),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
 });
@@ -145,6 +146,9 @@ export async function addContactToList(listId: string, input: z.infer<typeof con
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Input non valido" };
 
   try {
+    const existing = await db.emailListContact.findMany({ where: { listId }, select: { email: true } });
+    if (existing.some(row => row.email.trim().toLowerCase() === parsed.data.email))
+      return { error: "Email già presente in questa lista" };
     const row = await db.emailListContact.create({
       data: {
         listId,
@@ -171,23 +175,27 @@ export async function importContactsToList(
   const list = await db.emailList.findFirst({ where: { id: listId, organizationId: orgId } });
   if (!list) return { error: "Lista non trovata" };
 
-  let added = 0;
-  let skipped = 0;
-
-  for (const c of contacts) {
-    if (!c.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) { skipped++; continue; }
-    try {
-      await db.emailListContact.create({
-        data: { listId, email: c.email.toLowerCase(), firstName: c.firstName ?? null, lastName: c.lastName ?? null },
-      });
-      added++;
-    } catch {
-      skipped++;
-    }
+  if (!Array.isArray(contacts) || contacts.length > 2000) return { error: "Importa al massimo 2000 recapiti per volta" };
+  try {
+    const data = await crmTransaction(async tx => {
+      const existing = await tx.emailListContact.findMany({ where: { listId }, select: { email: true } });
+      const emails = new Set(existing.map(row => row.email.trim().toLowerCase()));
+      const additions: { listId: string; email: string; firstName: string | null; lastName: string | null }[] = [];
+      let skipped = 0;
+      for (const row of contacts) {
+        const parsed = contactSchema.safeParse(row);
+        if (!parsed.success || emails.has(parsed.data.email)) { skipped++; continue; }
+        emails.add(parsed.data.email);
+        additions.push({ listId, email: parsed.data.email, firstName: parsed.data.firstName ?? null, lastName: parsed.data.lastName ?? null });
+      }
+      if (additions.length) await tx.emailListContact.createMany({ data: additions });
+      return { added: additions.length, skipped };
+    });
+    revalidatePath("/emails");
+    return { data };
+  } catch {
+    return { error: "Importazione non completata: nessun recapito aggiunto. Riprova." };
   }
-
-  revalidatePath("/emails");
-  return { data: { added, skipped } };
 }
 
 export async function removeContactFromList(id: string): Promise<AR<void>> {

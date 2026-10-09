@@ -3,6 +3,7 @@ import { sendViaSMTP } from "@/lib/smtp-send";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { getOrgPlan, checkFeature } from "@/lib/plan";
+import { checkRecipientPolicy, type MailPurpose } from "@/lib/recipient-policy";
 
 /**
  * Unico punto d'uscita della posta.
@@ -24,9 +25,11 @@ export type MailOptions = {
   fromName?: string;
   headers?: Record<string, string>;
   idempotencyKey?: string;
+  purpose?: MailPurpose;
+  listContactId?: string;
 };
 
-export type MailResult = { ok: true; via: "smtp" | "resend" } | { ok: false; error: string };
+export type MailResult = { ok: true; via: "smtp" | "resend" } | { ok: false; error: string; blocked?: boolean };
 
 /** Canale d'invio di un'organizzazione: SMTP proprio se verificato, altrimenti Resend di piattaforma. */
 export type OrgChannel = "smtp" | "resend";
@@ -97,6 +100,12 @@ export async function resolveOrgChannel(orgId: string): Promise<OrgChannel | nul
  * Passare `channel` (da resolveOrgChannel) evita una query per ogni destinatario.
  */
 export async function sendOrgMail(orgId: string, opts: MailOptions, channel?: OrgChannel | null): Promise<MailResult> {
+  try {
+    const policy = await checkRecipientPolicy(orgId, [opts.to, ...(opts.cc ?? [])], opts.purpose, opts.listContactId);
+    if (policy.blocked) return { ok: false, blocked: true, error: policy.error! };
+  } catch {
+    return { ok: false, error: "Impossibile verificare le esclusioni: nessun messaggio inviato" };
+  }
   const via = channel === undefined ? await resolveOrgChannel(orgId) : channel;
   if (via === null) {
     return { ok: false, error: "Configura un provider email (SMTP verificato o Resend) prima di inviare." };

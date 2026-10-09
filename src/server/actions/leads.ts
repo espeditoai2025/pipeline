@@ -7,11 +7,12 @@ import { auth } from "@/lib/auth";
 import { crmPermissionError } from "@/lib/crm-permissions";
 import { db } from "@/lib/db";
 import type { Lead, LeadStatus } from "@/types/contacts";
-import { enqueueWorkflows, enqueueImportedRecords } from "@/lib/workflow-events";
+import { enqueueWorkflows } from "@/lib/workflow-events";
 import { wakeWorkflows } from "@/lib/workflow-wake";
 import { crmTransaction, assertContactCapacity, CrmError } from "@/lib/crm-transaction";
 import { validateCrmReferences } from "@/lib/crm-references";
 import { dispatchWebhook } from "@/lib/webhook-delivery";
+import { deduplicateByEmail } from "@/lib/contact-import";
 import { safeFetch, assertPublicUrl } from "@/lib/ssrf";
 
 function getIds(s: Session | null) {
@@ -241,7 +242,7 @@ export async function importLeads(
     .filter((r) => typeof r.title === "string" && r.title.trim())
     .map((r) => ({
       title: r.title.trim(),
-      email: r.email?.trim() || null,
+      email: r.email?.trim().toLowerCase() || null,
       phone: r.phone?.trim() || null,
       source: r.source?.trim() || null,
       status: (APP_TO_DB[r.status?.toUpperCase() ?? ""] ?? "NEW") as "NEW" | "CONTACTED" | "QUALIFIED" | "CONVERTED" | "DISQUALIFIED",
@@ -257,13 +258,13 @@ export async function importLeads(
 
   try {
     const result = await crmTransaction(async tx => {
-      const created = await tx.lead.createManyAndReturn({ data: valid.map(row => ({ ...row, ownerId: session!.user!.id! })) });
-      await enqueueImportedRecords(tx, orgId, created.map(row => ({ trigger: "LEAD_CREATED", orgId, leadId: row.id, leadTitle: row.title, ownerId: row.ownerId ?? undefined })));
-      return { count: created.length };
+      const existing = await tx.lead.findMany({ where: { organizationId: orgId }, select: { email: true } });
+      const { records, duplicates } = deduplicateByEmail(valid, existing.map(row => row.email));
+      const created = records.length ? await tx.lead.createManyAndReturn({ data: records.map(row => ({ ...row, ownerId: session!.user!.id! })) }) : [];
+      return { count: created.length, duplicates };
     });
-    wakeWorkflows(orgId);
     revalidatePath("/leads");
-    return { created: result.count, skipped, error: null };
+    return { created: result.count, skipped: skipped + result.duplicates, error: null };
   } catch (e) {
     return { created: 0, skipped, error: e instanceof Error ? e.message : "Errore durante l'importazione" };
   }

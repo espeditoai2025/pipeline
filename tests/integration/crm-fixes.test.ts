@@ -386,16 +386,16 @@ describe("mutazioni, limiti e veridicità dei dati", () => {
     ).toBe(true);
     expect(await db.workflowQueue.count({ where: { orgId: "a" } })).toBe(5);
   });
-  it("importa senza avviare email salvo consenso esplicito nella configurazione", async () => {
+  it("gli import non accodano automazioni anche se la configurazione abilita triggerOnImport", async () => {
     const wf = await workflow([notify], { type: "CONTACT_CREATED" });
     expect((await importContacts([{ firstName: "Anna" }])).error).toBeNull();
     expect(await db.workflowQueue.count({ where: { orgId: "a" } })).toBe(0);
     await db.workflow.update({ where: { id: wf.id }, data: { triggerOnImport: true } });
     expect((await importContacts([{ firstName: "Carla" }])).imported).toBe(1);
-    expect(await db.workflowQueue.count({ where: { orgId: "a" } })).toBe(1);
+    expect(await db.workflowQueue.count({ where: { orgId: "a" } })).toBe(0);
     await workflow([notify], { type: "LEAD_CREATED" });
     expect((await importLeads([{ title: "Importato" }])).created).toBe(1);
-    expect(await db.workflowQueue.count({ where: { orgId: "a" } })).toBe(1);
+    expect(await db.workflowQueue.count({ where: { orgId: "a" } })).toBe(0);
   });
   it("rollback della modifica CRM quando non è possibile salvare il suo evento", async () => {
     await workflow([notify], { type: "CONTACT_CREATED" });

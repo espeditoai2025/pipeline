@@ -10,7 +10,7 @@ import { auth } from "@/lib/auth";
 import { crmPermissionError } from "@/lib/crm-permissions";
 import { db } from "@/lib/db";
 import type { Contact, Company } from "@/types/contacts";
-import { enqueueWorkflows, enqueueImportedRecords } from "@/lib/workflow-events";
+import { enqueueWorkflows } from "@/lib/workflow-events";
 import { wakeWorkflows } from "@/lib/workflow-wake";
 import { crmTransaction, assertContactCapacity } from "@/lib/crm-transaction";
 import { isRecordId } from "@/lib/record-id";
@@ -455,8 +455,8 @@ export async function importContacts(rows: ContactImportRow[]): Promise<{ import
 
   try {
     const result = await crmTransaction(async (tx) => {
-      const existing = await tx.contact.findMany({ where: { organizationId: orgId }, select: { email: true } });
-      const { contacts, duplicates } = deduplicateContactImport(parsed.data, existing.map((contact) => contact.email));
+      const existing = await tx.contact.findMany({ where: { organizationId: orgId }, select: { email: true, externalSource: true, externalId: true } });
+      const { contacts, duplicates } = deduplicateContactImport(parsed.data, existing.map((contact) => contact.email), existing);
       if (!contacts.length) return { imported: 0, duplicates, companies: 0 };
       await assertContactCapacity(tx, orgId, contacts.length);
 
@@ -478,16 +478,16 @@ export async function importContacts(rows: ContactImportRow[]): Promise<{ import
           cache.set(key, company.id);
         }
       }
-      const created = await tx.contact.createManyAndReturn({ data: contacts.map((row) => ({
+      await tx.contact.createManyAndReturn({ data: contacts.map((row) => ({
         firstName: row.firstName, lastName: row.lastName || null, email: row.email || null,
         phone: row.phone || null, jobTitle: row.jobTitle || null,
         companyId: row.companyName ? cache.get(row.companyName.toLowerCase())! : null,
         organizationId: orgId, ownerId: session.user!.id!,
+        externalSource: row.externalSource ?? null, externalId: row.externalId ?? null,
       })) });
-      await enqueueImportedRecords(tx, orgId, created.map(row => ({ trigger: "CONTACT_CREATED", orgId, contactId: row.id, contactName: row.firstName, contactEmail: row.email ?? undefined, ownerId: row.ownerId })));
+      // Imports never implicitly enqueue email-capable workflows or webhooks.
       return { imported: contacts.length, duplicates, companies: cache.size };
     });
-    wakeWorkflows(orgId);
     revalidatePath("/contacts");
     revalidatePath("/companies");
     revalidatePath("/dashboard");

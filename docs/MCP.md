@@ -26,6 +26,12 @@ Le chiavi `pip_mcp_` sono separate dalle chiavi REST `pip_live_`. Una chiave MCP
 | `pipely_get_record` | Dettaglio contatto/azienda/trattativa/attività; ultime 20 note per contatto/trattativa |
 | `pipely_create_contact` | Crea contatto, verifica quota e riferimenti dell'organizzazione |
 | `pipely_update_contact` | Aggiorna i campi indicati e collega, cambia o rimuove l'azienda, con controllo della versione |
+| `pipely_get_external_record` | Cerca azienda/contatto tramite fonte e ID esterni permanenti |
+| `pipely_upsert_company` | Sincronizza un'azienda tramite ID esterno, con conflitti email/PIVA e senza invii |
+| `pipely_upsert_contact` | Sincronizza un contatto tramite ID esterno, con conflitti email e senza invii |
+| `pipely_import_batch` | Lotto di massimo 100 voci, dry-run, risultati per voce e import senza invii |
+| `pipely_get_recipient_policy` | Legge esclusioni, sospensioni, rimbalzi e ultimi 30 eventi del recapito |
+| `pipely_set_recipient_policy` | Registra uno stato del recapito con motivo, fonte, data e controllo versione |
 | `pipely_create_deal` | Crea trattativa OPEN con pipeline/fase coerenti |
 | `pipely_create_activity` | Crea attività attribuita al creatore della chiave |
 | `pipely_create_note` | Aggiunge una nota testuale a contatto o trattativa |
@@ -34,7 +40,7 @@ Le chiavi `pip_mcp_` sono separate dalle chiavi REST `pip_live_`. Una chiave MCP
 | `pipely_update_company` | Aggiorna solo i campi indicati, con controllo della versione e cancellazione tramite null |
 | `pipely_complete_activity` | Completa un'attività; se già conclusa mantiene la data originale |
 
-Il server 1.2.0 espone 16 tool: le chiavi di lettura espongono solo i primi sette. Gli altri nove sono registrati solo quando la chiave autorizza la scrittura; il server ricontrolla credenziale e ruolo anche nella transazione di scrittura. I riferimenti a contatti, aziende, fasi, pipeline e responsabili devono appartenere all'organizzazione della chiave. Le chiavi di scrittura esistenti abilitano anche le nuove operazioni; ricarica l'elenco strumenti nel client dopo il rilascio.
+Il server 1.3.0 nel sorgente espone 22 tool: nove di lettura e tredici di scrittura. La ricerca per ID esterno e la lettura degli stati dei recapiti sono disponibili anche alle chiavi di sola lettura. Le altre operazioni sono registrate solo quando la chiave autorizza la scrittura; il server ricontrolla credenziale e ruolo anche nella transazione di scrittura. I riferimenti a contatti, aziende, fasi, pipeline e responsabili devono appartenere all'organizzazione della chiave. Le chiavi di scrittura esistenti abilitano anche le nuove operazioni; ricarica l'elenco strumenti nel client dopo il rilascio. Per lo stato pubblicato consulta il registro dei lavori e i rapporti di rilascio.
 
 Le liste accettano `page` (1–10.000), `perPage` (1–50, predefinito 25) e `search` (massimo 200 caratteri). Il dettaglio restituisce al massimo 20 note, con 10.000 caratteri ciascuna e indicazione di eventuale troncamento. Non espone audio, credenziali di servizi, dettagli di abbonamento o dati di altre organizzazioni.
 
@@ -47,6 +53,28 @@ Ogni scrittura richiede un `requestId` univoco, per esempio un UUID, di 8–100 
 Per collegare un contatto già creato a un'azienda, leggi il contatto con `pipely_get_record` (`kind: "contact"`) o `pipely_list_contacts`, cerca l'azienda con `pipely_list_companies` e invoca `pipely_update_contact` con `id`, `expectedUpdatedAt`, `requestId` e `companyId`. Ripeti per ogni contatto usando un requestId distinto. Il contatto conserva il proprio ID e tutti i campi omessi. `companyId: null` rimuove il collegamento; un altro ID cambia l'azienda. Non vengono creati duplicati né consumata quota contatti.
 
 Il tool può anche modificare nome, cognome, email, telefono, ruolo lavorativo e responsabile (`ownerId`). `null` cancella i campi facoltativi; cognome, telefono e ruolo accettano anche una stringa vuota. Nome e responsabile restano obbligatori; l'email deve essere valida oppure null. Il responsabile deve essere un membro della stessa organizzazione.
+
+`pipely_update_contact` restituisce anche `record`, la scheda aggiornata. Una email in collisione con un altro contatto dell'organizzazione viene rifiutata, anche se differisce per maiuscole o spazi; nessuna unione automatica. Note e attività conservano il collegamento al medesimo ID.
+
+## Sincronizzazione GoBus e import senza invii
+
+Aziende e contatti supportano `externalSource`, `externalId` e `operationalEmail`. Fonte e ID devono essere forniti insieme: la fonte è normalizzata con trim/minuscole, l'ID con trim preservando le maiuscole. La coppia è univoca per tipo di record e organizzazione; lo stesso ID in un'altra organizzazione resta isolato. L'indirizzo operativo è distinto dall'email anagrafica e dall'email dell'account Pipely.
+
+`pipely_get_external_record` cerca la coppia permanente; le liste accettano gli stessi filtri. Gli upsert richiedono `requestId`: un ID esterno assente crea un record, uno esistente e invariato restituisce `unchanged` con lo stesso ID. Le modifiche a un record esistente richiedono `expectedUpdatedAt`; una versione esplicitamente obsoleta viene sempre rifiutata. Le collisioni email e, per aziende, partita IVA normalizzata vengono segnalate senza fondere aziende diverse. Per collegare una scheda preesistente a GoBus, verificarne prima l'identità e assegnare esplicitamente fonte e ID tramite il normale aggiornamento versionato; non si usa l'email come chiave di fusione.
+
+`pipely_import_batch` accetta `entries: [{kind: "company"|"contact", data: {...}}]`, massimo 100 voci e comunque entro il limite HTTP di 64 KiB. `dryRun` è true per impostazione predefinita: legge e segnala effetti previsti e conflitti senza salvare record, ricevute o eventi. Con `dryRun: false` salva i risultati per voce e una ricevuta idempotente; un retry identico recupera gli stessi risultati. Un nuovo lotto con gli stessi ID esterni conserva gli ID del CRM. Gli errori di una voce non applicano modifiche parziali a quella voce. Per collegare i contatti a nuove aziende, importare prima le aziende e utilizzare gli ID restituiti.
+
+L'import MCP e gli upsert applicano sempre `withoutSends`: non accodano workflow o webhook e non risvegliano code. Non è disponibile un valore false per aggirare questo vincolo. Gli import CSV/Excel di contatti, lead e liste email deduplicano le email con trim/minuscole; quelli dei contatti supportano anche le colonne `externalSource`/`externalId`. I campi omessi e gli stati esistenti dei recapiti non vengono sovrascritti. Senza email o ID esterno non si può stabilire l'identità con certezza: non vengono fuse persone soltanto perché condividono un nome. Gli import di contatti/lead non attivano più workflow, anche se `triggerOnImport` era configurato; le creazioni singole conservano gli effetti documentati.
+
+## Esclusioni dei recapiti
+
+Gli stati sono strutturati per indirizzo email normalizzato e organizzazione, separati dalle note CRM. `DO_NOT_CONTACT` blocca campagne e workflow; `SUSPENDED` applica lo stesso blocco fino a `suspendedUntil`, oppure fino a una modifica esplicita se la scadenza manca. Gli invii manuali restano disponibili, come richiesto, per permettere anche le risposte di assistenza. `PERMANENT_BOUNCE` blocca ogni invio a un recapito non utilizzabile.
+
+Ogni modifica richiede motivo, fonte, data e requestId; per uno stato esistente è obbligatoria la sua `expectedUpdatedAt`. Lo storico delle modifiche è conservato. `CLEARED` richiede una verifica esplicita, conserva l'evento precedente, non rappresenta un consenso marketing e non reiscrive alle liste. Una disiscrizione di lista continua a bloccare la relativa campagna, anche dopo una correzione di uno stato globale.
+
+Il punto centrale di invio controlla lo stato appena prima di chiamare SMTP/Resend, per destinatario e copie, anche con canale già risolto. Le campagne e i workflow accodati leggono lo stato corrente; un workflow escluso registra lo step `SKIPPED`, senza ricevuta email o esito incerto. Se la lettura delle esclusioni fallisce, non si invia. Il blocco sopravvive a reimport e cancellazione delle schede, perché è legato al recapito e all'organizzazione.
+
+Il testo «NON RICONTATTARE» nelle descrizioni o nei registri locali non viene convertito automaticamente: va registrato esplicitamente con `pipely_set_recipient_policy` dopo aver verificato il recapito. Le nuove funzioni non hanno modificato i dati delle 35 aziende GoBus o inviato messaggi reali.
 
 Le aziende supportano nome, sito, settore, dimensione, indirizzo, città, paese, email, telefono, partita IVA, descrizione, LinkedIn e nome/ruolo/email/telefono del referente. Gli aggiornamenti sono parziali: i campi omessi restano invariati e `null` cancella un campo facoltativo. Nome, email e URL non validi vengono rifiutati; i limiti dei campi sono indicati nello schema del tool. Il server salva i dati forniti, senza verificare partita IVA o recapiti su servizi esterni.
 

@@ -347,6 +347,7 @@ async function executeJob(initial: WorkflowQueue, deadline: number) {
           let timer: ReturnType<typeof setTimeout> | undefined;
           const sent = await Promise.race([
             sendOrgMail(job.orgId, {
+              purpose: "MARKETING",
               to,
               subject,
               html,
@@ -364,6 +365,15 @@ async function executeJob(initial: WorkflowQueue, deadline: number) {
               );
             }),
           ]).finally(() => clearTimeout(timer));
+          if (!sent.ok && sent.blocked) {
+            entry.status = "SKIPPED";
+            entry.message = sent.error;
+            job = await crmTransaction(tx => checkpoint(tx, job, {
+              emailInFlight: false, stepIndex: job.stepIndex + 1, attempts: 0,
+              logs: [...job.logs, entry],
+            }));
+            continue;
+          }
           if (!sent.ok)
             throw new CrmError(
               `Email non confermata: ${sent.error}. Verifica l'esito prima di riprovare.`,

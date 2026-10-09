@@ -6,8 +6,8 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 
 if (process.argv[2] !== "--synthetic-fixture") throw new Error("Use --synthetic-fixture");
-const reportPath = process.argv[3] ?? "docs/MCP-PRODUZIONE-CONTATTI-2026-10-09.json";
-if (!/^docs\/MCP-PRODUZIONE(?:-CONTATTI)?-\d{4}-\d{2}-\d{2}\.json$/.test(reportPath))
+const reportPath = process.argv[3] ?? "docs/MCP-PRODUZIONE-GOBUS-2026-10-09.json";
+if (!/^docs\/MCP-PRODUZIONE(?:-CONTATTI|-GOBUS)?-\d{4}-\d{2}-\d{2}\.json$/.test(reportPath))
   throw new Error("Use a dated MCP report under docs");
 dotenv.config({ path: ".env.local", quiet: true });
 const origin = "https://www.pipely.it";
@@ -64,7 +64,7 @@ try {
       authProvider: { token: async () => raw },
     }),
   );
-  assert((await client.listTools()).tools.length === 16, "officialClient16Tools");
+  assert((await client.listTools()).tools.length === 22, "officialClient22Tools");
   const context = await client.callTool({ name: "pipely_get_context", arguments: {} });
   assert(value(context)?.organization?.id === id, "isolatedTenant");
   const input = { requestId: randomUUID(), firstName: "Cliente sintetico MCP" };
@@ -225,20 +225,111 @@ try {
       value(activityRecord)?.data?.completedAt === value(completion).completedAt,
     "activityCompletionPreservesDate",
   );
+  const syncInput = {
+    requestId: randomUUID(),
+    externalSource: " GoBus ",
+    externalId: " smoke-company ",
+    name: "GoBus sintetico",
+  };
+  const syncCompany = await client.callTool({
+    name: "pipely_upsert_company",
+    arguments: syncInput,
+  });
+  const syncRetry = await client.callTool({ name: "pipely_upsert_company", arguments: syncInput });
+  const external = await client.callTool({
+    name: "pipely_get_external_record",
+    arguments: { kind: "company", externalSource: "gobus", externalId: "smoke-company" },
+  });
+  assert(
+    value(syncCompany)?.id &&
+      value(syncRetry)?.replayed &&
+      value(external)?.record?.id === value(syncCompany).id,
+    "permanentExternalIdentityAndRetry",
+  );
+  const batch = {
+    requestId: randomUUID(),
+    entries: [
+      {
+        kind: "contact",
+        data: {
+          externalSource: "gobus",
+          externalId: "smoke-contact",
+          firstName: "Contatto GoBus sintetico",
+          companyId: value(syncCompany).id,
+        },
+      },
+    ],
+  };
+  const preview = await client.callTool({ name: "pipely_import_batch", arguments: batch });
+  assert(
+    value(preview)?.dryRun && value(preview)?.results?.[0]?.status === "would_created",
+    "importDryRun",
+  );
+  const imported = await client.callTool({
+    name: "pipely_import_batch",
+    arguments: { ...batch, dryRun: false },
+  });
+  const importedAgain = await client.callTool({
+    name: "pipely_import_batch",
+    arguments: { ...batch, requestId: randomUUID(), dryRun: false },
+  });
+  assert(
+    value(imported)?.results?.[0]?.id &&
+      value(importedAgain)?.results?.[0]?.id === value(imported).results[0].id &&
+      value(importedAgain).results[0].status === "unchanged",
+    "repeatImportPreservesIds",
+  );
+  const policyInput = {
+    requestId: randomUUID(),
+    address: " SMOKE@EXAMPLE.TEST ",
+    status: "DO_NOT_CONTACT",
+    reason: "Esclusione sintetica",
+    source: "gobus-fixture",
+    effectiveAt: new Date().toISOString(),
+  };
+  const policy = await client.callTool({
+    name: "pipely_set_recipient_policy",
+    arguments: policyInput,
+  });
+  const policyRetry = await client.callTool({
+    name: "pipely_set_recipient_policy",
+    arguments: policyInput,
+  });
+  const policyRead = await client.callTool({
+    name: "pipely_get_recipient_policy",
+    arguments: { address: "smoke@example.test" },
+  });
+  assert(
+    value(policy)?.id &&
+      value(policyRetry)?.replayed &&
+      value(policyRead)?.policy?.status === "DO_NOT_CONTACT" &&
+      value(policyRead).policy.events.length === 1,
+    "structuredRecipientPolicyAndRetry",
+  );
+  const unverifiedClear = await client.callTool({
+    name: "pipely_set_recipient_policy",
+    arguments: {
+      ...policyInput,
+      requestId: randomUUID(),
+      status: "CLEARED",
+      expectedUpdatedAt: value(policy).updatedAt,
+    },
+  });
+  assert(unverifiedClear.isError, "unverifiedPolicyClearRejected");
   const counts = await database.query(
     'SELECT (SELECT count(*) FROM "Contact" WHERE "organizationId"=$1)::int AS contacts, (SELECT count(*) FROM "Company" WHERE "organizationId"=$1)::int AS companies, (SELECT count(*) FROM "Activity" WHERE "organizationId"=$1)::int AS activities, (SELECT count(*) FROM "McpOperation" WHERE "organizationId"=$1)::int AS operations, (SELECT count(*) FROM "WorkflowQueue" WHERE "orgId"=$1)::int AS workflows',
     [id],
   );
   assert(
-    counts.rows[0].contacts === 1 &&
-      counts.rows[0].companies === 1 &&
+    counts.rows[0].contacts === 2 &&
+      counts.rows[0].companies === 2 &&
       counts.rows[0].activities === 1 &&
-      counts.rows[0].operations === 9 &&
+      counts.rows[0].operations === 13 &&
       counts.rows[0].workflows === 0,
     "databaseReceiptsAndStarterPolicy",
   );
   await database.query('UPDATE "McpToken" SET "canWrite"=false WHERE id=$1', [tokenId]);
-  assert((await client.listTools()).tools.length === 7, "liveReadOnlyScope");
+  assert((await client.listTools()).tools.length === 9, "liveReadOnlyScope");
   await database.query('UPDATE "McpToken" SET "revokedAt"=now() WHERE id=$1', [tokenId]);
   const rejected = await fetch(`${origin}/api/mcp`, {
     method: "POST",

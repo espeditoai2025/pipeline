@@ -14,11 +14,13 @@ export const contactInputSchema = z.object({
 });
 export const contactImportRowSchema = contactInputSchema.omit({ companyId: true }).extend({
   companyName: optionalText(250),
-});
+  externalSource: z.string().trim().toLowerCase().max(100).optional().transform(value => value || undefined),
+  externalId: z.string().trim().max(200).optional().transform(value => value || undefined),
+}).refine(row => !!row.externalSource === !!row.externalId, "Specifica fonte e ID esterno insieme");
 export const contactImportSchema = z.array(contactImportRowSchema)
   .min(1, "Il file non contiene contatti")
   .max(MAX_CONTACT_IMPORT_ROWS, `Importa al massimo ${MAX_CONTACT_IMPORT_ROWS} contatti per volta`);
-export type ContactImportRow = z.infer<typeof contactImportRowSchema>;
+export type ContactImportRow = z.input<typeof contactImportRowSchema>;
 
 const aliases: Record<string, string[]> = {
   firstName: ["firstname", "nome", "name"],
@@ -27,6 +29,8 @@ const aliases: Record<string, string[]> = {
   phone: ["phone", "telefono", "tel", "cellulare", "mobile"],
   jobTitle: ["jobtitle", "ruolo", "title", "posizione"],
   companyName: ["company", "azienda", "companyname", "ragionesociale"],
+  externalSource: ["externalsource", "fonteesterna"],
+  externalId: ["externalid", "idesterno", "idgobus"],
 };
 
 export function resolveContactHeader(raw: string): string {
@@ -112,16 +116,32 @@ export function parseContactCSV(input: string): ImportRow[] {
   });
 }
 
-export function deduplicateContactImport(rows: ContactImportRow[], existingEmails: (string | null)[]) {
-  const emails = new Set(existingEmails.map((email) => email?.trim().toLowerCase()).filter(Boolean));
-  const contacts: ContactImportRow[] = [];
+export function deduplicateByEmail<T extends { email?: string | null }>(rows: T[], existingEmails: (string | null)[]) {
+  const emails = new Set(existingEmails.map(email => email?.trim().toLowerCase()).filter(Boolean));
+  const records: T[] = [];
   let duplicates = 0;
   for (const row of rows) {
     const email = row.email?.trim().toLowerCase();
     if (email && emails.has(email)) duplicates++;
+    else { records.push(row); if (email) emails.add(email); }
+  }
+  return { records, duplicates };
+}
+
+export function deduplicateContactImport(rows: ContactImportRow[], existingEmails: (string | null)[], existingIdentities: { externalSource: string | null; externalId: string | null }[] = []) {
+  const emails = new Set(existingEmails.map((email) => email?.trim().toLowerCase()).filter(Boolean));
+  const external = new Set(existingIdentities.filter(row => row.externalSource && row.externalId)
+    .map(row => JSON.stringify([row.externalSource!.trim().toLowerCase(), row.externalId!.trim()])));
+  const contacts: ContactImportRow[] = [];
+  let duplicates = 0;
+  for (const row of rows) {
+    const email = row.email?.trim().toLowerCase();
+    const key = row.externalSource && row.externalId ? JSON.stringify([row.externalSource, row.externalId]) : null;
+    if ((email && emails.has(email)) || (key && external.has(key))) duplicates++;
     else {
       contacts.push(row);
       if (email) emails.add(email);
+      if (key) external.add(key);
     }
   }
   return { contacts, duplicates };

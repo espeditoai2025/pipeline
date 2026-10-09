@@ -73,6 +73,7 @@ model Organization {
   aiUsageDays         AiUsageDay[]
   mcpTokens           McpToken[]
   mcpOperations       McpOperation[]
+  recipientPolicies   RecipientPolicy[]
 }
 
 model Invitation {
@@ -221,6 +222,9 @@ model Contact {
   email          String?
   phone          String?
   jobTitle       String?
+  externalSource String?
+  externalId     String?
+  operationalEmail String?
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   ownerId        String
@@ -243,6 +247,46 @@ model Contact {
   @@index([organizationId])
   @@index([organizationId, createdAt])
   @@index([email])
+  @@unique([organizationId, externalSource, externalId])
+}
+
+enum RecipientPolicyStatus {
+  DO_NOT_CONTACT
+  PERMANENT_BOUNCE
+  SUSPENDED
+  CLEARED
+}
+
+model RecipientPolicy {
+  id             String @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  address        String
+  status         RecipientPolicyStatus
+  reason         String
+  source         String
+  effectiveAt    DateTime
+  suspendedUntil DateTime?
+  verification   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  events         RecipientPolicyEvent[]
+
+  @@unique([organizationId, address])
+}
+
+model RecipientPolicyEvent {
+  id             String @id @default(cuid())
+  policyId       String
+  policy         RecipientPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  status         RecipientPolicyStatus
+  reason         String
+  source         String
+  effectiveAt    DateTime
+  suspendedUntil DateTime?
+  verification   String?
+  actorId        String
+  createdAt      DateTime @default(now())
 }
 
 model Company {
@@ -263,6 +307,9 @@ model Company {
   referentRole   String?
   referentEmail  String?
   referentPhone  String?
+  externalSource String?
+  externalId     String?
+  operationalEmail String?
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -274,6 +321,7 @@ model Company {
   updatedAt DateTime @updatedAt
 
   @@index([organizationId])
+  @@unique([organizationId, externalSource, externalId])
 }
 
 model Tag {

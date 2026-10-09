@@ -143,6 +143,7 @@ export async function sendEmail(input: z.infer<typeof composeSchema>): Promise<{
   // dall'API: prima un rifiuto di Resend veniva salvato come "SENT" (H15).
   const htmlBody = body.replace(/\n/g, "<br>");
   const result = await sendOrgMail(orgId, {
+    purpose: "MANUAL",
     to,
     cc: cc ? [cc] : undefined,
     subject,
