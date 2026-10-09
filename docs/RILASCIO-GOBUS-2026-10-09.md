@@ -6,6 +6,8 @@ Il lavoro implementa le tre priorità del collaudo MCP GoBus. La prima tranche (
 
 La seconda tranche aggiunge schede/report GoBus, campi e pipeline MCP, gestione attività e note aziendali, lettura e previsione degli effetti automatici, registrazione di eventi esterni deduplicati. Server 1.4.0 con 35 strumenti, 15 di sola lettura e 20 di scrittura. Migrazioni additive applicate dal normale processo Vercel `prisma migrate deploy`.
 
+Pubblicato il commit applicativo `5617c6eee967576f7acf7d331b787ddd9ede25af`: deployment `dpl_FyRKANCC92yd6gdJbx16G2WCx9Nq` READY / Production su `www.pipely.it` e `pipely.it`. Tutti i [29 controlli pubblici](MCP-PRODUZIONE-GOBUS-OPERATIVITA-2026-10-09.json) superati alle 21:02, ora italiana. La fixture sintetica è stata eliminata; verificati anche i permessi di lettura correnti e la revoca senza cache o redirect al login.
+
 ## Evidenze locali
 
 | Richiesta | Verifica |
