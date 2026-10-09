@@ -105,16 +105,19 @@ export const pageSchema = z
 export const companiesSchema = pageSchema.extend({
   externalSource: externalSource.optional(),
   externalId: externalId.optional(),
+  segment: text(200).optional(),
 });
 export const contactsSchema = companiesSchema.extend({ companyId: id.optional() });
 export const dealsSchema = pageSchema.extend({
   status: z.enum(["OPEN", "WON", "LOST"]).optional(),
   pipelineId: id.optional(),
+  isTest: z.boolean().optional(),
 });
 export const activitiesSchema = pageSchema.extend({
   completed: z.boolean().optional(),
   contactId: id.optional(),
   dealId: id.optional(),
+  companyId: id.optional(),
 });
 export const recordSchema = z
   .object({ kind: z.enum(["contact", "company", "deal", "activity"]), id })
@@ -205,6 +208,7 @@ export const createDealSchema = z
     contactId: id.optional(),
     companyId: id.optional(),
     ownerId: id.optional(),
+    isTest: z.boolean().optional(),
   })
   .strict();
 export const createActivitySchema = z
@@ -216,14 +220,15 @@ export const createActivitySchema = z
     dueDate: dateTime.optional(),
     duration: z.number().int().min(0).max(10080).optional(),
     ...links,
+    companyId: id.optional(),
   })
   .strict();
 export const createNoteSchema = z
-  .object({ requestId, content: text(10000), ...links })
+  .object({ requestId, content: text(10000), ...links, companyId: id.optional() })
   .strict()
   .refine(
-    (value) => !!value.contactId || !!value.dealId,
-    "Collega la nota a un contatto o a una trattativa",
+    (value) => !!value.contactId || !!value.dealId || !!value.companyId,
+    "Collega la nota a un contatto, azienda o trattativa",
   );
 export const updateDealSchema = z
   .object({
@@ -237,15 +242,229 @@ export const updateDealSchema = z
     status: z.enum(["OPEN", "WON", "LOST"]).optional(),
     stageId: id.optional(),
     lostReason: z.string().trim().max(1000).optional(),
+    acceptanceEvidence: text(2000).optional(),
+    isTest: z.boolean().optional(),
   })
   .strict()
   .refine(
     (value) =>
-      [value.title, value.value, value.status, value.stageId, value.lostReason].some(
-        (field) => field !== undefined,
-      ),
+      [
+        value.title,
+        value.value,
+        value.status,
+        value.stageId,
+        value.lostReason,
+        value.acceptanceEvidence,
+        value.isTest,
+      ].some((field) => field !== undefined),
     "Specifica almeno una modifica",
   );
+export const updateActivitySchema = z
+  .object({
+    requestId,
+    id,
+    expectedUpdatedAt,
+    subject: text(300).optional(),
+    type: createActivitySchema.shape.type.optional(),
+    notes: z.string().trim().max(10000).nullable().optional(),
+    dueDate: dateTime.nullable().optional(),
+    duration: z.number().int().min(0).max(10080).nullable().optional(),
+    contactId: id.nullable().optional(),
+    dealId: id.nullable().optional(),
+    companyId: id.nullable().optional(),
+  })
+  .strict()
+  .refine(
+    (v) => Object.keys(v).some((k) => !["requestId", "id", "expectedUpdatedAt"].includes(k)),
+    "Specifica una modifica",
+  );
+export const reopenActivitySchema = z
+  .object({ requestId, id, expectedUpdatedAt, reason: text(1000) })
+  .strict();
+export const customFieldsReadSchema = z
+  .object({ entityType: z.enum(["company", "contact", "deal"]) })
+  .strict();
+export const customFieldWriteSchema = z
+  .object({
+    requestId,
+    id: id.optional(),
+    expectedUpdatedAt: expectedUpdatedAt.optional(),
+    entityType: z.enum(["company", "contact", "deal"]),
+    name: text(200),
+    fieldType: z.enum(["text", "number", "date", "boolean", "select", "multiselect"]),
+    options: z.array(text(200)).max(100).optional(),
+    isRequired: z.boolean().default(false),
+  })
+  .strict()
+  .refine(
+    (v) => !["select", "multiselect"].includes(v.fieldType) || !!v.options?.length,
+    "Specifica le opzioni",
+  );
+export const customValuesWriteSchema = z
+  .object({
+    requestId,
+    entityType: z.enum(["company", "contact", "deal"]),
+    id,
+    expectedUpdatedAt,
+    values: z
+      .array(z.object({ fieldId: id, value: z.string().max(10000).nullable() }).strict())
+      .min(1)
+      .max(100),
+  })
+  .strict()
+  .refine(
+    (v) => new Set(v.values.map((x) => x.fieldId)).size === v.values.length,
+    "Campi duplicati",
+  );
+export const pipelineWriteSchema = z
+  .object({
+    requestId,
+    id: id.optional(),
+    expectedUpdatedAt: expectedUpdatedAt.optional(),
+    name: text(200),
+    isDefault: z.boolean().optional(),
+    stages: z
+      .array(
+        z
+          .object({
+            id: id.optional(),
+            name: text(200),
+            probability: z.number().int().min(0).max(100),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(50),
+  })
+  .strict();
+export const gobusProfileReadSchema = z.object({ companyId: id }).strict();
+export const gobusProfileWriteSchema = z
+  .object({
+    requestId,
+    companyId: id,
+    expectedUpdatedAt: expectedUpdatedAt.optional(),
+    source: externalSource,
+    segment: optionalCompanyText(200),
+    companyType: optionalCompanyText(200),
+    verificationStatus: z.enum(["UNVERIFIED", "VERIFIED", "REJECTED"]).optional(),
+    lifecycle: z.enum(["PROSPECT", "TRIAL", "CUSTOMER", "INACTIVE"]).optional(),
+    basePlan: optionalCompanyText(200),
+    trialUpgrade: optionalCompanyText(200),
+    trialEndsAt: dateTime.nullable().optional(),
+    activatedAt: dateTime.nullable().optional(),
+    firstServiceAt: dateTime.nullable().optional(),
+    nextAction: optionalCompanyText(1000),
+    isTest: z.boolean().optional(),
+    feeAmount: z.number().finite().min(0).max(1e12).nullable().optional(),
+    feeCurrency: z
+      .string()
+      .regex(/^[A-Z]{3}$/)
+      .optional(),
+    feePeriod: z.enum(["MONTH", "QUARTER", "YEAR", "ONE_OFF"]).nullable().optional(),
+    feeVat: z.enum(["INCLUDED", "EXCLUDED", "EXEMPT", "UNKNOWN"]).optional(),
+    feeSource: optionalCompanyText(200),
+    feeVerifiedAt: dateTime.nullable().optional(),
+    feeEvidence: optionalCompanyText(2000),
+  })
+  .strict();
+export const gobusReportSchema = z
+  .object({ source: externalSource.optional(), segment: text(200).optional() })
+  .strict();
+export const effectsSchema = z
+  .object({
+    operation: z.enum([
+      "create_contact",
+      "update_contact",
+      "create_company",
+      "update_company",
+      "create_deal",
+      "update_deal",
+      "create_activity",
+      "complete_activity",
+      "create_note",
+      "upsert_company",
+      "upsert_contact",
+      "import_batch",
+    ]),
+  })
+  .strict();
+export const externalEventWriteSchema = z
+  .object({
+    requestId,
+    source: externalSource,
+    externalId,
+    expectedUpdatedAt: expectedUpdatedAt.optional(),
+    kind: z.enum(["PCSMAIL", "GOBUS"]),
+    state: z.enum([
+      "DRAFT",
+      "SENT_CONFIRMED",
+      "UNCERTAIN",
+      "BOUNCE",
+      "REPLY_RECEIVED",
+      "REGISTERED",
+      "FIRST_SERVICE",
+      "TRIAL",
+      "SUBSCRIPTION",
+      "SUPPORT_REQUEST",
+    ]),
+    direction: z.enum(["INBOUND", "OUTBOUND", "NONE"]),
+    occurredAt: dateTime,
+    companyId: id.nullable().optional(),
+    contactId: id.nullable().optional(),
+    recipient: optionalCompanyEmail,
+    recipientVerified: z.boolean().default(false),
+    account: normalizedEmail.optional(),
+    mailbox: text(200).optional(),
+    uidValidity: z
+      .string()
+      .regex(/^[1-9]\d{0,19}$/)
+      .optional(),
+    uid: z
+      .string()
+      .regex(/^[1-9]\d{0,19}$/)
+      .optional(),
+    messageId: text(998).optional(),
+    messageRef: text(1000).optional(),
+    evidence: text(2000).optional(),
+    isTest: z.boolean().optional(),
+  })
+  .strict()
+  .superRefine((v, c) => {
+    const fail = (message: string) => c.addIssue({ code: "custom", message });
+    const mail = ["DRAFT", "SENT_CONFIRMED", "UNCERTAIN", "BOUNCE", "REPLY_RECEIVED"].includes(
+      v.state,
+    );
+    if ((v.kind === "PCSMAIL") !== mail) fail("Stato incompatibile con la fonte");
+    if (
+      v.kind === "PCSMAIL" &&
+      (!v.account || !v.mailbox || !v.uidValidity || !v.uid || v.direction === "NONE")
+    )
+      fail("Servono account, mailbox, UIDVALIDITY, UID e direzione");
+    if (v.recipientVerified && !v.recipient) fail("Manca il destinatario verificato");
+    if (v.kind === "GOBUS" && (!v.evidence || v.direction !== "NONE" || !v.companyId))
+      fail("Evento GoBus: servono azienda, evidenza verificata e direzione NONE");
+    if (
+      v.kind === "GOBUS" &&
+      [v.account, v.mailbox, v.uidValidity, v.uid, v.messageId, v.messageRef].some(Boolean)
+    )
+      fail("I riferimenti di posta sono ammessi solo per PCSMail");
+    if (v.kind === "PCSMAIL" && v.source !== "pcsmail")
+      fail("La fonte PCSMail deve essere pcsmail");
+    if (v.state === "REPLY_RECEIVED" && v.direction !== "INBOUND")
+      fail("Una risposta ricevuta è INBOUND");
+    if (["DRAFT", "SENT_CONFIRMED"].includes(v.state) && v.direction !== "OUTBOUND")
+      fail("Bozza/invio richiedono OUTBOUND");
+    if (v.state === "SENT_CONFIRMED" && !v.evidence)
+      fail(
+        "L'invio confermato richiede una ricevuta verificata; Inviati da solo non prova la consegna",
+      );
+  });
+export const externalEventsReadSchema = pageSchema.extend({
+  source: externalSource.optional(),
+  companyId: id.optional(),
+  contactId: id.optional(),
+  kind: z.enum(["PCSMAIL", "GOBUS"]).optional(),
+});
 export const createTokenSchema = z
   .object({
     name: text(80),

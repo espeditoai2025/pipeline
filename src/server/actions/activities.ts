@@ -8,6 +8,8 @@ import { crmPermissionError } from "@/lib/crm-permissions";
 import { db } from "@/lib/db";
 import { validateCrmReferences } from "@/lib/crm-references";
 import { dispatchWebhook } from "@/lib/webhook-delivery";
+import { completeActivityRecord } from "@/lib/activity-state";
+import { crmTransaction } from "@/lib/crm-transaction";
 import type { Activity, ActivityType } from "@/types/activities";
 
 function getOrgId(s: Session | null) {
@@ -159,12 +161,9 @@ export async function completeActivity(id: string): Promise<{ error: string | nu
   if ((!orgId) || (await crmPermissionError(session, "write"))) return { error: "Non autorizzato" };
 
   try {
-    const row = await db.activity.update({
-      where: { id, organizationId: orgId },
-      data: { completedAt: new Date() },
-    });
+    const { row, alreadyCompleted } = await crmTransaction(tx => completeActivityRecord(tx, orgId, id, session!.user!.id!));
     refreshActivityPages();
-    dispatchWebhook(orgId, "activity.completed", { id: row.id, type: row.type, subject: row.subject }).catch(() => {});
+    if (!alreadyCompleted) dispatchWebhook(orgId, "activity.completed", { id: row.id, type: row.type, subject: row.subject }).catch(() => {});
     return { error: null };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Errore" };

@@ -74,6 +74,8 @@ model Organization {
   mcpTokens           McpToken[]
   mcpOperations       McpOperation[]
   recipientPolicies   RecipientPolicy[]
+  gobusProfiles       GobusProfile[]
+  externalEvents      ExternalEvent[]
 }
 
 model Invitation {
@@ -151,6 +153,7 @@ model Pipeline {
   position       Int          @default(0)
   isDefault      Boolean      @default(false)
   createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   stages Stage[]
   deals  Deal[]
@@ -177,6 +180,8 @@ model Deal {
   expectedClose  DateTime?
   closedAt       DateTime?
   lostReason     String?
+  acceptanceEvidence String?
+  isTest         Boolean      @default(false)
   pipelineId     String
   pipeline       Pipeline     @relation(fields: [pipelineId], references: [id])
   stageId        String
@@ -316,6 +321,9 @@ model Company {
   contacts     Contact[]
   deals        Deal[]
   customValues CustomFieldValue[]
+  notes        Note[]
+  activities   Activity[]
+  gobusProfile GobusProfile?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -343,6 +351,7 @@ model Activity {
   notes          String?
   dueDate        DateTime?
   completedAt    DateTime?
+  firstCompletedAt DateTime?
   duration       Int?         // minutes
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -352,8 +361,12 @@ model Activity {
   deal           Deal?        @relation(fields: [dealId], references: [id])
   contactId      String?
   contact        Contact?     @relation(fields: [contactId], references: [id])
+  companyId      String?
+  company        Company?     @relation(fields: [companyId], references: [id])
+  events         ActivityEvent[]
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, dueDate])
 }
@@ -536,6 +549,7 @@ model CustomField {
   fieldType      String       // text, number, date, select, multiselect
   options        Json?        // for select/multiselect
   isRequired     Boolean      @default(false)
+  updatedAt      DateTime     @updatedAt
 
   values CustomFieldValue[]
 }
@@ -567,11 +581,97 @@ model Note {
   deal      Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
   contactId String?
   contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
   authorId  String
   createdAt DateTime @default(now())
 
   @@index([dealId])
   @@index([contactId])
+  @@index([companyId])
+}
+
+model ActivityEvent {
+  id          String   @id @default(cuid())
+  activityId  String
+  activity    Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  action      String
+  actorId     String
+  completedAt DateTime?
+  reason      String?
+  createdAt   DateTime @default(now())
+  @@index([activityId, createdAt])
+}
+
+model GobusProfile {
+  id             String @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  companyId      String @unique
+  company        Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  source         String
+  segment        String?
+  companyType    String?
+  verificationStatus String @default("UNVERIFIED")
+  lifecycle      String @default("PROSPECT")
+  basePlan       String?
+  trialUpgrade   String?
+  trialEndsAt    DateTime?
+  activatedAt    DateTime?
+  firstServiceAt DateTime?
+  nextAction     String?
+  isTest         Boolean @default(false)
+  feeAmount      Decimal?
+  feeCurrency    String @default("EUR")
+  feePeriod      String?
+  feeVat         String @default("UNKNOWN")
+  feeSource      String?
+  feeVerifiedAt  DateTime?
+  feeEvidence    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  @@index([organizationId, source, segment])
+}
+
+model ExternalEvent {
+  id             String @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  source         String
+  externalId     String
+  identityKey    String?
+  kind           String
+  state          String
+  direction      String
+  occurredAt     DateTime
+  companyId      String?
+  contactId      String?
+  recipient      String?
+  recipientVerified Boolean @default(false)
+  account        String?
+  mailbox        String?
+  uidValidity    String?
+  uid            String?
+  messageId      String?
+  messageRef     String?
+  evidence       String?
+  isTest         Boolean @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  revisions      ExternalEventRevision[]
+  @@unique([organizationId, source, externalId])
+  @@unique([organizationId, identityKey])
+  @@index([organizationId, companyId, occurredAt])
+}
+
+model ExternalEventRevision {
+  id        String @id @default(cuid())
+  eventId   String
+  event     ExternalEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  snapshot  Json
+  actorId   String
+  createdAt DateTime @default(now())
+  @@index([eventId, createdAt])
 }
 
 model Notification {

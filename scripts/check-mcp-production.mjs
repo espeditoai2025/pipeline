@@ -6,8 +6,12 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 
 if (process.argv[2] !== "--synthetic-fixture") throw new Error("Use --synthetic-fixture");
-const reportPath = process.argv[3] ?? "docs/MCP-PRODUZIONE-GOBUS-2026-10-09.json";
-if (!/^docs\/MCP-PRODUZIONE(?:-CONTATTI|-GOBUS)?-\d{4}-\d{2}-\d{2}\.json$/.test(reportPath))
+const reportPath = process.argv[3] ?? "docs/MCP-PRODUZIONE-GOBUS-OPERATIVITA-2026-10-09.json";
+if (
+  !/^docs\/MCP-PRODUZIONE(?:-CONTATTI|-GOBUS(?:-OPERATIVITA)?)?-\d{4}-\d{2}-\d{2}\.json$/.test(
+    reportPath,
+  )
+)
   throw new Error("Use a dated MCP report under docs");
 dotenv.config({ path: ".env.local", quiet: true });
 const origin = "https://www.pipely.it";
@@ -64,7 +68,7 @@ try {
       authProvider: { token: async () => raw },
     }),
   );
-  assert((await client.listTools()).tools.length === 22, "officialClient22Tools");
+  assert((await client.listTools()).tools.length === 35, "officialClient35Tools");
   const context = await client.callTool({ name: "pipely_get_context", arguments: {} });
   assert(value(context)?.organization?.id === id, "isolatedTenant");
   const input = { requestId: randomUUID(), firstName: "Cliente sintetico MCP" };
@@ -316,6 +320,207 @@ try {
     },
   });
   assert(unverifiedClear.isError, "unverifiedPolicyClearRejected");
+  phase = "GoBus operational tools";
+  const activityRead = await client.callTool({
+    name: "pipely_get_record",
+    arguments: { kind: "activity", id: value(activity).id },
+  });
+  const rescheduled = await client.callTool({
+    name: "pipely_update_activity",
+    arguments: {
+      requestId: randomUUID(),
+      id: value(activity).id,
+      expectedUpdatedAt: value(activityRead).data.updatedAt,
+      subject: "Verifica sintetica ripianificata",
+      dueDate: "2030-10-09T09:00:00Z",
+      companyId: value(company).id,
+    },
+  });
+  const reopenArgs = {
+    requestId: randomUUID(),
+    id: value(activity).id,
+    expectedUpdatedAt: value(rescheduled).updatedAt,
+    reason: "Riapertura sintetica",
+  };
+  const reopened = await client.callTool({ name: "pipely_reopen_activity", arguments: reopenArgs });
+  const reopenedRetry = await client.callTool({
+    name: "pipely_reopen_activity",
+    arguments: reopenArgs,
+  });
+  const activityHistory = await client.callTool({
+    name: "pipely_get_record",
+    arguments: { kind: "activity", id: value(activity).id },
+  });
+  assert(
+    value(reopened)?.record?.completedAt === null &&
+      value(reopenedRetry)?.replayed &&
+      value(activityHistory)?.events?.some(
+        (e) => e.action === "REOPENED" && e.completedAt === value(completion).completedAt,
+      ),
+    "activityRescheduleAndAuditedReopen",
+  );
+  const companyNote = await client.callTool({
+    name: "pipely_create_note",
+    arguments: {
+      requestId: randomUUID(),
+      companyId: value(company).id,
+      content: "Nota aziendale sintetica",
+    },
+  });
+  const companyRead = await client.callTool({
+    name: "pipely_get_record",
+    arguments: { kind: "company", id: value(company).id },
+  });
+  assert(
+    value(companyNote)?.id &&
+      value(companyRead)?.recentNotes?.some((n) => n.id === value(companyNote).id),
+    "companyNoteWithoutCommercialContact",
+  );
+  const field = await client.callTool({
+    name: "pipely_save_custom_field",
+    arguments: {
+      requestId: randomUUID(),
+      entityType: "company",
+      name: "ID GoBus sintetico",
+      fieldType: "text",
+    },
+  });
+  const fields = await client.callTool({
+    name: "pipely_list_custom_fields",
+    arguments: { entityType: "company" },
+  });
+  const customValues = await client.callTool({
+    name: "pipely_set_custom_values",
+    arguments: {
+      requestId: randomUUID(),
+      id: value(company).id,
+      entityType: "company",
+      expectedUpdatedAt: value(companyRead).data.updatedAt,
+      values: [{ fieldId: value(field).id, value: "synthetic-35" }],
+    },
+  });
+  const customRead = await client.callTool({
+    name: "pipely_get_record",
+    arguments: { kind: "company", id: value(company).id },
+  });
+  assert(
+    value(customValues)?.id &&
+      value(fields)?.fields?.length === 1 &&
+      value(customRead)?.customValues?.[0]?.value === "synthetic-35",
+    "versionedCustomFieldsAndValues",
+  );
+  const pipeline = await client.callTool({
+    name: "pipely_save_pipeline",
+    arguments: {
+      requestId: randomUUID(),
+      name: "GoBus sintetico",
+      stages: [{ name: "Verifica", probability: 10 }],
+    },
+  });
+  const profile = await client.callTool({
+    name: "pipely_set_gobus_profile",
+    arguments: {
+      requestId: randomUUID(),
+      companyId: value(company).id,
+      source: "gobus",
+      lifecycle: "CUSTOMER",
+      verificationStatus: "VERIFIED",
+      basePlan: "Pro",
+      trialUpgrade: "Enterprise",
+      trialEndsAt: "2030-10-30T00:00:00Z",
+      feeAmount: 49,
+      feePeriod: "MONTH",
+      feeVat: "EXCLUDED",
+      feeSource: "synthetic",
+      feeVerifiedAt: new Date(Date.now() - 60000).toISOString(),
+      feeEvidence: "Verifica sintetica",
+      isTest: true,
+    },
+  });
+  const profileRead = await client.callTool({
+    name: "pipely_get_gobus_profile",
+    arguments: { companyId: value(company).id },
+  });
+  const report = await client.callTool({ name: "pipely_get_gobus_report", arguments: {} });
+  assert(
+    value(profile)?.id &&
+      Number(value(profileRead)?.profile?.feeAmount) === 49 &&
+      value(report)?.payingCompanies === 0 &&
+      value(report)?.totalCompanies === 0 &&
+      value(report)?.reconciledReceipts === null,
+    "gobusProfileKeepsBaseFeeAndExcludesTests",
+  );
+  const offer = await client.callTool({
+    name: "pipely_create_deal",
+    arguments: {
+      requestId: randomUUID(),
+      title: "Proposta sintetica 40",
+      value: 40,
+      companyId: value(company).id,
+      pipelineId: value(pipeline).id,
+      stageId: value(pipeline).record.stages[0].id,
+      isTest: true,
+    },
+  });
+  const wonWithoutProof = await client.callTool({
+    name: "pipely_update_deal",
+    arguments: {
+      requestId: randomUUID(),
+      id: value(offer).id,
+      expectedUpdatedAt: value(offer).updatedAt,
+      status: "WON",
+    },
+  });
+  assert(
+    value(pipeline)?.id && value(offer)?.id && wonWithoutProof.isError,
+    "pipelineAndAcceptanceEvidence",
+  );
+  const automationConfig = await client.callTool({
+    name: "pipely_list_automation_effects",
+    arguments: {},
+  });
+  const prediction = await client.callTool({
+    name: "pipely_predict_effects",
+    arguments: { operation: "import_batch" },
+  });
+  assert(
+    value(automationConfig)?.automationsEnabled === false &&
+      value(prediction)?.maySendEmail === false &&
+      value(prediction)?.possibleWebhooks?.length === 0,
+    "automationVisibilityAndSilentImportPrediction",
+  );
+  const eventInput = {
+    requestId: randomUUID(),
+    source: "gobus",
+    externalId: "synthetic-first-service",
+    kind: "GOBUS",
+    state: "FIRST_SERVICE",
+    direction: "NONE",
+    occurredAt: new Date().toISOString(),
+    companyId: value(company).id,
+    evidence: "Evento sintetico verificato",
+    isTest: true,
+  };
+  const externalEvent = await client.callTool({
+    name: "pipely_upsert_external_event",
+    arguments: eventInput,
+  });
+  const sameEvent = await client.callTool({
+    name: "pipely_upsert_external_event",
+    arguments: { ...eventInput, requestId: randomUUID() },
+  });
+  const eventList = await client.callTool({
+    name: "pipely_list_external_events",
+    arguments: { companyId: value(company).id },
+  });
+  assert(
+    value(externalEvent)?.id &&
+      value(sameEvent)?.id === value(externalEvent).id &&
+      value(sameEvent)?.unchanged &&
+      value(eventList)?.data?.length === 1 &&
+      value(eventList).data[0].revisions.length === 1,
+    "externalEventsDeduplicateWithoutExtraRevisions",
+  );
   const counts = await database.query(
     'SELECT (SELECT count(*) FROM "Contact" WHERE "organizationId"=$1)::int AS contacts, (SELECT count(*) FROM "Company" WHERE "organizationId"=$1)::int AS companies, (SELECT count(*) FROM "Activity" WHERE "organizationId"=$1)::int AS activities, (SELECT count(*) FROM "McpOperation" WHERE "organizationId"=$1)::int AS operations, (SELECT count(*) FROM "WorkflowQueue" WHERE "orgId"=$1)::int AS workflows',
     [id],
@@ -324,12 +529,12 @@ try {
     counts.rows[0].contacts === 2 &&
       counts.rows[0].companies === 2 &&
       counts.rows[0].activities === 1 &&
-      counts.rows[0].operations === 13 &&
+      counts.rows[0].operations === 23 &&
       counts.rows[0].workflows === 0,
     "databaseReceiptsAndStarterPolicy",
   );
   await database.query('UPDATE "McpToken" SET "canWrite"=false WHERE id=$1', [tokenId]);
-  assert((await client.listTools()).tools.length === 9, "liveReadOnlyScope");
+  assert((await client.listTools()).tools.length === 15, "liveReadOnlyScope");
   await database.query('UPDATE "McpToken" SET "revokedAt"=now() WHERE id=$1', [tokenId]);
   const rejected = await fetch(`${origin}/api/mcp`, {
     method: "POST",

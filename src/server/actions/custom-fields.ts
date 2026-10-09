@@ -3,6 +3,7 @@
 import { crmPermissionError } from "@/lib/crm-permissions";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { crmTransaction } from "@/lib/crm-transaction";
 import type { Session } from "next-auth";
 import type { CustomField, CustomFieldValue, EntityType, FieldType } from "@/types/custom-fields";
 
@@ -176,12 +177,19 @@ export async function saveCustomFieldValues(
 
   const safeValues = values.filter((v) => v.value !== "" && validIds.has(v.fieldId));
 
-  await db.$transaction([
-    db.customFieldValue.deleteMany({ where: { [idKey]: entityId } }),
-    db.customFieldValue.createMany({
+  await crmTransaction(async tx => {
+    const parentWhere = { id: entityId, organizationId: orgId };
+    const parent = entityType === "company" ? await tx.company.findFirst({ where: parentWhere }) : entityType === "contact" ? await tx.contact.findFirst({ where: parentWhere }) : await tx.deal.findFirst({ where: parentWhere });
+    if (!parent) throw new Error("Record non disponibile");
+    await tx.customFieldValue.deleteMany({ where: { [idKey]: entityId } });
+    await tx.customFieldValue.createMany({
       data: safeValues.map((v) => ({ fieldId: v.fieldId, [idKey]: entityId, value: v.value })),
-    }),
-  ]);
+    });
+    const data = { updatedAt: new Date(Math.max(Date.now(), parent.updatedAt.getTime() + 1)) };
+    if (entityType === "company") await tx.company.update({ where: parentWhere, data });
+    else if (entityType === "contact") await tx.contact.update({ where: parentWhere, data });
+    else await tx.deal.update({ where: parentWhere, data });
+  });
 
   return {};
 }

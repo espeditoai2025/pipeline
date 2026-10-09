@@ -1,0 +1,30 @@
+{
+  "checkedAt": "2026-10-09T18:40:35.073Z",
+  "endpoint": "https://www.pipely.it/api/mcp",
+  "syntheticFixture": true,
+  "checks": {
+    "officialClient22Tools": true,
+    "isolatedTenant": true,
+    "idempotentContactCreation": true,
+    "noteCreated": true,
+    "noteReadBack": true,
+    "idempotentCompanyCreation": true,
+    "partialCompanyUpdateAndRetry": true,
+    "staleCompanyVersionRejected": true,
+    "existingContactLinkedAndRetry": true,
+    "staleContactVersionRejected": true,
+    "contactCompanyRemoved": true,
+    "activityCreated": true,
+    "activityCompletionPreservesDate": true,
+    "permanentExternalIdentityAndRetry": true,
+    "importDryRun": true,
+    "repeatImportPreservesIds": true,
+    "structuredRecipientPolicyAndRetry": true,
+    "unverifiedPolicyClearRejected": true,
+    "databaseReceiptsAndStarterPolicy": true,
+    "liveReadOnlyScope": true,
+    "revocationAndNoStore": true,
+    "bearerAuthWithoutLoginRedirect": true
+  },
+  "removed": true
+}

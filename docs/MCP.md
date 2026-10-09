@@ -23,7 +23,7 @@ Le chiavi `pip_mcp_` sono separate dalle chiavi REST `pip_live_`. Una chiave MCP
 | `pipely_list_companies` | Ricerca aziende per nome/partita IVA, paginazione |
 | `pipely_list_deals` | Ricerca trattative per titolo, stato/pipeline, paginazione; escluse quelle eliminate |
 | `pipely_list_activities` | Ricerca attività per oggetto, completamento e collegamenti |
-| `pipely_get_record` | Dettaglio contatto/azienda/trattativa/attività; ultime 20 note per contatto/trattativa |
+| `pipely_get_record` | Dettaglio contatto/azienda/trattativa/attività; note azienda/contatto/trattativa, valori personalizzati e storico attività |
 | `pipely_create_contact` | Crea contatto, verifica quota e riferimenti dell'organizzazione |
 | `pipely_update_contact` | Aggiorna i campi indicati e collega, cambia o rimuove l'azienda, con controllo della versione |
 | `pipely_get_external_record` | Cerca azienda/contatto tramite fonte e ID esterni permanenti |
@@ -34,15 +34,21 @@ Le chiavi `pip_mcp_` sono separate dalle chiavi REST `pip_live_`. Una chiave MCP
 | `pipely_set_recipient_policy` | Registra uno stato del recapito con motivo, fonte, data e controllo versione |
 | `pipely_create_deal` | Crea trattativa OPEN con pipeline/fase coerenti |
 | `pipely_create_activity` | Crea attività attribuita al creatore della chiave |
-| `pipely_create_note` | Aggiunge una nota testuale a contatto o trattativa |
+| `pipely_create_note` | Aggiunge una nota testuale ad azienda, contatto o trattativa |
 | `pipely_update_deal` | Modifica titolo/valore/stato/fase/motivo perdita, con controllo della versione |
 | `pipely_create_company` | Crea azienda con anagrafica, partita IVA e referente |
 | `pipely_update_company` | Aggiorna solo i campi indicati, con controllo della versione e cancellazione tramite null |
 | `pipely_complete_activity` | Completa un'attività; se già conclusa mantiene la data originale |
+| `pipely_update_activity` / `pipely_reopen_activity` | Ripianifica o riapre con versione; conserva lo storico dei completamenti |
+| `pipely_list_custom_fields` / `pipely_save_custom_field` / `pipely_set_custom_values` | Gestisce definizioni e valori personalizzati, senza sovrascrivere i campi omessi |
+| `pipely_save_pipeline` | Crea/aggiorna pipeline e fasi con quota e versione; non elimina fasi con trattative |
+| `pipely_get_gobus_profile` / `pipely_set_gobus_profile` / `pipely_get_gobus_report` | Scheda GoBus e report con canoni separati dalle offerte e prove/test esclusi dai paganti |
+| `pipely_list_automation_effects` / `pipely_predict_effects` | Legge configurazione senza segreti e prevede possibili workflow/webhook/email |
+| `pipely_upsert_external_event` / `pipely_list_external_events` | Storico PCSMail/GoBus deduplicato e versionato, senza invii o note duplicate |
 
-Il server 1.3.0 nel sorgente espone 22 tool: nove di lettura e tredici di scrittura. La ricerca per ID esterno e la lettura degli stati dei recapiti sono disponibili anche alle chiavi di sola lettura. Le altre operazioni sono registrate solo quando la chiave autorizza la scrittura; il server ricontrolla credenziale e ruolo anche nella transazione di scrittura. I riferimenti a contatti, aziende, fasi, pipeline e responsabili devono appartenere all'organizzazione della chiave. Le chiavi di scrittura esistenti abilitano anche le nuove operazioni; ricarica l'elenco strumenti nel client dopo il rilascio. Per lo stato pubblicato consulta il registro dei lavori e i rapporti di rilascio.
+Il server 1.4.0 nel sorgente espone 35 tool: quindici di lettura e venti di scrittura. La ricerca per ID esterno e la lettura degli stati dei recapiti sono disponibili anche alle chiavi di sola lettura. Le altre operazioni sono registrate solo quando la chiave autorizza la scrittura; il server ricontrolla credenziale e ruolo anche nella transazione di scrittura. I riferimenti a contatti, aziende, fasi, pipeline e responsabili devono appartenere all'organizzazione della chiave. Le chiavi di scrittura esistenti abilitano anche le nuove operazioni; ricarica l'elenco strumenti nel client dopo il rilascio. Per lo stato pubblicato consulta il registro dei lavori e i rapporti di rilascio.
 
-Le liste accettano `page` (1–10.000), `perPage` (1–50, predefinito 25) e `search` (massimo 200 caratteri). Il dettaglio restituisce al massimo 20 note, con 10.000 caratteri ciascuna e indicazione di eventuale troncamento. Non espone audio, credenziali di servizi, dettagli di abbonamento o dati di altre organizzazioni.
+Le liste accettano `page` (1–10.000), `perPage` (1–50, predefinito 25) e `search` (massimo 200 caratteri). Il dettaglio restituisce al massimo 20 note, con 10.000 caratteri ciascuna e indicazione di eventuale troncamento. Non espone audio, credenziali di servizi, credenziali di abbonamento Pipely o dati di altre organizzazioni.
 
 ## Scritture, retry ed eventi
 
@@ -93,7 +99,31 @@ Le aziende supportano nome, sito, settore, dimensione, indirizzo, città, paese,
 
 I job workflow sono ripresi dopo il commit e dal cron; i webhook sono accodati nella transazione e consegnati dopo il commit, con i retry ordinari. La consegna remota non è "exactly once": il ricevente deve gestire eventi ripetuti. Un'attività di tipo EMAIL è un promemoria, non invia una email. I workflow già configurati possono invece produrre effetti esterni, compreso l'invio di messaggi: il client deve ottenere l'autorizzazione dell'utente per l'azione CRM richiesta.
 
-MCP è disponibile in Starter, Pro e Enterprise. Starter resta limitato a 500 contatti e non esegue workflow Pro. MCP non invoca l'AI interna e non consuma la quota giornaliera di trascrizione/comandi; eventuali costi dell'agente esterno sono gestiti dal suo fornitore. Non sono esposti cancellazioni, pagamenti, invio di fatture, campagne, amministrazione o trascrizioni vocali.
+MCP è disponibile in Starter, Pro e Enterprise. Starter resta limitato a 500 contatti e non esegue workflow Pro. MCP non invoca l'AI interna e non consuma la quota giornaliera di trascrizione/comandi; eventuali costi dell'agente esterno sono gestiti dal suo fornitore. Non sono esposti cancellazioni, pagamenti, invio di fatture, campagne, amministrazione utenti o trascrizioni vocali.
+
+## Schede, campi e report GoBus
+
+`pipely_get_gobus_profile` / `pipely_set_gobus_profile` gestiscono una scheda strutturata per azienda: fonte, segmento, tipo azienda, verifica, cliente/prova/prospect/inattivo, piano base, upgrade in prova e scadenza, attivazione, primo servizio, prossima azione e `isTest`. Il profilo è separato dall'offerta CRM e versionato tramite il suo `updatedAt`. La lettura include gli stati strutturati dei recapiti noti dell'azienda e dei primi 100 contatti; non deduce esclusioni dalle descrizioni o dai campi personalizzati.
+
+Il canone ha importo, valuta, periodicità (`MONTH`, `QUARTER`, `YEAR`, `ONE_OFF`), IVA (`INCLUDED`, `EXCLUDED`, `EXEMPT`, `UNKNOWN`), fonte, data e riferimento di verifica. Cambiare un dato economico invalida la vecchia verifica, salvo nuova data ed evidenza esplicita. `pipely_get_gobus_report` esclude i test e mostra separatamente canoni contrattuali verificati e offerte accettate, senza mescolare valute, periodicità o IVA. Contano fra i paganti ricorrenti solo clienti verificati con canone positivo, ricorrente e verificato. Pro 49 euro con prova Enterprise conserva il canone base; una proposta di 40 euro e una prova gratuita non entrano nel ricorrente. `reconciledReceipts` è null: questo report non dispone di un registro degli incassi riconciliati e non presenta il canone dichiarato come cassa.
+
+Negli aggiornamenti MCP, `status: "WON"` richiede `acceptanceEvidence`; un importo o una nota di interesse non vengono convertiti automaticamente in accettazione. Le trattative hanno un flag `isTest`, disponibile anche come filtro. Il report GoBus esclude offerte senza evidenza e test; i report CRM generali conservano la loro semantica precedente.
+
+`pipely_save_custom_field` crea o modifica definizioni per azienda, contatto o trattativa, con versione obbligatoria per modifiche. Tipi: text, number, date, boolean, select, multiselect; multiselect usa un array JSON nella stringa del valore. Non cambia tipo/entità e non rimuove opzioni in uso. `pipely_set_custom_values` modifica solo i valori indicati e richiede la versione del record parent; null rimuove un valore facoltativo. `pipely_get_record` restituisce i valori. Campi consigliati sono quelli del collaudo GoBus; lo stato di esclusione effettivo resta sempre `RecipientPolicy`, anche se esiste un campo descrittivo di marketing.
+
+`pipely_save_pipeline` crea o aggiorna pipeline e fasi. Per aggiornare occorrono ID e versione della pipeline da `pipely_list_pipelines`. Gli ID delle fasi esistenti devono essere conservati; omettere una fase la rimuove soltanto se non contiene trattative. Quota del piano e organizzazione sono verificati. Le liste di aziende/contatti supportano fonte/ID esterni e segmento GoBus; il report supporta fonte del profilo e segmento.
+
+## Attività, note e previsione degli effetti
+
+`pipely_update_activity` modifica oggetto, tipo, note, scadenza, durata e associazioni azienda/contatto/trattativa, con versione e requestId. Non crea un'altra attività. `pipely_reopen_activity` richiede motivo e versione: libera il completamento corrente, conserva `firstCompletedAt` e registra un evento con la data del completamento precedente. `get_record` restituisce gli ultimi 50 eventi. Un completamento ripetuto conserva data e storico, anche dall'interfaccia web. Dopo una riapertura e nuovo completamento nasce un nuovo evento: la data storica originaria rimane immutata. Le note supportano `companyId` e si leggono direttamente dalla scheda azienda senza creare un contatto commerciale.
+
+`pipely_list_automation_effects` legge fino a 100 workflow e webhook, con indicazione di troncamento. Restituisce stato, eventi e azioni validate, ma non segreto webhook, credenziali, percorso o query della destinazione. `pipely_predict_effects` indica i possibili effetti di una scrittura; per update_deal include prudenzialmente gli eventi condizionati a cambiamenti e filtri. `maySendEmail` è true per workflow di invio, false solo quando non ci sono effetti di invio noti, null se un webhook o un elenco incompleto impediscono di escluderli. La configurazione può cambiare dopo la lettura e le scadenze delle attività possono attivare workflow in seguito. Import/upsert applicano la soppressione backend documentata.
+
+## Eventi PCSMail e GoBus
+
+`pipely_upsert_external_event` salva solo metadati e riferimenti, con chiave permanente fonte/ID per organizzazione. Per PCSMail richiede fonte `pcsmail`, account, mailbox, UIDVALIDITY, UID, direzione e timestamp; conserva Message-ID quando presente, destinatario e flag di verifica, stato e riferimento al messaggio. La coppia account/mailbox/UIDVALIDITY/UID impedisce anche una duplicazione tramite un altro ID esterno. Message-ID da solo non è una chiave di fusione. Retry identici e reimport invariati conservano ID e non creano revisioni duplicate; modifiche richiedono versione e conservano una revisione immutabile.
+
+Stati posta: `DRAFT`, `SENT_CONFIRMED`, `UNCERTAIN`, `BOUNCE`, `REPLY_RECEIVED`. L'invio confermato richiede un riferimento di evidenza di invio; un messaggio in Inviati non dimostra consegna. Stati GoBus: `REGISTERED`, `FIRST_SERVICE`, `TRIAL`, `SUBSCRIPTION`, `SUPPORT_REQUEST`; richiedono azienda ed evidenza fornita dal chiamante. Pipely valida i riferimenti e conserva la provenienza, senza verificare autonomamente GoBus o PCSMail. La registrazione non crea note/attività, non invia messaggi e non modifica consensi, profili economici o esclusioni. Un rimbalzo registrato va classificato prima di aggiornare il relativo stato di recapito. `pipely_list_external_events` restituisce eventi paginati e ultime dieci revisioni per evento. Lo schema rifiuta corpo, allegati e campi aggiuntivi; non inserire chiavi o dati passeggeri nei riferimenti o nelle evidenze. Non vengono avviati monitoraggi o sincronizzazioni programmate di account reali.
 
 ## Trasporto e hosting
 

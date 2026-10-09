@@ -231,7 +231,7 @@ describe("connessioni e autenticazione MCP", () => {
     expect(text(settings)).not.toContain(created.key);
     expect(text(settings)).not.toContain(stored.keyHash);
     const client = await connect(created.key);
-    expect((await client.listTools()).tools).toHaveLength(9);
+    expect((await client.listTools()).tools).toHaveLength(15);
     for (const name of [
       "pipely_create_company",
       "pipely_update_company",
@@ -336,7 +336,7 @@ describe("trasporto HTTP e compatibilità", () => {
       request("POST", undefined, { "MCP-Protocol-Version": "2025-11-25" }),
     );
     expect(listed.status).toBe(200);
-    expect((await rpcBody(listed)).result.tools).toHaveLength(22);
+    expect((await rpcBody(listed)).result.tools).toHaveLength(35);
     expect((await handleMcpRequest(request("GET"))).status).toBe(405);
     expect((await handleMcpRequest(request("DELETE"))).status).toBe(405);
   });
@@ -353,9 +353,9 @@ describe("trasporto HTTP e compatibilità", () => {
   });
 });
 describe("tool CRM attraverso il client MCP ufficiale", () => {
-  it("elenca 22 tool e consulta solo l'organizzazione della chiave", async () => {
+  it("elenca 35 tool e consulta solo l'organizzazione della chiave", async () => {
     const client = await connect();
-    expect((await client.listTools()).tools).toHaveLength(22);
+    expect((await client.listTools()).tools).toHaveLength(35);
     const context = await client.callTool({ name: "pipely_get_context", arguments: {} });
     expect(text(context)).toContain("Studio MCP");
     for (const tool of [
@@ -381,7 +381,7 @@ describe("tool CRM attraverso il client MCP ufficiale", () => {
   it("le chiavi di lettura non espongono né eseguono tool di scrittura", async () => {
     await db.mcpToken.update({ where: { id: "mcp-token" }, data: { canWrite: false } });
     const client = await connect();
-    expect((await client.listTools()).tools).toHaveLength(9);
+    expect((await client.listTools()).tools).toHaveLength(15);
     const outcome = await client
       .callTool({ name: "pipely_create_contact", arguments: contactInput })
       .catch((error) => error);
@@ -1035,6 +1035,7 @@ describe("tool CRM attraverso il client MCP ufficiale", () => {
         id: dealId,
         expectedUpdatedAt: receipt(deal).updatedAt,
         status: "WON",
+        acceptanceEvidence: "Accettazione cliente verificata nella fixture",
         value: 30,
       },
     });
