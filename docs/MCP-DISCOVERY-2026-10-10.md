@@ -1,0 +1,40 @@
+# Pipely — discovery MCP e coordinazione GoBus, 10 ottobre 2026
+
+Riferimento: `gobus-pipely-discovery-20261010`. L'utente ha autorizzato esplicitamente in questa chat la coordinazione in sola lettura con «Progettare la crescita AI di GoBus». I messaggi sono stati inviati dopo questa conferma; la precedente richiesta era stata respinta dalla revisione automatica. Nessuna nuova pubblicazione o scrittura nei record reali è stata effettuata durante la diagnosi.
+
+La diagnosi è conclusa: dopo il riavvio di Codex, GoBus vede tutti i 35 strumenti. Le indicazioni «locale/non pubblicata» sotto descrivono lo stato durante la discovery. Successivamente il titolare ha autorizzato il rilascio SMS dopo i controlli: stato aggiornato e risultati in [RILASCIO-SMS-2026-10-10.md](RILASCIO-SMS-2026-10-10.md).
+
+## Evidenze e limiti
+
+- L'ispezione Vercel del 10 ottobre conferma che `www.pipely.it` punta al deployment READY `dpl_ETHP38LRxHHtrzJ2eFAmLt4VuaR1`, URL `https://pipeline-cbhbwiv7t-espeditoai2025-1690s-projects.vercel.app`, creato il 9 ottobre. Il rilascio applicativo MCP 1.4.0 è il commit `5617c6eee967576f7acf7d331b787ddd9ede25af`, seguito dal commit documentale `6f894022010541708df1bd91871721dc89f22ca6`.
+- Il sorgente rilasciato registra 35 strumenti per le chiavi di scrittura e 15 di lettura per le chiavi read-only. Il [collaudo pubblico del 9 ottobre](MCP-PRODUZIONE-GOBUS-OPERATIVITA-2026-10-09.json) aveva verificato 35 strumenti attraverso il client ufficiale e 29 controlli su un'organizzazione sintetica poi rimossa. Questo non è un nuovo `tools/list` autenticato del 10 ottobre.
+- In questa sessione sul computer Pcs Hp non risultano strumenti Pipely nativi né configurazione locale Pipely disponibile. Non è stata creata una nuova chiave per la diagnosi. È stata richiesta alla chat GoBus una verifica sul suo host usando esclusivamente la credenziale già configurata.
+- Il conteggio di 15 strumenti da solo non distingue una chiave read-only dal catalogo 1.1.0: occorrono nomi, versione server e tipo di connessione. Non è ancora accertato se il problema dipenda da sessione, filtri, metadata del plugin o pubblicazione in revisione.
+
+Aggiornamento ricevuto dalla chat GoBus: sul suo host il collegamento è MCP diretto, sezione `[mcp_servers.pipely]`, URL `https://www.pipely.it/api/mcp`, senza `enabled_tools` o `disabled_tools`. Il catalogo nativo include ancora i vecchi strumenti di scrittura `pipely_create_contact`, `pipely_create_company`, `pipely_complete_activity`, ma non `pipely_predict_effects`, `pipely_update_contact`, `pipely_update_activity`: non corrisponde ai 15 strumenti read-only di 1.4.0. GoBus sta eseguendo solo `initialize`/`tools/list` con la credenziale già configurata, senza fixture, dati CRM o pubblicazioni. Il risultato autenticato fresco non è ancora disponibile; non si attribuisce definitivamente la causa alla cache.
+
+**Esito successivo comunicato da GoBus: discovery autenticata completata il 10 ottobre alle 09:08 UTC (11:08 Europe/Rome).** La nuova connessione restituisce server `pipely` versione `1.4.0`, **35 strumenti**, inclusi `pipely_predict_effects` con `readOnly=true`, `pipely_update_contact`, `pipely_update_activity`, `pipely_import_batch`, `pipely_upsert_company`, `pipely_upsert_contact`, `pipely_get_recipient_policy` e `pipely_list_external_events`. Il catalogo nativo della sessione GoBus mantiene invece i 15 vecchi nomi. Con endpoint diretto corretto e assenza di filtri, la discrepanza fra discovery nuova e sessione è confermata: non è necessario un nuovo deploy del server Pipely. La specifica causa interna del client non è stata isolata.
+
+La verifica GoBus ha eseguito soltanto `initialize` e `tools/list`, senza chiamate CRM, fixture o mutazioni. L'evidenza minimale è conservata sul suo host in `C:/Users/AceMagic/.codex/private/pipely-capabilities-latest.json`; il file non è stato letto direttamente da questa chat. Le scritture dipendenti rimangono in coda finché il catalogo nativo non viene aggiornato, senza bypass HTTP. L'estensione SMS 1.4.1 resta locale e non pubblicata.
+
+**Conferma finale GoBus: blocco discovery risolto dopo il riavvio di Codex effettuato dal titolare.** Il catalogo nativo espone ora tutti i 35 strumenti, inclusi previsione effetti, aggiornamenti contatti/attività e import/upsert. Le chiamate native `pipely_get_context` e `pipely_predict_effects` per `update_contact` sono riuscite; GoBus riferisce una preview completa e nessun workflow, webhook o email attualmente previsto per questa operazione. È una fotografia della configurazione corrente, da rileggere prima delle scritture effettive. Non è stata eseguita alcuna mutazione CRM per il test; nessun nuovo deploy necessario. La conferma è stata salvata nel checkpoint GoBus. SMS 1.4.1 resta separato e non pubblicato.
+
+## Verifiche richieste al client GoBus
+
+1. Identificare connessione diretta MCP oppure plugin custom/pubblicato e controllare solo metadata sicuri: URL, abilitazione, `enabled_tools`/`disabled_tools`, nome della variabile del Bearer. Non condividere valori o header di autenticazione.
+2. Eseguire una nuova inizializzazione più `tools/list`, senza chiamate CRM. Lo script [check-mcp-discovery.mjs](../scripts/check-mcp-discovery.mjs) legge una variabile ambiente già presente e usa l'endpoint fisso `https://www.pipely.it/api/mcp`. Espone versione, nomi, annotazioni e campi; gli errori non riportano richieste o credenziali.
+3. Confrontare versione/nomi fra nuova connessione e catalogo nativo. Se la nuova connessione restituisce 1.4.0 con 35 strumenti e il client conserva quelli vecchi, il server pubblico non richiede una reimplementazione: verificare filtri e aggiornamento della connessione. Se restituisce 15 strumenti tutti di lettura, controllare i permessi. Se restituisce un server vecchio, verificare URL e collegamento prima di attribuire l'errore alla cache.
+
+Per MCP diretto, la documentazione Codex indica configurazione e filtri in `config.toml`, e salvataggio più **Restart** del server dalle impostazioni MCP. [Documentazione ufficiale](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
+
+Per una connessione custom ChatGPT, la documentazione indica **Refresh** dei metadata e una nuova conversazione. Questa procedura non conferma lo stato di un plugin pubblicato. [Connessione ChatGPT](https://developers.openai.com/plugins/deploy/connect-chatgpt).
+
+Per plugin pubblicati, i nuovi strumenti possono rimanere indisponibili durante la revisione dell'aggiornamento: controllare lo stato effettivo della pubblicazione. Non è stato osservato lo stato di revisione Pipely da questa chat. [Documentazione pubblicazione](https://developers.openai.com/plugins/deploy/submission).
+
+## Funzioni già disponibili e integrazione locale
+
+`pipely_update_activity` già rilasciato consente soggetto, note, scadenza, durata e associazioni con versione e `requestId`, conservando l'attività. Per modificare il testo della prossima azione nell'attività si usano `subject`/`notes`; il campo dedicato `nextAction` appartiene alla scheda GoBus. Lo storico PCSMail deduplicato è già presente in 1.4.0.
+
+SMS è una lacuna distinta: 1.4.0 accetta solo `PCSMAIL` e `GOBUS`. L'estensione locale 1.4.1 aggiunge metadata SMS Hosting e stati di invio/consegna/revoca/click, con E.164, account provider, chiave esterna permanente, versione e ricevute. I click non sono conversioni; le revoche registrate non cambiano consensi o blacklist. Lo storico non invia e non attiva workflow. Nessuna migrazione DB aggiuntiva; nessun deploy effettuato durante la discovery. [Contratto SMS](MCP.md#storico-sms-141).
+
+Validazione: **50 test passati** nelle due suite MCP/operazioni su database locale in memoria, con dati sintetici e provider simulati; coprono protocollo SDK, deduplicazione, retry, versioni obsolete, identità immutabile, isolamento organizzazioni, evidenze obbligatorie, rifiuto corpi/credenziali/campi aggiuntivi e assenza di effetti automatici. TypeScript ed ESLint senza errori. Lo script diagnostico è stato controllato per sintassi e per rifiuto senza variabile: il probe pubblico autenticato resta da eseguire sul client configurato.

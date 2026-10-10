@@ -560,6 +560,211 @@ describe("operatività GoBus via MCP", () => {
     expect(await db.recipientPolicy.count({ where: { organizationId: org } })).toBe(0);
     expect(await db.workflowQueue.count({ where: { orgId: org } })).toBe(0);
   });
+  it("deduplica SMS, conserva gli esiti verificati e non modifica consensi o automazioni", async () => {
+    const input = s.externalEventWriteSchema.parse({
+      requestId: "sms-create",
+      source: " SMSHosting ",
+      externalId: "fixture-account:event-123",
+      kind: "SMS",
+      state: "SENT_CONFIRMED",
+      direction: "OUTBOUND",
+      occurredAt: "2026-10-01T10:00:00Z",
+      companyId,
+      smsAccountId: "fixture-account",
+      recipient: " +390000000000 ",
+      recipientVerified: true,
+      messageId: "provider-message-123",
+      evidence: "smshosting:fixture:accepted-123",
+      isTest: true,
+    });
+    const made = await events.upsertMcpExternalEvent(context, input);
+    expect((await events.upsertMcpExternalEvent(context, input)).replayed).toBe(true);
+    const repeated = await events.upsertMcpExternalEvent(context, {
+      ...input,
+      requestId: "sms-repeat",
+    });
+    expect(repeated.id).toBe(made.id);
+    expect(repeated.unchanged).toBe(true);
+    const delivery = s.externalEventWriteSchema.parse({
+      ...input,
+      requestId: "sms-delivered",
+      expectedUpdatedAt: made.updatedAt,
+      state: "DELIVERED",
+      evidence: "smshosting:fixture:delivery-receipt-123",
+    });
+    const delivered = await events.upsertMcpExternalEvent(context, delivery);
+    expect(delivered.updatedAt).not.toBe(made.updatedAt);
+    expect((await events.upsertMcpExternalEvent(context, delivery)).replayed).toBe(true);
+    await expect(
+      events.upsertMcpExternalEvent(context, {
+        ...delivery,
+        requestId: "sms-stale",
+        state: "LINK_CLICKED",
+      }),
+    ).rejects.toThrow("Versione");
+    for (const changed of [{ smsAccountId: "another-account" }, { recipient: "+390000000001" }]) {
+      await expect(
+        events.upsertMcpExternalEvent(context, {
+          ...input,
+          ...changed,
+          requestId: `identity-${Object.keys(changed)[0]}`,
+          expectedUpdatedAt: delivered.updatedAt,
+        }),
+      ).rejects.toThrow("identità");
+    }
+    for (const refs of [{ companyId: "ops-company-b" }, { contactId: "ops-contact-b" }]) {
+      await expect(
+        events.upsertMcpExternalEvent(context, {
+          ...input,
+          ...refs,
+          externalId: `foreign-${Object.keys(refs)[0]}`,
+          requestId: `foreign-${Object.keys(refs)[0]}`,
+        }),
+      ).rejects.toThrow("organizzazione");
+    }
+    const other = {
+      organizationId: "ops-b",
+      userId: "ops-owner-b",
+      tokenId: "ops-token-b",
+      canWrite: true,
+    };
+    expect(
+      (await events.upsertMcpExternalEvent(other, { ...input, companyId: "ops-company-b" })).id,
+    ).not.toBe(made.id);
+    const listed = await events.listMcpExternalEvents(
+      context,
+      s.externalEventsReadSchema.parse({ kind: "SMS" }),
+    );
+    expect(listed.data).toHaveLength(1);
+    expect(listed.data[0]).toMatchObject({
+      id: made.id,
+      kind: "SMS",
+      state: "DELIVERED",
+      account: "fixture-account",
+      recipient: "+390000000000",
+    });
+    expect(listed.data[0]?.revisions).toHaveLength(2);
+    await events.upsertMcpExternalEvent(
+      context,
+      s.externalEventWriteSchema.parse({
+        ...input,
+        requestId: "sms-opt-out",
+        externalId: "fixture-account:opt-out-123",
+        state: "OPT_OUT",
+        direction: "INBOUND",
+        evidence: "smshosting:fixture:revocation-123",
+      }),
+    );
+    expect(await db.recipientPolicy.count({ where: { organizationId: org } })).toBe(0);
+    expect(await db.note.count({ where: { companyId } })).toBe(0);
+    expect(await db.activity.count({ where: { organizationId: org } })).toBe(0);
+    expect(await db.workflowQueue.count({ where: { orgId: org } })).toBe(0);
+  });
+  it("serializza reimport SMS concorrenti e rifiuta retry alterati e credenziali revocate", async () => {
+    const input = s.externalEventWriteSchema.parse({
+      requestId: "sms-concurrent-a",
+      source: "smshosting",
+      externalId: "fixture-account:event-concurrent",
+      kind: "SMS",
+      state: "UNCERTAIN",
+      direction: "OUTBOUND",
+      occurredAt: "2026-10-01T10:00:00Z",
+      smsAccountId: "fixture-account",
+      recipient: "+390000000000",
+      companyId,
+    });
+    const [first, second] = await Promise.all([
+      events.upsertMcpExternalEvent(context, input),
+      events.upsertMcpExternalEvent(context, { ...input, requestId: "sms-concurrent-b" }),
+    ]);
+    expect(second.id).toBe(first.id);
+    expect(await db.externalEvent.count({ where: { organizationId: org } })).toBe(1);
+    expect(await db.externalEventRevision.count({ where: { eventId: first.id } })).toBe(1);
+    await expect(
+      events.upsertMcpExternalEvent(context, {
+        ...input,
+        evidence: "Changed data with reused requestId",
+      }),
+    ).rejects.toThrow("requestId");
+    await db.mcpToken.update({ where: { id: context.tokenId }, data: { revokedAt: new Date() } });
+    await expect(events.upsertMcpExternalEvent(context, input)).rejects.toThrow("chiave");
+    await expect(
+      events.upsertMcpExternalEvent(context, {
+        ...input,
+        requestId: "sms-after-revoke",
+        externalId: "fixture-account:revoked",
+      }),
+    ).rejects.toThrow("chiave");
+    expect(await db.externalEvent.count({ where: { organizationId: org } })).toBe(1);
+    expect(await db.externalEventRevision.count({ where: { eventId: first.id } })).toBe(1);
+  });
+  it("rifiuta SMS senza evidenza o con dati incompatibili e conserva la validazione degli altri canali", () => {
+    const input = {
+      requestId: "sms-validate",
+      source: "smshosting",
+      externalId: "fixture:event",
+      kind: "SMS",
+      state: "DELIVERED",
+      direction: "OUTBOUND",
+      occurredAt: "2026-10-01T10:00:00Z",
+      smsAccountId: "fixture",
+      recipient: "+390000000000",
+      messageId: "fixture-message",
+      evidence: "fixture:delivery-receipt",
+    };
+    expect(s.externalEventWriteSchema.safeParse(input).success).toBe(true);
+    for (const invalid of [
+      { evidence: undefined },
+      { messageId: undefined },
+      { smsAccountId: undefined },
+      { recipient: "00000000000" },
+      { recipient: "client@example.test" },
+      { direction: "NONE" },
+      { direction: "INBOUND" },
+      { state: "BOUNCE" },
+      { state: "REGISTERED" },
+      { source: "pcsmail" },
+      { account: "info@example.test" },
+      { mailbox: "Sent" },
+      { uid: "35" },
+      { uidValidity: "17" },
+      { body: "Corpo vietato" },
+      { attachments: [] },
+      { apiKey: "fixture-secret" },
+      { passengers: [{ name: "Fixture" }] },
+    ]) {
+      expect(
+        s.externalEventWriteSchema.safeParse({ ...input, ...invalid }).success,
+        JSON.stringify(Object.keys(invalid)),
+      ).toBe(false);
+    }
+    expect(
+      s.externalEventWriteSchema.safeParse({
+        ...input,
+        kind: "PCSMAIL",
+        state: "SENT_CONFIRMED",
+        source: "pcsmail",
+        smsAccountId: undefined,
+        account: "info@example.test",
+        mailbox: "Sent",
+        uidValidity: "17",
+        uid: "35",
+      }).success,
+    ).toBe(false);
+    expect(
+      s.externalEventWriteSchema.safeParse({
+        ...input,
+        kind: "GOBUS",
+        state: "FIRST_SERVICE",
+        source: "gobus",
+        companyId,
+        direction: "NONE",
+        smsAccountId: undefined,
+        recipient: undefined,
+        messageId: undefined,
+      }).success,
+    ).toBe(true);
+  });
   it("richiede evidenze GoBus e non duplica eventi, note o attività nei retry", async () => {
     const input = s.externalEventWriteSchema.parse({
       requestId: "first-service",

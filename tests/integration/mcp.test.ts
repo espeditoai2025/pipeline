@@ -771,6 +771,62 @@ describe("tool CRM attraverso il client MCP ufficiale", () => {
     expect(mocks.wake).not.toHaveBeenCalled();
     expect(mocks.after).not.toHaveBeenCalled();
   });
+  it("espone SMS nel catalogo e registra lo storico tramite SDK senza avviare invii", async () => {
+    const client = await connect();
+    const catalog = await client.listTools();
+    expect(catalog.tools).toHaveLength(35);
+    const tool = catalog.tools.find((row) => row.name === "pipely_upsert_external_event");
+    expect(tool?.inputSchema.properties).toHaveProperty("smsAccountId");
+    const input = {
+      requestId: "sdk-sms-create",
+      source: "smshosting",
+      externalId: "fixture:delivery-123",
+      kind: "SMS",
+      state: "DELIVERED",
+      direction: "OUTBOUND",
+      smsAccountId: "fixture-account",
+      recipient: "+390000000000",
+      recipientVerified: true,
+      occurredAt: "2026-10-01T10:00:00Z",
+      companyId: "mcp-company-a",
+      messageId: "fixture-provider-123",
+      evidence: "fixture:delivery-receipt-123",
+      isTest: true,
+    };
+    const first = await client.callTool({ name: "pipely_upsert_external_event", arguments: input });
+    expect(first.isError, text(first)).not.toBe(true);
+    const repeated = await client.callTool({
+      name: "pipely_upsert_external_event",
+      arguments: input,
+    });
+    expect(receipt(repeated)).toMatchObject({ id: receipt(first).id, replayed: true });
+    expect(
+      (
+        await client.callTool({
+          name: "pipely_upsert_external_event",
+          arguments: {
+            ...input,
+            requestId: "sms-no-evidence",
+            externalId: "fixture:invalid",
+            evidence: undefined,
+          },
+        })
+      ).isError,
+    ).toBe(true);
+    const listed = await client.callTool({
+      name: "pipely_list_external_events",
+      arguments: { kind: "SMS" },
+    });
+    expect(listed.structuredContent).toMatchObject({
+      data: [{ id: receipt(first).id, state: "DELIVERED", account: "fixture-account" }],
+      meta: { total: 1 },
+    });
+    expect(await db.externalEventRevision.count()).toBe(1);
+    expect(await db.workflowQueue.count({ where: { orgId } })).toBe(0);
+    expect(await db.webhookDelivery.count()).toBe(0);
+    expect(mocks.wake).not.toHaveBeenCalled();
+    expect(mocks.after).not.toHaveBeenCalled();
+  });
   it("importa lo stesso lotto senza duplicati e recupera la ricevuta dopo un retry", async () => {
     const client = await connect();
     const input = {

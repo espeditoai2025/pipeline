@@ -394,7 +394,7 @@ export const externalEventWriteSchema = z
     source: externalSource,
     externalId,
     expectedUpdatedAt: expectedUpdatedAt.optional(),
-    kind: z.enum(["PCSMAIL", "GOBUS"]),
+    kind: z.enum(["PCSMAIL", "GOBUS", "SMS"]),
     state: z.enum([
       "DRAFT",
       "SENT_CONFIRMED",
@@ -406,14 +406,27 @@ export const externalEventWriteSchema = z
       "TRIAL",
       "SUBSCRIPTION",
       "SUPPORT_REQUEST",
+      "DELIVERED",
+      "DELIVERY_FAILED",
+      "OPT_OUT",
+      "LINK_CLICKED",
     ]),
     direction: z.enum(["INBOUND", "OUTBOUND", "NONE"]),
     occurredAt: dateTime,
     companyId: id.nullable().optional(),
     contactId: id.nullable().optional(),
-    recipient: optionalCompanyEmail,
+    recipient: normalizedEmail
+      .or(
+        z
+          .string()
+          .trim()
+          .regex(/^\+[1-9]\d{7,14}$/, "Numero internazionale E.164 non valido"),
+      )
+      .nullable()
+      .optional(),
     recipientVerified: z.boolean().default(false),
     account: normalizedEmail.optional(),
+    smsAccountId: text(200).optional(),
     mailbox: text(200).optional(),
     uidValidity: z
       .string()
@@ -434,7 +447,61 @@ export const externalEventWriteSchema = z
     const mail = ["DRAFT", "SENT_CONFIRMED", "UNCERTAIN", "BOUNCE", "REPLY_RECEIVED"].includes(
       v.state,
     );
-    if ((v.kind === "PCSMAIL") !== mail) fail("Stato incompatibile con la fonte");
+    const gobus = [
+      "REGISTERED",
+      "FIRST_SERVICE",
+      "TRIAL",
+      "SUBSCRIPTION",
+      "SUPPORT_REQUEST",
+    ].includes(v.state);
+    const sms = [
+      "DRAFT",
+      "SENT_CONFIRMED",
+      "UNCERTAIN",
+      "REPLY_RECEIVED",
+      "DELIVERED",
+      "DELIVERY_FAILED",
+      "OPT_OUT",
+      "LINK_CLICKED",
+    ].includes(v.state);
+    if (
+      (v.kind === "PCSMAIL" && !mail) ||
+      (v.kind === "GOBUS" && !gobus) ||
+      (v.kind === "SMS" && !sms)
+    )
+      fail("Stato incompatibile con la fonte");
+    if (v.kind !== "SMS" && v.recipient && !normalizedEmail.safeParse(v.recipient).success)
+      fail("Questo canale richiede un indirizzo email");
+    if (v.kind !== "SMS" && v.smsAccountId) fail("smsAccountId è ammesso soltanto per SMS");
+    if (v.kind === "SMS") {
+      if (v.source !== "smshosting") fail("La fonte SMS deve essere smshosting");
+      if (
+        !v.smsAccountId ||
+        !v.recipient ||
+        !/^\+[1-9]\d{7,14}$/.test(v.recipient) ||
+        v.direction === "NONE"
+      )
+        fail("SMS: servono account provider, destinatario E.164 e direzione");
+      if ([v.account, v.mailbox, v.uidValidity, v.uid].some(Boolean))
+        fail("Gli identificativi IMAP non sono ammessi per SMS");
+      if (
+        ["SENT_CONFIRMED", "DELIVERED", "DELIVERY_FAILED", "OPT_OUT", "LINK_CLICKED"].includes(
+          v.state,
+        ) &&
+        !v.evidence
+      )
+        fail("L'esito SMS richiede un riferimento di evidenza del provider");
+      if (
+        ["SENT_CONFIRMED", "DELIVERED", "DELIVERY_FAILED", "LINK_CLICKED"].includes(v.state) &&
+        !v.messageId
+      )
+        fail("L'esito SMS richiede l'ID del messaggio nel provider");
+      if (
+        ["DELIVERED", "DELIVERY_FAILED", "LINK_CLICKED"].includes(v.state) &&
+        v.direction !== "OUTBOUND"
+      )
+        fail("Esiti e click SMS richiedono OUTBOUND");
+    }
     if (
       v.kind === "PCSMAIL" &&
       (!v.account || !v.mailbox || !v.uidValidity || !v.uid || v.direction === "NONE")
@@ -463,7 +530,7 @@ export const externalEventsReadSchema = pageSchema.extend({
   source: externalSource.optional(),
   companyId: id.optional(),
   contactId: id.optional(),
-  kind: z.enum(["PCSMAIL", "GOBUS"]).optional(),
+  kind: z.enum(["PCSMAIL", "GOBUS", "SMS"]).optional(),
 });
 export const createTokenSchema = z
   .object({

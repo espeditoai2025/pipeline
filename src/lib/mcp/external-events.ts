@@ -31,7 +31,19 @@ export async function upsertMcpExternalEvent(
                 ]),
               )
               .digest("hex")
-          : null;
+          : input.kind === "SMS"
+            ? createHash("sha256")
+                .update(
+                  JSON.stringify([
+                    input.kind,
+                    input.source,
+                    input.smsAccountId,
+                    input.externalId,
+                    input.recipient,
+                  ]),
+                )
+                .digest("hex")
+            : null;
       const before = await tx.externalEvent.findFirst({
         where: {
           organizationId: c.organizationId,
@@ -52,8 +64,13 @@ export async function upsertMcpExternalEvent(
             `Messaggio già collegato all'evento ${sameMessage.id}; usa il suo ID esterno, nessuna fusione automatica`,
           );
       }
-      const fields = omit(input, "requestId", "expectedUpdatedAt");
-      const data = { ...fields, occurredAt: new Date(input.occurredAt), identityKey };
+      const fields = omit(input, "requestId", "expectedUpdatedAt", "smsAccountId");
+      const data = {
+        ...fields,
+        ...(input.kind === "SMS" && { account: input.smsAccountId }),
+        occurredAt: new Date(input.occurredAt),
+        identityKey,
+      };
       if (before) {
         if (before.kind !== input.kind || before.identityKey !== identityKey)
           throw new CrmError("L'identità dell'evento non può cambiare");
@@ -118,6 +135,6 @@ export async function listMcpExternalEvents(
     data,
     meta: { total, page: input.page, perPage: input.perPage },
     instructions:
-      "Eventi deduplicati senza note, attività, webhook o invii automatici. SENT_CONFIRMED attesta l'invio verificato, non la consegna. Rimbalzi e risposte non modificano consensi o esclusioni. Sono accettati solo riferimenti e metadati: niente corpo, allegati, chiavi o dati passeggeri.",
+      "Eventi PCSMail, GoBus e SMS deduplicati senza note, attività, webhook o invii. SENT_CONFIRMED attesta l'invio, non la consegna; DELIVERED richiede evidenza del provider SMS. LINK_CLICKED non prova una conversione. Eventi e revoche non modificano consensi o esclusioni: quelle SMS restano nel provider e nel registro del canale, separate dalle email. Per SMS account è l'ID dell'account provider. Solo metadati e riferimenti: niente corpi, allegati, chiavi o dati passeggeri.",
   };
 }
