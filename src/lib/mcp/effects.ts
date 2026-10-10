@@ -75,6 +75,8 @@ const events: Record<string, { triggers: string[]; hooks: string[] }> = {
     hooks: ["deal.updated", "deal.won", "deal.lost", "deal.stage_changed"],
   },
   create_activity: { triggers: ["ACTIVITY_OVERDUE"], hooks: ["activity.created"] },
+  // updateMcpActivity does not enqueue effects; the overdue scanner can enqueue later.
+  update_activity: { triggers: ["ACTIVITY_OVERDUE"], hooks: [] },
   complete_activity: { triggers: [], hooks: ["activity.completed"] },
 };
 export async function predictMcpEffects(c: McpContext, input: z.infer<typeof s.effectsSchema>) {
@@ -101,6 +103,6 @@ export async function predictMcpEffects(c: McpContext, input: z.infer<typeof s.e
     externalEffectsPossible: hooks.length > 0,
     complete: silent || (!cfg.truncated.workflows && !cfg.truncated.webhooks),
     instructions:
-      "Previsione prudente, non garanzia: update_deal dipende dai campi modificati e filtri delle fasi; la configurazione può cambiare. Un webhook può causare effetti esterni. Un'attività scaduta può avviare ACTIVITY_OVERDUE in seguito. Per un import senza invii usa upsert/import_batch: soppressione backend. Le esclusioni vengono ricontrollate al momento dell'invio.",
+      "Previsione prudente, non garanzia: update_deal dipende dai campi modificati e filtri delle fasi; la configurazione può cambiare. Un webhook può causare effetti esterni. update_activity non accoda workflow/webhook né invia email direttamente: i workflow ACTIVITY_OVERDUE indicati sono possibili in una scansione successiva per attività aperte con scadenza idonea, anche dopo una ripianificazione. La previsione riguarda il tipo di operazione, non una specifica attività o nuova scadenza. Per un import senza invii usa upsert/import_batch: soppressione backend. Le esclusioni vengono ricontrollate al momento dell'invio.",
   };
 }

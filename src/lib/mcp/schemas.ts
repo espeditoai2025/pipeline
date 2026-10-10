@@ -380,6 +380,7 @@ export const effectsSchema = z
       "create_deal",
       "update_deal",
       "create_activity",
+      "update_activity",
       "complete_activity",
       "create_note",
       "upsert_company",

@@ -48,6 +48,9 @@ try {
         endpoint: "https://www.pipely.it/api/mcp",
         server: client.getServerVersion(),
         count: catalog.length,
+        predictionOperations:
+          catalog.find((tool) => tool.name === "pipely_predict_effects")?.inputSchema.properties
+            ?.operation?.enum ?? [],
         readOnly: catalog.filter((tool) => tool.annotations?.readOnlyHint === true).length,
         names: catalog.map((tool) => tool.name).sort(),
         externalEvents: {

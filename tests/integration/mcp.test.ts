@@ -296,6 +296,45 @@ describe("connessioni e autenticazione MCP", () => {
   });
 });
 describe("trasporto HTTP e compatibilità", () => {
+  it("espone e accetta predict update_activity anche con chiave di sola lettura, preservando create_activity", async () => {
+    await db.mcpToken.update({ where: { id: "mcp-token" }, data: { canWrite: false } });
+    const client = await connect();
+    expect(client.getServerVersion()?.version).toBe("1.4.2");
+    const catalog = await client.listTools();
+    expect(catalog.tools).toHaveLength(15);
+    const schema = catalog.tools.find((t) => t.name === "pipely_predict_effects")?.inputSchema;
+    expect(schema?.properties?.operation).toMatchObject({
+      enum: expect.arrayContaining(["update_activity", "create_activity", "complete_activity"]),
+    });
+    const predicted = await client.callTool({
+      name: "pipely_predict_effects",
+      arguments: { operation: "update_activity" },
+    });
+    expect(predicted.isError).not.toBe(true);
+    expect(predicted.structuredContent).toMatchObject({
+      operation: "update_activity",
+      possibleWorkflows: [],
+      possibleWebhooks: [],
+      maySendEmail: false,
+      complete: true,
+    });
+    const created = await client.callTool({
+      name: "pipely_predict_effects",
+      arguments: { operation: "create_activity" },
+    });
+    expect(created.isError).not.toBe(true);
+    expect(created.structuredContent).toMatchObject({
+      possibleWebhooks: [expect.objectContaining({ id: "mcp-hook" })],
+      maySendEmail: null,
+    });
+    const unknown = await client.callTool({
+      name: "pipely_predict_effects",
+      arguments: { operation: "unsupported" },
+    });
+    expect(unknown.isError).toBe(true);
+    expect(await db.mcpOperation.count({ where: { organizationId: orgId } })).toBe(0);
+    expect(await db.activity.count({ where: { organizationId: orgId } })).toBe(0);
+  });
   it("CORS solo per origini autorizzate e nessun redirect a login", async () => {
     const preflight = await handleMcpRequest(
       request("OPTIONS", undefined, { Origin: "http://localhost:3000" }),

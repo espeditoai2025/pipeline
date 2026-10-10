@@ -3,12 +3,15 @@ import { db, startDatabase, closeDatabase } from "./database";
 vi.mock("@/lib/db", async () => await import("./database"));
 vi.mock("next/server", () => ({ after: vi.fn() }));
 vi.mock("@/lib/workflow-wake", () => ({ wakeWorkflows: vi.fn() }));
+vi.mock("@/lib/mailer", () => ({ sendOrgMail: vi.fn() }));
 import * as crm from "@/lib/mcp/crm";
 import * as ops from "@/lib/mcp/operations";
 import * as gobus from "@/lib/mcp/gobus";
 import * as effects from "@/lib/mcp/effects";
 import * as events from "@/lib/mcp/external-events";
 import * as s from "@/lib/mcp/schemas";
+import { enqueueOverdueActivities } from "@/lib/workflow-engine";
+import { sendOrgMail } from "@/lib/mailer";
 const org = "ops-a",
   companyId = "ops-company-a";
 const context = {
@@ -20,6 +23,7 @@ const context = {
 beforeAll(startDatabase);
 afterAll(closeDatabase);
 beforeEach(async () => {
+  vi.clearAllMocks();
   await db.organization.deleteMany({ where: { id: { in: ["ops-a", "ops-b"] } } });
   for (const suffix of ["a", "b"]) {
     await db.organization.create({
@@ -422,6 +426,146 @@ describe("operatività GoBus via MCP", () => {
         }),
       ),
     ).rejects.toThrow("organizzazione");
+  });
+  it("prevede update_activity senza confondere webhook, workflow inattivi o altre organizzazioni", async () => {
+    await db.workflow.createMany({
+      data: [
+        {
+          organizationId: org,
+          name: "Inattivo",
+          isActive: false,
+          trigger: { type: "ACTIVITY_OVERDUE" },
+          steps: [],
+        },
+        {
+          organizationId: "ops-b",
+          name: "Altra organizzazione",
+          isActive: true,
+          trigger: { type: "ACTIVITY_OVERDUE" },
+          steps: [
+            { id: "mail", action: { type: "SEND_EMAIL", to: "owner", templateId: "fixture" } },
+          ],
+        },
+      ],
+    });
+    await db.webhook.create({
+      data: {
+        organizationId: org,
+        name: "Attività",
+        isActive: true,
+        url: "https://example.test/never-deliver",
+        secret: "fixture",
+        events: ["activity.created", "activity.completed", "activity.updated"],
+      },
+    });
+    const predicted = await effects.predictMcpEffects(
+      context,
+      s.effectsSchema.parse({ operation: "update_activity" }),
+    );
+    expect(predicted).toMatchObject({
+      operation: "update_activity",
+      possibleWorkflows: [],
+      possibleWebhooks: [],
+      maySendEmail: false,
+      externalEffectsPossible: false,
+      complete: true,
+    });
+    expect(await db.mcpOperation.count({ where: { organizationId: org } })).toBe(0);
+    expect(await db.workflowQueue.count({ where: { orgId: org } })).toBe(0);
+    expect(await db.webhookDelivery.count()).toBe(0);
+  });
+  it("prevede l'email futura di una ripianificazione, senza effetti immediati o invii nel test", async () => {
+    const workflow = await db.workflow.create({
+      data: {
+        organizationId: org,
+        name: "Scadenza",
+        isActive: true,
+        trigger: { type: "ACTIVITY_OVERDUE" },
+        steps: [{ id: "mail", action: { type: "SEND_EMAIL", to: "owner", templateId: "fixture" } }],
+      },
+    });
+    const future = new Date(Date.now() + 86_400_000);
+    const activity = await db.activity.create({
+      data: {
+        organizationId: org,
+        userId: context.userId,
+        type: "TASK",
+        subject: "Fixture",
+        dueDate: future,
+        workflowOverdueAt: future,
+      },
+    });
+    const prediction = await effects.predictMcpEffects(context, { operation: "update_activity" });
+    expect(prediction.possibleWorkflows.map((w) => w.id)).toEqual([workflow.id]);
+    expect(prediction).toMatchObject({ possibleWebhooks: [], maySendEmail: true, complete: true });
+    expect(prediction.instructions).toContain("scansione successiva");
+    const past = new Date(Date.now() - 60_000).toISOString();
+    await ops.updateMcpActivity(
+      context,
+      s.updateActivitySchema.parse({
+        requestId: "predicted-reschedule",
+        id: activity.id,
+        expectedUpdatedAt: activity.updatedAt.toISOString(),
+        dueDate: past,
+      }),
+    );
+    expect(
+      (await db.activity.findUniqueOrThrow({ where: { id: activity.id } })).workflowOverdueAt,
+    ).toBeNull();
+    expect(await db.workflowQueue.count({ where: { orgId: org } })).toBe(0);
+    expect(await db.webhookDelivery.count()).toBe(0);
+    expect(await enqueueOverdueActivities()).toBe(1);
+    const jobs = await db.workflowQueue.findMany({ where: { orgId: org } });
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]).toMatchObject({
+      workflowId: workflow.id,
+      payload: {
+        trigger: "ACTIVITY_OVERDUE",
+        activityId: activity.id,
+        dueDate: past,
+      },
+    });
+    expect(await enqueueOverdueActivities()).toBe(0);
+    expect(sendOrgMail).not.toHaveBeenCalled();
+  });
+  it("non promette assenza di email per update_activity con configurazione troncata", async () => {
+    await db.workflow.createMany({
+      data: Array.from({ length: 101 }, (_, n) => ({
+        organizationId: org,
+        name: `Workflow ${n}`,
+        isActive: true,
+        trigger: { type: "CONTACT_CREATED" },
+        steps: [],
+      })),
+    });
+    expect(
+      await effects.predictMcpEffects(context, { operation: "update_activity" }),
+    ).toMatchObject({
+      possibleWorkflows: [],
+      possibleWebhooks: [],
+      maySendEmail: null,
+      complete: false,
+    });
+  });
+  it("esclude i workflow di scadenza disabilitati dal piano nella previsione dell'aggiornamento", async () => {
+    await db.workflow.create({
+      data: {
+        organizationId: org,
+        name: "Scadenza",
+        isActive: true,
+        trigger: { type: "ACTIVITY_OVERDUE" },
+        steps: [{ id: "mail", action: { type: "SEND_EMAIL", to: "owner", templateId: "fixture" } }],
+      },
+    });
+    await db.organization.update({ where: { id: org }, data: { plan: "FREE" } });
+    expect(
+      await effects.predictMcpEffects(context, { operation: "update_activity" }),
+    ).toMatchObject({
+      possibleWorkflows: [],
+      possibleWebhooks: [],
+      maySendEmail: false,
+      complete: true,
+    });
   });
   it("legge effetti senza segreti e distingue email possibili da import senza invii", async () => {
     await db.workflow.create({
