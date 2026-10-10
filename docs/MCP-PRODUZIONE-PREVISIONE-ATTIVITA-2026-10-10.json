@@ -1,0 +1,69 @@
+{
+  "checkedAt": "2026-10-10T14:41:09.126Z",
+  "endpoint": "https://www.pipely.it/api/mcp",
+  "crmCalls": 0,
+  "syntheticFixtures": false,
+  "checks": [
+    {
+      "name": "missingBearerPost",
+      "expected": 401,
+      "status": 401,
+      "cache": "private, no-store",
+      "cors": null,
+      "passed": true
+    },
+    {
+      "name": "missingBearerGet",
+      "expected": 401,
+      "status": 401,
+      "cache": "private, no-store",
+      "cors": null,
+      "passed": true
+    },
+    {
+      "name": "invalidBearer",
+      "expected": 401,
+      "status": 401,
+      "cache": "private, no-store",
+      "cors": null,
+      "passed": true
+    },
+    {
+      "name": "untrustedOrigin",
+      "expected": 403,
+      "status": 403,
+      "cache": "private, no-store",
+      "cors": null,
+      "passed": true
+    },
+    {
+      "name": "allowedPreflight",
+      "expected": 204,
+      "status": 204,
+      "cache": "private, no-store",
+      "cors": "https://www.pipely.it",
+      "passed": true
+    }
+  ],
+  "deployment": {
+    "id": "dpl_C97GDdx2wAoZa461PS6WNrjh6cQL",
+    "url": "pipeline-h2c2vxmxu-espeditoai2025-1690s-projects.vercel.app",
+    "readyState": "READY",
+    "commit": "fded46a6677c0d4e5aef01b068a69a933fb201ee",
+    "aliases": [
+      "www.pipely.it",
+      "pipeline-ecru-psi.vercel.app",
+      "pipely.it",
+      "pipeline-espeditoai2025-1690s-projects.vercel.app",
+      "pipeline-git-main-espeditoai2025-1690s-projects.vercel.app"
+    ],
+    "createdAt": 1791643055027,
+    "verifiedAt": "2026-10-10T14:41:37.2824472Z"
+  },
+  "authenticatedPrediction": {
+    "status": "requested",
+    "sourceThreadId": "01a120e9-fda2-73b2-928b-b7714392b648",
+    "operation": "update_activity",
+    "crmWrites": 0
+  }
+}

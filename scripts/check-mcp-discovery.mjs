@@ -1,4 +1,4 @@
-// Read-only metadata probe. Never calls CRM tools or creates credentials/fixtures.
+// Read-only probe. Optional effects prediction; never writes CRM or creates credentials/fixtures.
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 
 const envName = process.argv[2];
@@ -30,6 +30,33 @@ try {
     catalog.push(...page.tools);
     cursor = page.nextCursor;
   } while (cursor);
+  let updateActivityPrediction;
+  if (process.argv[3] === "--predict-update-activity") {
+    const predictor = catalog.find((tool) => tool.name === "pipely_predict_effects");
+    const supported = predictor?.inputSchema.properties?.operation?.enum ?? [];
+    if (predictor?.annotations?.readOnlyHint !== true || !supported.includes("update_activity"))
+      throw new Error("Previsione in sola lettura non disponibile nel catalogo corrente.");
+    const prediction = await client.callTool(
+      { name: "pipely_predict_effects", arguments: { operation: "update_activity" } },
+      { timeout: 15000 },
+    );
+    if (prediction.isError || !prediction.structuredContent)
+      throw new Error("Previsione non completata.");
+    const value = prediction.structuredContent;
+    updateActivityPrediction = {
+      operation: value.operation,
+      possibleWorkflowCount: Array.isArray(value.possibleWorkflows)
+        ? value.possibleWorkflows.length
+        : null,
+      possibleWebhookCount: Array.isArray(value.possibleWebhooks)
+        ? value.possibleWebhooks.length
+        : null,
+      maySendEmail: value.maySendEmail,
+      externalEffectsPossible: value.externalEffectsPossible,
+      complete: value.complete,
+      instructions: value.instructions,
+    };
+  }
   const watched = [
     "pipely_predict_effects",
     "pipely_update_contact",
@@ -48,6 +75,7 @@ try {
         endpoint: "https://www.pipely.it/api/mcp",
         server: client.getServerVersion(),
         count: catalog.length,
+        updateActivityPrediction,
         predictionOperations:
           catalog.find((tool) => tool.name === "pipely_predict_effects")?.inputSchema.properties
             ?.operation?.enum ?? [],
