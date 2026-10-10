@@ -1,0 +1,75 @@
+{
+  "checkedAt": "2026-10-10T09:45:44.285Z",
+  "endpoint": "https://www.pipely.it/api/mcp",
+  "crmCalls": 0,
+  "syntheticFixtures": false,
+  "checks": [
+    {
+      "name": "missingBearerPost",
+      "expected": 401,
+      "status": 401,
+      "cache": "private, no-store",
+      "cors": null,
+      "passed": true
+    },
+    {
+      "name": "missingBearerGet",
+      "expected": 401,
+      "status": 401,
+      "cache": "private, no-store",
+      "cors": null,
+      "passed": true
+    },
+    {
+      "name": "invalidBearer",
+      "expected": 401,
+      "status": 401,
+      "cache": "private, no-store",
+      "cors": null,
+      "passed": true
+    },
+    {
+      "name": "untrustedOrigin",
+      "expected": 403,
+      "status": 403,
+      "cache": "private, no-store",
+      "cors": null,
+      "passed": true
+    },
+    {
+      "name": "allowedPreflight",
+      "expected": 204,
+      "status": 204,
+      "cache": "private, no-store",
+      "cors": "https://www.pipely.it",
+      "passed": true
+    }
+  ],
+  "release": {
+    "applicationCommit": "6b7c7148bee0030c6c57db3dc1670c5b80af1bc0",
+    "publishedCommit": "1b4bc7bf55752cb86eb1625496991d856bd2c802",
+    "deploymentId": "dpl_29iMGM2SoveKoqDTnpxW2hqGUpoW",
+    "deploymentUrl": "https://pipeline-q1l7zu4rc-espeditoai2025-1690s-projects.vercel.app",
+    "status": "READY",
+    "verifiedGitCommit": "1b4bc7bf55752cb86eb1625496991d856bd2c802",
+    "verifiedGitRef": "main",
+    "aliases": [
+      "https://www.pipely.it",
+      "https://pipely.it"
+    ]
+  },
+  "localValidation": {
+    "unitTests": 187,
+    "integrationTests": 110,
+    "typeScript": "passed",
+    "eslint": "passed",
+    "build": "passed",
+    "pages": 113
+  },
+  "authenticatedMetadata": {
+    "status": "pending",
+    "expectedVersion": "1.4.1",
+    "host": "GoBus existing connection",
+    "crmCalls": 0
+  }
+}

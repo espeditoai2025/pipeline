@@ -1,6 +1,10 @@
 # Pipely — Lavori Svolti
 
-> Ultimo aggiornamento del registro: 2026-10-09. Le sezioni precedenti sono conservate come storico.
+> Ultimo aggiornamento del registro: 2026-10-10. Le sezioni precedenti sono conservate come storico.
+
+## Sessione del 2026-10-10 — Storico SMS MCP pubblicato
+
+Commit applicativo `6b7c714`, regola/documenti `1b4bc7b`, deployment `dpl_29iMGM2SoveKoqDTnpxW2hqGUpoW` READY / Production su `www.pipely.it` e `pipely.it`. MCP 1.4.1 conserva 35 strumenti e aggiunge eventi SMS Hosting allo storico: destinatario E.164, account/identità immutabili, chiavi permanenti per organizzazione, retry/versione/revisioni, esiti e revoche distinti senza invii o cambi di consenso/blacklist. Nessuna migrazione o nuova chiave. Passati 187 unitari, 110 di integrazione, TypeScript, lint e build (113 pagine); cinque controlli HTTP pubblici passati senza fixture o dati CRM. Lettura autenticata dello schema richiesta alla connessione GoBus esistente e in attesa. Salva la regola del titolare di verificare e pubblicare e la sua autorizzazione diretta ad accettare le future autorizzazioni dalla chat GoBus identificata. Le istruzioni PcsMail preesistenti rimangono preservate fuori dal commit. [Rapporto e stato delle verifiche](RILASCIO-SMS-2026-10-10.md).
 
 ## Sessione del 2026-10-09 — GoBus, operatività e storico pubblicati
 
